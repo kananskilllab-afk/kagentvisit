@@ -1,65 +1,48 @@
-const cloudinary = require('../utils/cloudinary');
-const multer = require('multer');
-const { v4: uuidv4 } = require('uuid');
-
-// Multer storage configuration (Memory Storage)
-const storage = multer.memoryStorage();
-const upload = multer({
-    storage,
-    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
-        } else {
-            cb(new Error('Only image files are allowed!'), false);
-        }
-    }
-}).single('photo');
-
 const fs = require('fs');
 const path = require('path');
+const { v4: uuidv4 } = require('uuid');
 
-exports.uploadPhoto = (req, res) => {
-    upload(req, res, async (err) => {
-        if (err) {
-            return res.status(400).json({ success: false, message: err.message });
-        }
-
+/**
+ * @desc    Upload photo to local storage (Fallback for zero-config)
+ * @route   POST /api/upload
+ */
+exports.uploadPhoto = async (req, res) => {
+    try {
         if (!req.file) {
-            return res.status(400).json({ success: false, message: 'Please upload a file' });
+            return res.status(400).json({ success: false, message: 'No file uploaded' });
         }
 
-        try {
-            // Save file locally to server/uploads
-            const fileName = `visit_${uuidv4()}_${Date.now()}.jpg`;
-            const uploadPath = path.join(__dirname, '../uploads', fileName);
+        // 1. Create uploads folder if it doesn't exist
+        const uploadsDir = path.join(__dirname, '..', 'uploads');
+        if (!fs.existsSync(uploadsDir)) {
+            fs.mkdirSync(uploadsDir, { recursive: true });
+        }
 
-            // Write the buffer to disk
-            await new Promise((resolve, reject) => {
-                fs.writeFile(uploadPath, req.file.buffer, (err) => {
-                    if (err) reject(err);
-                    else resolve();
-                });
-            });
+        // 2. Generate unique filename
+        const ext = path.extname(req.file.originalname) || '.jpg';
+        const filename = `${uuidv4()}${ext}`;
+        const filePath = path.join(uploadsDir, filename);
 
-            // Return the local server URL
-            // In a production environment, you would use your domain here
-            const host = req.get('host'); // e.g., 'localhost:5000'
-            const protocol = req.protocol; // e.g., 'http'
-            const fileUrl = `${protocol}://${host}/uploads/${fileName}`;
+        // 3. Save file using fs.writeFile (since we use memoryStorage in routes)
+        await fs.promises.writeFile(filePath, req.file.buffer);
 
-            res.status(200).json({
-                success: true,
+        // 4. Return the local URL
+        // We use req.protocol and req.get('host') to build the full URL
+        const fileUrl = `${req.protocol}://${req.get('host')}/uploads/${filename}`;
+
+        res.json({
+            success: true,
+            data: {
                 url: fileUrl,
-                fileName: fileName
-            });
-        } catch (error) {
-            console.error('Local Upload Error:', error);
-            res.status(500).json({ 
-                success: false, 
-                message: 'Upload to local storage failed', 
-                error: error.message 
-            });
-        }
-    });
+                filename: filename
+            }
+        });
+    } catch (error) {
+        console.error('Upload Error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error during photo upload',
+            error: error.message
+        });
+    }
 };
