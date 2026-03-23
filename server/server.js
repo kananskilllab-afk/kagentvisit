@@ -17,7 +17,24 @@ const app = express();
 // Connect to Database
 mongoose.connect(process.env.MONGODB_URI)
     .then(async () => {
-        console.log('MongoDB Connected');
+        console.log('MongoDB Connected...');
+        
+        // Final bootstrap – Ensure at least one superadmin exists if DB is clean
+        const User = require('./models/User');
+        const userCount = await User.countDocuments();
+        if (userCount === 0) {
+            console.log('No users found. Creating bootstrap superadmin...');
+            await User.create({
+                employeeId: 'K-001',
+                name: 'Super Admin',
+                email: 'superadmin@kanan.co',
+                passwordHash: 'Admin@123',
+                role: 'superadmin',
+                department: 'B2B'
+            });
+            console.log('Bootstrap superadmin created: superadmin@kanan.co / Admin@123');
+        }
+
         // Auto-seed FormConfig if missing
         const FormConfig = require('./models/FormConfig');
         const activeB2B = await FormConfig.findOne({ formType: 'generic', isActive: true });
