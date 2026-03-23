@@ -1,5 +1,4 @@
 const Visit = require('../models/Visit');
-const { v4: uuidv4 } = require('uuid');
 
 // @desc    Get all visits (User: own, Admin+: all)
 exports.getVisits = async (req, res) => {
