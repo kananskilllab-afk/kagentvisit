@@ -9,6 +9,7 @@ import Analytics from './pages/Analytics';
 import UserManagement from './pages/SuperAdmin/UserManagement';
 import FormBuilder from './pages/FormBuilder';
 import Profile from './pages/Profile';
+import ManageAgent from './pages/ManageAgent';
 
 const ProtectedRoute = ({ children, roles }) => {
     const { user } = useAuth();
@@ -50,6 +51,11 @@ function App() {
                     <Route path="form-builder" element={
                         <ProtectedRoute roles={['superadmin']}>
                             <FormBuilder />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="agents" element={
+                        <ProtectedRoute roles={['admin', 'superadmin']}>
+                            <ManageAgent />
                         </ProtectedRoute>
                     } />
                 </Route>

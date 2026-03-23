@@ -5,7 +5,7 @@ import ErrorBoundary from './ErrorBoundary';
 import {
     LayoutDashboard, PlusCircle, Users, BarChart3,
     Settings, LogOut, Menu, X, User as UserIcon,
-    ChevronRight, List, Bell
+    ChevronRight, List, Bell, Building2
 } from 'lucide-react';
 
 const SidebarLink = ({ icon: Icon, label, path, active, onClick }) => (
@@ -60,6 +60,7 @@ const Layout = () => {
             ...(user.role === 'superadmin' || isB2C ? [
                 { label: 'Home Visits',   icon: List, path: '/visits?formType=home_visit',  roles: ['admin','superadmin'] },
             ] : []),
+            { label: 'Manage Agent',  icon: Building2,      path: '/agents',       roles: ['admin', 'superadmin'] },
         ] : [
             { label: 'New Visit',     icon: PlusCircle, path: '/new-visit', roles: ['user','home_visit'] },
             { label: 'Visit History', icon: List,       path: '/visits',    roles: ['user','home_visit'] },

@@ -75,9 +75,15 @@ const NewVisit = () => {
             switch (field.type) {
                 case 'number':
                 case 'star-rating':
-                    fieldSchema = z.number();
-                    if (field.required) fieldSchema = fieldSchema.min(1, `${field.label} is required`);
-                    else fieldSchema = fieldSchema.optional().nullable();
+                    // Preprocess to handle empty strings/NaN from number inputs
+                    fieldSchema = z.preprocess((val) => {
+                        if (val === '' || val === undefined || val === null || isNaN(Number(val))) return undefined;
+                        return Number(val);
+                    }, field.required ? z.number({ invalid_type_error: `${field.label} must be a number` }).min(0) : z.number().optional());
+                    
+                    if (field.required) {
+                        fieldSchema = fieldSchema.refine(val => val !== undefined, { message: `${field.label} is required` });
+                    }
                     break;
                 case 'toggle':
                     fieldSchema = z.boolean().default(false);
@@ -290,6 +296,39 @@ const NewVisit = () => {
         }
     };
 
+    const onValidationError = (errors) => {
+        console.error('Submission Validation Errors:', errors);
+        
+        // Flatten nested errors to find the first error's field ID
+        const getFirstErrorId = (errs, prefix = '') => {
+            for (const key in errs) {
+                const fullPath = prefix ? `${prefix}.${key}` : key;
+                if (errs[key]?.message) return fullPath;
+                if (typeof errs[key] === 'object') {
+                    const nested = getFirstErrorId(errs[key], fullPath);
+                    if (nested) return nested;
+                }
+            }
+            return null;
+        };
+
+        const firstErrorId = getFirstErrorId(errors);
+        if (firstErrorId) {
+            // Find which step (group) this field belongs to
+            const field = config.fields.find(f => f.id === firstErrorId);
+            if (field) {
+                const targetStep = groups.indexOf(field.group);
+                if (targetStep !== -1) {
+                    alert(`Submission blocked: Please check "${field.label}" in Step ${targetStep + 1} (${field.group})`);
+                    setCurrentStep(targetStep);
+                    window.scrollTo(0, 0);
+                    return;
+                }
+            }
+            alert(`Please correct errors in your form: ${firstErrorId}`);
+        }
+    };
+
     const onSubmit = async (data) => {
         setIsSaving(true);
         try {
@@ -412,7 +451,7 @@ const NewVisit = () => {
             <StepIndicator currentStep={currentStep} steps={groups} />
 
             {/* Form */}
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 max-w-4xl mx-auto">
+            <form onSubmit={handleSubmit(onSubmit, onValidationError)} className="space-y-6 max-w-4xl mx-auto">
                 <div className="card shadow-premium animate-fade-in">
                     {/* Section Header */}
                     <div className="flex items-center gap-4 mb-8 pb-6 border-b border-slate-100/60">

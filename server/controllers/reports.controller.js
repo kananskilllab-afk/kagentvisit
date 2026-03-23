@@ -10,7 +10,7 @@ exports.exportXlsx = async (req, res) => {
         const worksheet = workbook.addWorksheet('Visits');
 
         worksheet.columns = [
-            { header: 'Company Name', key: 'company', width: 25 },
+            { header: 'Agent/Company Name', key: 'company', width: 25 },
             { header: 'RM Name', key: 'rm', width: 20 },
             { header: 'Status', key: 'status', width: 15 },
             { header: 'Submitted By', key: 'user', width: 20 },
@@ -57,7 +57,7 @@ exports.exportPdf = async (req, res) => {
         // Header
         doc.fillColor('#1A3C6E').fontSize(20).text('Agent Visit Survey Report', { align: 'center' });
         doc.moveDown();
-        doc.fillColor('black').fontSize(12).text(`Company: ${visit.meta.companyName}`);
+        doc.fillColor('black').fontSize(12).text(`Agent/Company Name: ${visit.meta.companyName}`);
         doc.text(`RM: ${visit.meta.rmName}`);
         doc.text(`Date: ${visit.createdAt.toLocaleDateString()}`);
         doc.text(`Status: ${visit.status.toUpperCase()}`);

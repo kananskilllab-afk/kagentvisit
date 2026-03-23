@@ -1,0 +1,37 @@
+{
+  "version": 2,
+  "name": "agent-visit-survey",
+  "builds": [
+    {
+      "src": "client/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    },
+    {
+      "src": "server/server.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "headers": {
+        "cache-control": "no-cache"
+      },
+      "dest": "/server/server.js"
+    },
+    {
+      "src": "/uploads/(.*)",
+      "dest": "/server/uploads/$1"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/client/$1"
+    }
+  ]
+}

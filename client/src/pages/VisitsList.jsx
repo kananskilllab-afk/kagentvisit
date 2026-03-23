@@ -108,7 +108,7 @@ const VisitsList = () => {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                             type="text"
-                            placeholder={`Search ${isHomeVisit ? 'student, address' : 'company, agent, address'}...`}
+                            placeholder={`Search ${isHomeVisit ? 'student, address' : 'agent/company, address'}...`}
                             className="input-field pl-10 h-10"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -166,7 +166,7 @@ const VisitsList = () => {
                         <table className="w-full text-left">
                             <thead>
                                 <tr className="border-b border-slate-100">
-                                    <th className="th">{isHomeVisit ? 'Student / Visit' : 'Company / Agent'}</th>
+                                    <th className="th">{isHomeVisit ? 'Student / Visit' : 'Agent / Company Name'}</th>
                                     <th className="th">Status</th>
                                     <th className="th">Location</th>
                                     <th className="th">Date</th>
