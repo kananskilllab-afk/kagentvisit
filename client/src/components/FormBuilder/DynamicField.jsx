@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import MultiSelect from '../shared/MultiSelect';
 import StarRating from '../shared/StarRating';
 import PhotoUpload from './PhotoUpload';
+import AgentAutocomplete from './AgentAutocomplete';
 import { Copy, Check } from 'lucide-react';
 
 const DynamicField = ({ field, register, control, errors, watch, setValue, Controller, disabled, showCopy }) => {
@@ -116,6 +117,24 @@ const DynamicField = ({ field, register, control, errors, watch, setValue, Contr
                                     value={value}
                                     onChange={onChange}
                                     disabled={disabled}
+                                />
+                            )}
+                        />
+                    );
+                case 'autocomplete-agent':
+                    return (
+                        <Controller
+                            name={name}
+                            control={control}
+                            render={({ field: { value, onChange } }) => (
+                                <AgentAutocomplete
+                                    value={value}
+                                    onChange={onChange}
+                                    disabled={disabled}
+                                    error={error}
+                                    name={name}
+                                    setValue={setValue}
+                                    placeholder={field.placeholder || `Search ${label.toLowerCase()}...`}
                                 />
                             )}
                         />

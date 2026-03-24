@@ -9,7 +9,7 @@ const FormConfig = require('./models/FormConfig');
 // ── B2B Form Fields (9 Steps) ─────────────────────────────────────────────────
 const b2bFields = [
     // Step 1 – Visit Meta
-    { id: 'meta.companyName', group: 'Visit Meta', label: 'Agent/Company Name', type: 'text', required: true },
+    { id: 'meta.companyName', group: 'Visit Meta', label: 'Agent/Company Name', type: 'autocomplete-agent', required: true },
     { id: 'meta.email', group: 'Visit Meta', label: 'Email Address', type: 'text', required: false },
     { id: 'meta.bdmName', group: 'Visit Meta', label: 'BDM Name', type: 'text', required: true },
     { id: 'meta.rmName', group: 'Visit Meta', label: 'RM Name', type: 'text', required: true },
@@ -168,7 +168,10 @@ async function seed() {
             });
             console.log('B2B form configuration seeded.');
         } else {
-            console.log('Active B2B form already exists at version:', existingB2B.version);
+            existingB2B.fields = b2bFields;
+            existingB2B.version = `${existingB2B.version}-upd-${Date.now().toString().slice(-4)}`;
+            await existingB2B.save();
+            console.log('Active B2B form updated with new fields.');
         }
 
         // Seed B2C form

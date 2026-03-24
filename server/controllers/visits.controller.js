@@ -1,4 +1,5 @@
 const Visit = require('../models/Visit');
+const Agent = require('../models/Agent');
 
 // @desc    Get all visits (User: own, Admin+: all)
 exports.getVisits = async (req, res) => {
@@ -11,8 +12,9 @@ exports.getVisits = async (req, res) => {
         }
 
         // Additional filters from query params
-        const { status, companyName, startDate, endDate, city, formType, submittedBy } = req.query;
+        const { status, companyName, startDate, endDate, city, formType, submittedBy, agentId } = req.query;
         if (status) query.status = status;
+        if (agentId) query['meta.agentId'] = agentId;
 
         // Admin/superadmin can filter by specific user
         if (submittedBy && (req.user.role === 'admin' || req.user.role === 'superadmin')) {
@@ -75,6 +77,15 @@ exports.createVisit = async (req, res) => {
         };
 
         const visit = await Visit.create(visitData);
+        
+        // Update Agent visit stats if submitted
+        if (visit.status === 'submitted' && visit.meta?.agentId) {
+            await Agent.findByIdAndUpdate(visit.meta.agentId, {
+                $inc: { visitCount: 1 },
+                lastVisitDate: new Date()
+            });
+        }
+
         res.status(201).json({ success: true, data: visit });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
@@ -156,7 +167,28 @@ exports.updateVisit = async (req, res) => {
             req.params.id,
             updateData,
             { new: true, runValidators: true }
-        );
+        ).populate('meta.agentId');
+        
+        // Handle Agent stats update on status change
+        const wasSubmitted = visit.status === 'submitted';
+        const isNowSubmitted = updatedVisit.status === 'submitted';
+        const agentChanged = visit.meta?.agentId?.toString() !== updatedVisit.meta?.agentId?._id?.toString();
+
+        if ((!wasSubmitted && isNowSubmitted) || (wasSubmitted && isNowSubmitted && agentChanged)) {
+            // Increment new agent
+            if (updatedVisit.meta?.agentId) {
+                await Agent.findByIdAndUpdate(updatedVisit.meta.agentId._id, {
+                    $inc: { visitCount: 1 },
+                    lastVisitDate: new Date()
+                });
+            }
+            // Decrement old agent if it was a re-assignment
+            if (wasSubmitted && agentChanged && visit.meta?.agentId) {
+                await Agent.findByIdAndUpdate(visit.meta.agentId, {
+                    $inc: { visitCount: -1 }
+                });
+            }
+        }
 
         res.json({ success: true, data: updatedVisit });
     } catch (error) {

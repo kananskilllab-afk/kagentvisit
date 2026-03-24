@@ -6,7 +6,7 @@ const fieldSchema = new mongoose.Schema({
     label: { type: String, required: true },
     type: {
         type: String,
-        enum: ['text', 'textarea', 'number', 'date', 'datetime', 'dropdown', 'multi-select', 'toggle', 'star-rating', 'file', 'photo-upload'],
+        enum: ['text', 'textarea', 'number', 'date', 'datetime', 'dropdown', 'multi-select', 'toggle', 'star-rating', 'file', 'photo-upload', 'autocomplete-agent'],
         required: true
     },
     required:    { type: Boolean, default: false },

@@ -46,6 +46,7 @@ const visitSchema = new mongoose.Schema({
     // Step 1 – Visit Meta
     meta: {
         companyName:  { type: String, index: true },
+        agentId:      { type: mongoose.Schema.Types.ObjectId, ref: 'Agent', index: true },
         email:        { type: String },
         meetingStart: { type: Date },
         meetingEnd:   { type: Date },
