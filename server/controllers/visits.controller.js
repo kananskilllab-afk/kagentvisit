@@ -105,7 +105,8 @@ exports.getVisitById = async (req, res) => {
         }
 
         // Check ownership
-        if ((req.user.role === 'user' || req.user.role === 'home_visit') && visit.submittedBy._id.toString() !== req.user._id.toString()) {
+        const ownerId = visit.submittedBy?._id?.toString() || visit.submittedBy?.toString();
+        if ((req.user.role === 'user' || req.user.role === 'home_visit') && ownerId !== req.user._id.toString()) {
             return res.status(403).json({ success: false, message: 'Not authorized to view this visit' });
         }
 
@@ -125,7 +126,8 @@ exports.updateVisit = async (req, res) => {
         }
 
         // Check permission
-        const isOwner = visit.submittedBy.toString() === req.user._id.toString();
+        const ownerId = visit.submittedBy?.toString();
+        const isOwner = ownerId === req.user._id.toString();
         const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
 
         if (!isOwner && !isAdmin) {
@@ -169,23 +171,31 @@ exports.updateVisit = async (req, res) => {
             updateData,
             { new: true, runValidators: true }
         ).populate('meta.agentId');
+
+        if (!updatedVisit) {
+            return res.status(404).json({ success: false, message: 'Failed to retrieve updated visit' });
+        }
         
         // Handle Agent stats update on status change
         const wasSubmitted = visit.status === 'submitted';
         const isNowSubmitted = updatedVisit.status === 'submitted';
-        const agentChanged = visit.meta?.agentId?.toString() !== updatedVisit.meta?.agentId?._id?.toString();
+        
+        const oldAgentId = visit.meta?.agentId?.toString();
+        const newAgentId = updatedVisit.meta?.agentId?._id?.toString() || updatedVisit.meta?.agentId?.toString();
+        const agentChanged = oldAgentId !== newAgentId;
 
         if ((!wasSubmitted && isNowSubmitted) || (wasSubmitted && isNowSubmitted && agentChanged)) {
             // Increment new agent
-            if (updatedVisit.meta?.agentId) {
-                await Agent.findByIdAndUpdate(updatedVisit.meta.agentId._id, {
+            const targetNewAgentId = updatedVisit.meta?.agentId?._id || (typeof updatedVisit.meta?.agentId === 'string' ? updatedVisit.meta.agentId : null);
+            if (targetNewAgentId) {
+                await Agent.findByIdAndUpdate(targetNewAgentId, {
                     $inc: { visitCount: 1 },
                     lastVisitDate: new Date()
                 });
             }
             // Decrement old agent if it was a re-assignment
-            if (wasSubmitted && agentChanged && visit.meta?.agentId) {
-                await Agent.findByIdAndUpdate(visit.meta.agentId, {
+            if (wasSubmitted && agentChanged && oldAgentId) {
+                await Agent.findByIdAndUpdate(oldAgentId, {
                     $inc: { visitCount: -1 }
                 });
             }
