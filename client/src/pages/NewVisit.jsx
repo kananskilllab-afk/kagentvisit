@@ -139,7 +139,7 @@ const NewVisit = () => {
         return z.object(finalShape);
     }, [config]);
 
-    const { control, handleSubmit, register, reset, watch, setValue, formState: { errors, isValid, isDirty } } = useForm({
+    const { control, handleSubmit, register, reset, watch, setValue, trigger, formState: { errors, isValid, isDirty } } = useForm({
         resolver: zodResolver(schema),
         mode: 'onChange',
         defaultValues: {
