@@ -26,8 +26,8 @@ const connectDB = async () => {
     }
 
     if (!process.env.MONGODB_URI) {
-        console.error('FATAL ERROR: MONGODB_URI is not defined in environment variables.');
-        process.exit(1);
+        console.error('CRITICAL: MONGODB_URI is missing from environment variables!');
+        throw new Error('MONGODB_URI_MISSING');
     }
 
     try {
