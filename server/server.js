@@ -18,25 +18,15 @@ const app = express();
 app.set('trust proxy', 1);
 
 // Connect to Database
-const mongoUri = process.env.MONGODB_URI?.trim();
-if (!mongoUri) {
+if (!process.env.MONGODB_URI) {
     console.error('FATAL ERROR: MONGODB_URI is not defined in environment variables.');
     process.exit(1);
 }
 
-if (!process.env.JWT_SECRET) {
-    console.warn('WARNING: JWT_SECRET is not defined. Login will fail.');
-} else {
-    process.env.JWT_SECRET = process.env.JWT_SECRET.trim();
-}
-
-const maskedUri = mongoUri.split('@')[1] ? `mongodb+srv://***:***@${mongoUri.split('@')[1]}` : 'HIDDEN_URI';
+const maskedUri = process.env.MONGODB_URI.split('@')[1] ? `mongodb+srv://***:***@${process.env.MONGODB_URI.split('@')[1]}` : 'HIDDEN_URI';
 console.log(`Connecting to MongoDB Atlas: ${maskedUri}`);
 
-mongoose.connect(mongoUri, {
-    serverSelectionTimeoutMS: 10000, // Timeout after 10s instead of buffering forever
-    socketTimeoutMS: 45000,
-})
+mongoose.connect(process.env.MONGODB_URI)
     .then(async () => {
         console.log('MongoDB Connected successfully to:', maskedUri);
         // Auto-seed FormConfig if missing
