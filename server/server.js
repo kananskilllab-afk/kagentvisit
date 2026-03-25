@@ -18,9 +18,17 @@ const app = express();
 app.set('trust proxy', 1);
 
 // Connect to Database
+if (!process.env.MONGODB_URI) {
+    console.error('FATAL ERROR: MONGODB_URI is not defined in environment variables.');
+    process.exit(1);
+}
+
+const maskedUri = process.env.MONGODB_URI.split('@')[1] ? `mongodb+srv://***:***@${process.env.MONGODB_URI.split('@')[1]}` : 'HIDDEN_URI';
+console.log(`Connecting to MongoDB Atlas: ${maskedUri}`);
+
 mongoose.connect(process.env.MONGODB_URI)
     .then(async () => {
-        console.log('MongoDB Connected');
+        console.log('MongoDB Connected successfully to:', maskedUri);
         // Auto-seed FormConfig if missing
         const FormConfig = require('./models/FormConfig');
         const activeB2B = await FormConfig.findOne({ formType: 'generic', isActive: true });
@@ -189,7 +197,11 @@ mongoose.connect(process.env.MONGODB_URI)
             console.log('B2C Form configuration seeded.');
         }
     })
-    .catch(err => console.error('MongoDB Connection Error:', err));
+    .catch(err => {
+        console.error('CRITICAL: MongoDB Connection Error!');
+        console.error('Error details:', err.message);
+        console.error('Connection state:', mongoose.connection.readyState);
+    });
 
 // Middleware
 app.use(helmet()); // Security headers
