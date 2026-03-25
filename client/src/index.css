@@ -62,7 +62,7 @@
 
   /* ── Cards ────────────────────────────────────────────────── */
   .card {
-    @apply bg-white rounded-3xl shadow-card-premium border border-slate-100/60 p-5 sm:p-8;
+    @apply bg-white rounded-3xl shadow-card-premium border border-slate-100/60 p-4 sm:p-8;
   }
   .card-hover {
     @apply card hover:shadow-card-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer;

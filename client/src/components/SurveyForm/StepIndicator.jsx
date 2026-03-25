@@ -48,7 +48,7 @@ const StepIndicator = ({ currentStep, steps = [] }) => {
                     const active = index === currentStep;
 
                     return (
-                        <div key={label} className="flex flex-col items-center flex-none w-20 sm:w-24 snap-center relative group">
+                        <div key={label} className="flex flex-col items-center flex-none w-16 sm:w-24 snap-center relative group">
                             {/* Circle */}
                             <div className={`
                                 w-9 h-9 sm:w-10 sm:h-10 rounded-2xl flex items-center justify-center text-sm font-bold z-10

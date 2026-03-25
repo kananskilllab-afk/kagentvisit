@@ -160,7 +160,7 @@ const Layout = () => {
 
             {/* Main Content */}
             <main className="flex-1 lg:ml-64 xl:ml-72 min-h-screen">
-                <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8 pt-20 lg:pt-8">
+                <div className="max-w-7xl mx-auto p-3 sm:p-6 lg:p-8 pt-20 lg:pt-8">
                     <ErrorBoundary key={location.pathname}>
                         <Outlet />
                     </ErrorBoundary>

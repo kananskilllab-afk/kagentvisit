@@ -564,27 +564,26 @@ const NewVisit = () => {
                     </div>
                 </div>
 
-                {/* Fixed Navigation Bar */}
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-4xl z-40">
-                    <div className="glass shadow-premium p-3 sm:p-4 rounded-3xl flex justify-between items-center">
+                    <div className="card glass flex items-center justify-between gap-2 p-2.5 sm:p-5 shadow-premium backdrop-blur-xl border-white/40 ring-1 ring-brand-blue/5">
                         <button
                             type="button"
                             onClick={prevStep}
                             disabled={currentStep === 0}
-                            className="flex items-center gap-2 px-5 py-2.5 font-bold text-slate-500 disabled:opacity-20 hover:bg-white/50 rounded-2xl transition-all"
+                            className="btn-outline flex items-center justify-center gap-1.5 px-4 sm:px-6 py-2.5 rounded-2xl font-bold bg-white/80 hover:bg-white text-slate-700 hover:text-brand-blue shadow-sm border-white/60 transition-all active:scale-95 text-xs sm:text-sm disabled:opacity-30"
                         >
-                            <ChevronLeft className="w-5 h-5" />
-                            <span className="hidden sm:inline">Previous</span>
+                            <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+                            <span className="sm:inline hidden">Back</span>
                         </button>
 
                         <div className="flex items-center gap-2">
                             {groups.map((_, i) => (
-                                <div
-                                    key={i}
-                                    className={`rounded-full transition-all duration-500 ${
-                                        i === currentStep ? 'w-8 h-2 bg-brand-blue' :
-                                        i < currentStep ? 'w-2 h-2 bg-brand-green shadow-sm shadow-brand-green/30' :
-                                        'w-2 h-2 bg-slate-200'
+                                <div 
+                                    key={i} 
+                                    className={`h-1.5 rounded-full transition-all duration-500 ${
+                                        i === currentStep ? 'w-6 sm:w-8 bg-brand-blue shadow-sm' : 
+                                        i < currentStep ? 'w-1.5 bg-brand-green' : 
+                                        'w-1.5 bg-slate-200'
                                     }`}
                                 />
                             ))}
@@ -592,24 +591,21 @@ const NewVisit = () => {
 
                         {currentStep === groups.length - 1 ? (
                             <button
-                                type="submit"
+                                type="button"
+                                onClick={handleSubmit(onSubmit)}
                                 disabled={isSaving}
-                                className="flex items-center gap-2 px-8 py-3 bg-brand-green text-white font-bold rounded-2xl hover:bg-brand-green/90 disabled:opacity-60 transition-all shadow-xl shadow-brand-green/25"
+                                className="btn-primary flex items-center justify-center gap-2 px-5 sm:px-8 py-3 rounded-2xl font-bold bg-brand-gradient text-white shadow-lg shadow-brand-blue/20 hover:shadow-brand-blue/30 transition-all active:scale-95 disabled:opacity-70 disabled:grayscale text-sm sm:text-base"
                             >
-                                {isSaving ? (
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                    <><CheckCircle className="w-5 h-5" /> Submit</>
-                                )}
+                                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" /> Submit</>}
                             </button>
                         ) : (
                             <button
                                 type="button"
                                 onClick={nextStep}
-                                className="flex items-center gap-2 px-8 py-3 bg-brand-blue text-white font-bold rounded-2xl hover:bg-brand-navy transition-all shadow-xl shadow-brand-blue/25"
+                                className="btn-primary flex items-center justify-center gap-2 px-5 sm:px-8 py-3 rounded-2xl font-bold bg-brand-gradient text-white shadow-lg shadow-brand-blue/20 hover:shadow-brand-blue/30 transition-all active:scale-95 text-sm sm:text-base"
                             >
                                 <span>Next</span>
-                                <ChevronRight className="w-5 h-5" />
+                                <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                             </button>
                         )}
                     </div>

@@ -406,7 +406,7 @@ const Analytics = () => {
             )}
 
             {/* KPI Summary */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard title="Total Visits"      value={summary?.stats.totalVisits}    icon={FileText}     color="#284695" bgColor="#EEF4FF" />
                 <StatCard title="Pending Review"    value={summary?.stats.pendingReview}  icon={Clock}        color="#EF7F1A" bgColor="#FFF4EA" />
                 <StatCard title="Action Required"   value={summary?.stats.actionRequired} icon={AlertCircle}  color="#DC2626" bgColor="#FEF2F2" />
@@ -414,7 +414,7 @@ const Analytics = () => {
                     sub={summary?.stats.totalVisits ? `${Math.round((summary.stats.closedVisits / summary.stats.totalVisits) * 100)}% closure rate` : undefined}
                 />
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard title="Reviewed"         value={summary?.stats.reviewedVisits} icon={Award}    color="#00A0E3" bgColor="#E0F5FF" />
                 <StatCard title="Drafts"           value={summary?.stats.draftVisits}    icon={FileText} color="#94A3B8" bgColor="#F8FAFC" />
                 <StatCard title="Active Users"     value={summary?.stats.activeUsers}    icon={Users}    color="#9C2BE3" bgColor="#F5EDFF" />
