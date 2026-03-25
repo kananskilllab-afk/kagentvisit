@@ -45,6 +45,7 @@ exports.login = async (req, res) => {
             res.status(401).json({ success: false, message: 'Invalid email or password' });
         }
     } catch (error) {
+        console.error('CRITICAL LOGIN ERROR:', error);
         res.status(500).json({ success: false, message: error.message });
     }
 };

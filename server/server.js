@@ -24,6 +24,10 @@ if (!mongoUri) {
     process.exit(1);
 }
 
+if (!process.env.JWT_SECRET) {
+    console.warn('WARNING: JWT_SECRET is not defined. Login will fail.');
+}
+
 const maskedUri = mongoUri.split('@')[1] ? `mongodb+srv://***:***@${mongoUri.split('@')[1]}` : 'HIDDEN_URI';
 console.log(`Connecting to MongoDB Atlas: ${maskedUri}`);
 
