@@ -28,14 +28,14 @@
     },
     {
       "src": "/assets/(.*)",
-      "dest": "/client/assets/$1"
+      "dest": "/assets/$1"
     },
     {
       "handle": "filesystem"
     },
     {
       "src": "/(.*)",
-      "dest": "/client/index.html"
+      "dest": "/index.html"
     }
   ]
 }
