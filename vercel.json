@@ -28,14 +28,22 @@
     },
     {
       "src": "/assets/(.*)",
-      "dest": "/assets/$1"
+      "dest": "/client/assets/$1"
+    },
+    {
+      "src": "/logo.png",
+      "dest": "/client/logo.png"
+    },
+    {
+      "src": "/fav.png",
+      "dest": "/client/fav.png"
     },
     {
       "handle": "filesystem"
     },
     {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "/client/index.html"
     }
   ]
 }
