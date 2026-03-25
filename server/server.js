@@ -14,6 +14,9 @@ dotenv.config();
 
 const app = express();
 
+// Trust proxy for express-rate-limit behind Vercel/proxies
+app.set('trust proxy', 1);
+
 // Connect to Database
 mongoose.connect(process.env.MONGODB_URI)
     .then(async () => {
