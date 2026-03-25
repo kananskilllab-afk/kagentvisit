@@ -6,7 +6,8 @@ const agentSchema = new mongoose.Schema({
         type: String, 
         required: true, 
         unique: true,
-        index: true 
+        index: true,
+        match: [/^[a-zA-Z0-9\s.&',-]+$/, 'Agent name can only contain letters, numbers, spaces, and punctuation: . & \' , -']
     },
     categoryType: { type: String },
     agentType: { type: String },

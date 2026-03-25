@@ -6,12 +6,14 @@ const userSchema = new mongoose.Schema({
         type: String,
         unique: true,
         required: true,
-        trim: true
+        trim: true,
+        match: [/^[A-Z0-9-]+$/, 'Employee ID can only contain letters, numbers, and hyphens']
     },
     name: {
         type: String,
         required: true,
-        trim: true
+        trim: true,
+        match: [/^[a-zA-Z\s.-]+$/, 'Name can only contain letters, spaces, dots, and hyphens']
     },
     email: {
         type: String,

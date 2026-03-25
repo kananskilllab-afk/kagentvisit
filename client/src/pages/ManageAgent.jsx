@@ -426,8 +426,8 @@ const ManageAgent = () => {
                                                 {agent.name?.charAt(0) || 'A'}
                                             </div>
                                             <div>
-                                                <div className="flex items-center gap-2">
-                                                    <p className="font-bold text-slate-800 group-hover:text-brand-purple transition-colors">{agent.name}</p>
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <p className="font-bold text-slate-800 group-hover:text-brand-purple transition-colors truncate max-w-[200px]">{agent.name}</p>
                                                     {agent.rank && (
                                                         <span className={`text-[9px] font-black px-2 py-0.5 rounded border leading-none uppercase tracking-tighter ${
                                                             agent.rank === 'Platinum' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :

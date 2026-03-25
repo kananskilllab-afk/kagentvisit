@@ -139,10 +139,25 @@ const NewVisit = () => {
         return z.object(finalShape);
     }, [config]);
 
-    const { register, handleSubmit, watch, setValue, trigger, control, reset, formState: { errors } } = useForm({
+    const { control, handleSubmit, register, reset, watch, setValue, formState: { errors, isValid, isDirty } } = useForm({
         resolver: zodResolver(schema),
-        mode: 'onChange'
+        mode: 'onChange',
+        defaultValues: {
+            status: 'draft'
+        }
     });
+
+    // Handle BeforeUnload (Browser Back/Close)
+    useEffect(() => {
+        const handleBeforeUnload = (e) => {
+            if (isDirty) {
+                e.preventDefault();
+                e.returnValue = ''; // Required for most browsers to show the default confirm dialog
+            }
+        };
+        window.addEventListener('beforeunload', handleBeforeUnload);
+        return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+    }, [isDirty]);
 
     const formData = watch();
     const teamSize = parseInt(watch('visitInfo.teamSize') || '1');

@@ -8,7 +8,7 @@ const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 // @desc    Get all agents
 exports.getAgents = async (req, res) => {
     try {
-        const agents = await Agent.find().sort({ name: 1 });
+        const agents = await Agent.find().select('-__v').sort({ name: 1 });
         res.json({ success: true, data: agents });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

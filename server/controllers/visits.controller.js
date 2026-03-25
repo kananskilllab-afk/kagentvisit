@@ -59,6 +59,7 @@ exports.getVisits = async (req, res) => {
 
         const visits = await Visit.find(query)
             .populate('submittedBy', 'name employeeId')
+            .select('-__v')
             .sort({ createdAt: -1 });
 
         res.json({ success: true, count: visits.length, data: visits });
