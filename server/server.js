@@ -142,8 +142,7 @@ const genericFields = [
 
     // Step 11 – Final Summary
     { id: 'postVisit.actionPoints', group: 'Final Summary', label: 'Action Points', type: 'textarea', required: true },
-    { id: 'postVisit.remarks', group: 'Final Summary', label: 'Your Remarks', type: 'textarea', required: false },
-    { id: 'outcome.photo', group: 'Final Summary', label: 'Visit Photo', type: 'photo-upload', required: false }
+    { id: 'postVisit.remarks', group: 'Final Summary', label: 'Your Remarks', type: 'textarea', required: false }
 ];
 
 const b2cFields = [
@@ -178,8 +177,7 @@ const b2cFields = [
             'SHIFTED OTHER CITY', 'NOT FOUND'
         ]
     },
-    { id: 'outcome.remarks', group: 'Final Outcome', label: 'Remarks / Notes', type: 'textarea', required: true },
-    { id: 'outcome.photo', group: 'Final Outcome', label: 'Visit Verification Photo', type: 'photo-upload', required: false }
+    { id: 'outcome.remarks', group: 'Final Outcome', label: 'Remarks / Notes', type: 'textarea', required: true }
 ];
 
 // Seeding logic (only once per instance)
@@ -209,7 +207,7 @@ const seedData = async () => {
             console.log('B2B Form configuration seeded.');
         }
 
-        if (!hasB2C || hasB2C.fields.length < 19) {
+        if (!hasB2C || hasB2C.fields.length < 17) {
             console.log('Seeding B2C form configuration...');
             if (hasB2C) {
                 await FormConfig.updateMany({ formType: 'home_visit' }, { isActive: false });
