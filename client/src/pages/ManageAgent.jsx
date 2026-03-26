@@ -44,9 +44,7 @@ const ManageAgent = () => {
         formData.append('file', file);
 
         try {
-            const res = await api.post('/agents/import', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            const res = await api.post('/agents/import', formData);
             alert(res.data.message);
             fetchAgents();
         } catch (err) {

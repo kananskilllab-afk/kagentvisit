@@ -36,9 +36,7 @@ const PhotoUpload = ({ value, onChange, disabled }) => {
             const formData = new FormData();
             formData.append('photo', compressedFile, 'visit_photo.jpg');
 
-            const response = await api.post('/upload', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
+            const response = await api.post('/upload', formData);
 
             if (response.data?.success) {
                 const finalUrl = response.data.data.url;
