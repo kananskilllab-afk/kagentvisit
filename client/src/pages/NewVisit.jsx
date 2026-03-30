@@ -136,7 +136,54 @@ const NewVisit = () => {
                 finalShape[key] = shape[key];
             }
         });
-        return z.object(finalShape);
+        const baseSchema = z.object(finalShape);
+
+        // Add conditional refinements
+        return baseSchema.superRefine((data, ctx) => {
+            const prepcomStatus = data.kananSpecific?.prepcomAcademy;
+            const isPrepcomOrBoth = ['Prepcom', 'Both'].includes(prepcomStatus);
+
+            if (isPrepcomOrBoth) {
+                // 1. Portal Courses
+                if (!data.kananTools?.portalCourses || data.kananTools.portalCourses.length === 0) {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        message: "Courses for which Portal used is required for Prepcom/Both partners",
+                        path: ['kananTools', 'portalCourses']
+                    });
+                }
+
+                // 2. Is using Kanan Books (Toggle assumes boolean, but let's check)
+                // If it's a toggle, we might want to ensure they explicitly checked it if that's what "mandatory" means
+                // But usually mandatory for a toggle means "must be true" if that's the logic, or "must be touched".
+                // User said "Is using Kanan Books? this section should mandatory". 
+                // I'll interpret this as they must select something (Yes/No). 
+                // Since toggle is usually Yes/No, it's always "selected". 
+                // However, if they meant it MUST be Yes, that's different.
+                // Let's assume they mean it must be filled/considered.
+
+                // 3. Courses for which Books used
+                if (!data.kananTools?.bookCourses || data.kananTools.bookCourses.length === 0) {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        message: "Courses for which Books used is required for Prepcom/Both partners",
+                        path: ['kananTools', 'bookCourses']
+                    });
+                }
+
+                // 4. Classroom Content
+                // Same as Books, if it's a toggle it's already there.
+
+                // 5. Trainer Rating
+                if (!data.kananTools?.trainerRating || data.kananTools.trainerRating === 0) {
+                    ctx.addIssue({
+                        code: z.ZodIssueCode.custom,
+                        message: "Trainer Knowledge Rating is required for Prepcom/Both partners",
+                        path: ['kananTools', 'trainerRating']
+                    });
+                }
+            }
+        });
     }, [config]);
 
     const { control, handleSubmit, register, reset, watch, setValue, trigger, formState: { errors, isValid, isDirty } } = useForm({
@@ -316,11 +363,19 @@ const NewVisit = () => {
         
         // Flatten nested errors to find the first error's field ID
         const getFirstErrorId = (errs, prefix = '') => {
+            if (!errs || typeof errs !== 'object') return null;
+            
+            // Check if this object itself has a message (e.g. at this level)
+            if (errs.message) return prefix;
+
             for (const key in errs) {
                 const fullPath = prefix ? `${prefix}.${key}` : key;
-                if (errs[key]?.message) return fullPath;
-                if (typeof errs[key] === 'object') {
-                    const nested = getFirstErrorId(errs[key], fullPath);
+                const fieldError = errs[key];
+                
+                if (fieldError?.message) return fullPath;
+                
+                if (typeof fieldError === 'object') {
+                    const nested = getFirstErrorId(fieldError, fullPath);
                     if (nested) return nested;
                 }
             }
@@ -330,11 +385,12 @@ const NewVisit = () => {
         const firstErrorId = getFirstErrorId(errors);
         if (firstErrorId) {
             // Find which step (group) this field belongs to
-            const field = config.fields.find(f => f.id === firstErrorId);
+            // Split prefix (e.g. 'kananTools.portalCourses' -> 'kananTools')
+            const field = config.fields.find(f => f.id === firstErrorId || firstErrorId.startsWith(f.id));
             if (field) {
                 const targetStep = groups.indexOf(field.group);
                 if (targetStep !== -1) {
-                    alert(`Submission blocked: Please check "${field.label}" in Step ${targetStep + 1} (${field.group})`);
+                    alert(`Submission blocked: Please check "${field.label}" in Step ${targetStep + 1} (${field.group})\n\nError: ${errors[firstErrorId.split('.')[0]]?.[firstErrorId.split('.')[1]]?.message || 'Missing required information'}`);
                     setCurrentStep(targetStep);
                     window.scrollTo(0, 0);
                     return;
@@ -592,7 +648,7 @@ const NewVisit = () => {
                         {currentStep === groups.length - 1 ? (
                             <button
                                 type="button"
-                                onClick={handleSubmit(onSubmit)}
+                                onClick={handleSubmit(onSubmit, onValidationError)}
                                 disabled={isSaving}
                                 className="btn-primary flex items-center justify-center gap-2 px-5 sm:px-8 py-3 rounded-2xl font-bold bg-brand-gradient text-white shadow-lg shadow-brand-blue/20 hover:shadow-brand-blue/30 transition-all active:scale-95 disabled:opacity-70 disabled:grayscale text-sm sm:text-base"
                             >

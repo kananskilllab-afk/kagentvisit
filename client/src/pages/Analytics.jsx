@@ -116,14 +116,14 @@ const Analytics = () => {
     const [showFilters, setShowFilters] = useState(false);
 
     const [filters, setFilters] = useState({
-        pinCode: '', bdmName: '', rmName: '', status: '',
+        pinCode: '', bdmName: '', rmName: '', officerName: '', status: '',
         city: '', startDate: '', endDate: '',
         reportType: user.role === 'admin' && user.department ? user.department : ''
     });
 
     const activeFilterCount = Object.values(filters).filter(Boolean).length;
     const handleFilterChange = (name, value) => setFilters(prev => ({ ...prev, [name]: value }));
-    const resetFilters = () => setFilters({ pinCode: '', bdmName: '', rmName: '', status: '', city: '', startDate: '', endDate: '', reportType: '' });
+    const resetFilters = () => setFilters({ pinCode: '', bdmName: '', rmName: '', officerName: '', status: '', city: '', startDate: '', endDate: '', reportType: '' });
 
     const showToast = (msg, type = 'success') => {
         setToast({ msg, type });
@@ -347,16 +347,27 @@ const Analytics = () => {
             {showFilters && (
                 <div className="card animate-fade-in">
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div>
-                            <label className="label"><Users className="w-3 h-3 inline mr-1" />BDM Name</label>
-                            <input type="text" placeholder="Search BDM..." className="input-field h-9 text-sm"
-                                value={filters.bdmName} onChange={(e) => handleFilterChange('bdmName', e.target.value)} />
-                        </div>
-                        <div>
-                            <label className="label"><Briefcase className="w-3 h-3 inline mr-1" />RM Name</label>
-                            <input type="text" placeholder="Search RM..." className="input-field h-9 text-sm"
-                                value={filters.rmName} onChange={(e) => handleFilterChange('rmName', e.target.value)} />
-                        </div>
+                        {filters.reportType !== 'B2C' && (
+                            <>
+                                <div>
+                                    <label className="label"><Users className="w-3 h-3 inline mr-1" />BDM Name</label>
+                                    <input type="text" placeholder="Search BDM..." className="input-field h-9 text-sm"
+                                        value={filters.bdmName} onChange={(e) => handleFilterChange('bdmName', e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="label"><Briefcase className="w-3 h-3 inline mr-1" />RM Name</label>
+                                    <input type="text" placeholder="Search RM..." className="input-field h-9 text-sm"
+                                        value={filters.rmName} onChange={(e) => handleFilterChange('rmName', e.target.value)} />
+                                </div>
+                            </>
+                        )}
+                        {filters.reportType === 'B2C' && (
+                            <div>
+                                <label className="label"><Users className="w-3 h-3 inline mr-1" />Surveyor / Officer Name</label>
+                                <input type="text" placeholder="Search Surveyor..." className="input-field h-9 text-sm"
+                                    value={filters.officerName} onChange={(e) => handleFilterChange('officerName', e.target.value)} />
+                            </div>
+                        )}
                         <div>
                             <label className="label">Status</label>
                             <select className="input-field h-9 text-sm" value={filters.status}

@@ -7,18 +7,22 @@ const buildQuery = (reqQuery, user) => {
         query.submittedBy = user._id;
     }
 
-    const { pinCode, bdmName, rmName, status, city, startDate, endDate, reportType } = reqQuery;
+    const { pinCode, bdmName, rmName, officerName, status, city, startDate, endDate, reportType } = reqQuery;
 
-    if (pinCode && pinCode !== '') query['agencyProfile.pinCode'] = pinCode;
+    if (pinCode && pinCode !== '') {
+        query.$or = query.$or || [];
+        query.$or.push({ 'agencyProfile.pinCode': pinCode });
+        query.$or.push({ 'location.pinCode': pinCode });
+    }
     if (bdmName) query['meta.bdmName'] = { $regex: bdmName, $options: 'i' };
+    if (officerName) query['visitInfo.officer'] = { $regex: officerName, $options: 'i' };
     if (rmName) query['meta.rmName'] = { $regex: rmName, $options: 'i' };
     if (status) query.status = status;
     if (city) {
-        query.$or = [
-            { 'agencyProfile.address': { $regex: city, $options: 'i' } },
-            { 'location.city': { $regex: city, $options: 'i' } },
-            { 'location.address': { $regex: city, $options: 'i' } }
-        ];
+        query.$or = query.$or || [];
+        query.$or.push({ 'agencyProfile.address': { $regex: city, $options: 'i' } });
+        query.$or.push({ 'location.city': { $regex: city, $options: 'i' } });
+        query.$or.push({ 'location.address': { $regex: city, $options: 'i' } });
     }
 
     if (reportType === 'B2B') query.formType = 'generic';
@@ -195,10 +199,28 @@ exports.getDetailedAnalytics = async (req, res) => {
             { $sort: { _id: 1 } }
         ]);
 
-        // Top Pincodes
         const topPincodes = await Visit.aggregate([
-            { $match: { ...query, 'agencyProfile.pinCode': { $exists: true, $ne: '' } } },
-            { $group: { _id: '$agencyProfile.pinCode', count: { $sum: 1 } } },
+            {
+                $match: {
+                    ...query,
+                    $or: [
+                        { 'agencyProfile.pinCode': { $exists: true, $ne: '' } },
+                        { 'location.pinCode': { $exists: true, $ne: '' } }
+                    ]
+                }
+            },
+            {
+                $project: {
+                    pinCode: {
+                        $cond: [
+                            { $ifNull: ['$agencyProfile.pinCode', false] },
+                            '$agencyProfile.pinCode',
+                            '$location.pinCode'
+                        ]
+                    }
+                }
+            },
+            { $group: { _id: '$pinCode', count: { $sum: 1 } } },
             { $sort: { count: -1 } },
             { $limit: 10 }
         ]);
