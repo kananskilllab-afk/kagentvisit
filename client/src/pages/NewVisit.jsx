@@ -95,6 +95,13 @@ const NewVisit = () => {
                 case 'textarea':
                     fieldSchema = z.string();
                     if (field.required) fieldSchema = fieldSchema.min(10, `${field.label} must be at least 10 characters`);
+                    else fieldSchema = fieldSchema.optional().or(z.literal(''));
+                    break;
+                case 'date':
+                case 'datetime':
+                    fieldSchema = z.string();
+                    if (field.required) fieldSchema = fieldSchema.min(1, `${field.label} is required`);
+                    else fieldSchema = fieldSchema.optional().or(z.literal(''));
                     break;
                 case 'photo-upload':
                     fieldSchema = z.string().optional().or(z.literal(''));
@@ -384,13 +391,25 @@ const NewVisit = () => {
 
         const firstErrorId = getFirstErrorId(errors);
         if (firstErrorId) {
+            // Check for hardcoded fields first (e.g. visitInfo which is always on Step 1)
+            if (firstErrorId.startsWith('visitInfo')) {
+                alert(`Submission blocked: Please check "Visit Team Details" in Step 1 (Visit Meta)\n\nError: ${errors.visitInfo?.teamSize?.message || errors.visitInfo?.teamMembers?.[0]?.message || 'Missing team information'}`);
+                setCurrentStep(0);
+                window.scrollTo(0, 0);
+                return;
+            }
+
             // Find which step (group) this field belongs to
             // Split prefix (e.g. 'kananTools.portalCourses' -> 'kananTools')
             const field = config.fields.find(f => f.id === firstErrorId || firstErrorId.startsWith(f.id));
             if (field) {
                 const targetStep = groups.indexOf(field.group);
                 if (targetStep !== -1) {
-                    alert(`Submission blocked: Please check "${field.label}" in Step ${targetStep + 1} (${field.group})\n\nError: ${errors[firstErrorId.split('.')[0]]?.[firstErrorId.split('.')[1]]?.message || 'Missing required information'}`);
+                    const firstPart = firstErrorId.split('.')[0];
+                    const secondPart = firstErrorId.split('.')[1];
+                    const errorMsg = errors[firstPart]?.[secondPart]?.message || errors[firstErrorId]?.message || 'Missing required information';
+                    
+                    alert(`Submission blocked: Please check "${field.label}" in Step ${targetStep + 1} (${field.group})\n\nError: ${errorMsg}`);
                     setCurrentStep(targetStep);
                     window.scrollTo(0, 0);
                     return;
