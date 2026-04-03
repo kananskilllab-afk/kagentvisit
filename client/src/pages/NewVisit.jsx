@@ -8,6 +8,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import StepIndicator from '../components/SurveyForm/StepIndicator';
 import DynamicField from '../components/FormBuilder/DynamicField';
+import RichTextEditor from '../components/shared/RichTextEditor';
 import { Save, ChevronLeft, ChevronRight, CheckCircle, Info, Clock, Loader2, MapPin, AlertCircle, Bell, ShieldAlert } from 'lucide-react';
 
 const NewVisit = () => {
@@ -32,6 +33,11 @@ const NewVisit = () => {
     const [createdAt, setCreatedAt] = useState(null);
     const [visitStatus, setVisitStatus] = useState('draft');
     const [adminNotes, setAdminNotes] = useState([]);
+    
+    const [followUpMeetings, setFollowUpMeetings] = useState([]);
+    const [newMeetingDate, setNewMeetingDate] = useState(new Date().toISOString().slice(0, 10));
+    const [newMeetingNotes, setNewMeetingNotes] = useState('');
+    const [addingMeeting, setAddingMeeting] = useState(false);
 
     const fetchExactLocation = () => {
         if (!navigator.geolocation) {
@@ -324,6 +330,7 @@ const NewVisit = () => {
                     setCreatedAt(visitData.createdAt);
                     setVisitStatus(visitData.status || 'draft');
                     setAdminNotes(visitData.adminNotes || []);
+                    if (visitData.followUpMeetings) setFollowUpMeetings(visitData.followUpMeetings);
                     
                     // Handle deep link to specific step
                     const stepParam = searchParams.get('step');
@@ -393,6 +400,26 @@ const NewVisit = () => {
             alert('Failed to send request: ' + (err.response?.data?.message || err.message));
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleAddMeeting = async () => {
+        if (!newMeetingNotes.trim()) return alert("Notes are required");
+        setAddingMeeting(true);
+        try {
+            const res = await api.post(`/visits/${visitId}/follow-ups`, {
+                date: newMeetingDate,
+                notes: newMeetingNotes
+            });
+            if (res.data?.success) {
+                setFollowUpMeetings(res.data.data.followUpMeetings);
+                setNewMeetingNotes('');
+                alert("Follow-up meeting added!");
+            }
+        } catch (err) {
+            alert('Failed to add follow-up meeting: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setAddingMeeting(false);
         }
     };
 
@@ -850,6 +877,70 @@ const NewVisit = () => {
                     </div>
                 </div>
             </form>
+
+            {/* Follow Up Meetings Section */}
+            {id && (
+                <div className="max-w-4xl mx-auto mt-8 mb-40">
+                    <div className="card shadow-md border-t-4 border-brand-orange">
+                        <div className="flex items-center gap-3 mb-6">
+                            <div className="p-3 bg-brand-orange/10 rounded-xl text-brand-orange">
+                                <Clock className="w-6 h-6" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-slate-800 tracking-tight">Follow-up Meetings</h3>
+                                <p className="text-xs text-slate-500 font-medium">Log subsequent interactions with this agent/student.</p>
+                            </div>
+                        </div>
+
+                        {/* List */}
+                        {followUpMeetings.length > 0 && (
+                            <div className="space-y-4 mb-8">
+                                {followUpMeetings.map((mtg, i) => (
+                                    <div key={i} className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-bold text-brand-blue">Meeting {i + 2}</span>
+                                            <span className="text-xs text-slate-500 bg-white px-2 py-1 rounded-md border">{new Date(mtg.date).toLocaleDateString()}</span>
+                                        </div>
+                                        <div className="text-sm text-slate-700 bg-white p-3 rounded-lg border border-slate-100 mt-2 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: mtg.notes }} />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Add New */}
+                        <div className="p-5 bg-orange-50 border border-orange-100 rounded-2xl">
+                            <h4 className="text-sm font-bold text-orange-800 mb-4">Log New Meeting</h4>
+                            <div className="space-y-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-700">Meeting Date</label>
+                                    <input 
+                                        type="date" 
+                                        value={newMeetingDate} 
+                                        onChange={e => setNewMeetingDate(e.target.value)}
+                                        className="input-field max-w-xs"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-slate-700">Meeting Notes</label>
+                                    <RichTextEditor 
+                                        value={newMeetingNotes} 
+                                        onChange={setNewMeetingNotes}
+                                        placeholder="Discussed new intake options, agent requested brochures..."
+                                    />
+                                </div>
+                                <button 
+                                    type="button"
+                                    onClick={handleAddMeeting} 
+                                    disabled={addingMeeting}
+                                    className="btn-primary mt-2 px-6 py-2"
+                                >
+                                    {addingMeeting ? 'Adding...' : 'Add Follow-up'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

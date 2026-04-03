@@ -303,3 +303,30 @@ exports.approveVisitUnlock = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
+
+// @desc    Add follow-up meeting
+exports.addFollowUpMeeting = async (req, res) => {
+    try {
+        const visit = await Visit.findById(req.params.id);
+        if (!visit) {
+            return res.status(404).json({ success: false, message: 'Visit not found' });
+        }
+
+        const newMeeting = {
+            date: req.body.date || new Date(),
+            notes: req.body.notes,
+            addedBy: req.user._id
+        };
+
+        if (!visit.followUpMeetings) {
+            visit.followUpMeetings = [];
+        }
+
+        visit.followUpMeetings.push(newMeeting);
+        await visit.save();
+
+        res.json({ success: true, data: visit });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};

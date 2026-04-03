@@ -16,6 +16,13 @@ const editHistorySchema = new mongoose.Schema({
     changesSummary:  { type: String }
 }, { _id: true });
 
+const followUpMeetingSchema = new mongoose.Schema({
+    date:    { type: Date, required: true },
+    notes:   { type: String, required: true },
+    addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    addedAt: { type: Date, default: Date.now }
+}, { _id: true });
+
 // ─── Main Schema ─────────────────────────────────────────────────────────────
 
 const visitSchema = new mongoose.Schema({
@@ -229,6 +236,7 @@ const visitSchema = new mongoose.Schema({
 
     adminNotes:  [adminNoteSchema],
     editHistory: [editHistorySchema],
+    followUpMeetings: [followUpMeetingSchema],
 
     // Locking & Unlocking (B2B visit 24h rule)
     isAdminUnlocked:   { type: Boolean, default: false },
