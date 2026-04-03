@@ -2,17 +2,17 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import {
-    Users, BarChart2, PieChart as PieChartIcon,
-    Search, Filter, RefreshCcw, MapPin, Briefcase,
+    Users, BarChart2,
+    Search, Filter, RefreshCcw, MapPin,
     Calendar as CalendarIcon, Clock, Target, Award,
-    ChevronDown, ChevronUp, X, Star, Activity, Globe,
+    ChevronDown, ChevronUp, X, Star, Activity,
     FileText, CheckCircle2, AlertCircle, Loader2,
     AlertTriangle, CheckCheck, Eye, Lock, Download,
-    TrendingUp, Building2, Phone
+    TrendingUp, Building2
 } from 'lucide-react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-    ResponsiveContainer, PieChart, Pie, Cell, Legend,
+    ResponsiveContainer, Cell,
     AreaChart, Area
 } from 'recharts';
 import ActivityMap from '../components/charts/ActivityMap';
@@ -194,35 +194,39 @@ const Analytics = () => {
     }, []);
 
     // Fetch pending/action-required visits for admin action panel
+    // Respects the same date range and report-type filters as the KPI cards
     const fetchPendingVisits = useCallback(async () => {
         try {
+            const base = new URLSearchParams();
+            if (filters.startDate) base.append('startDate', filters.startDate);
+            if (filters.endDate)   base.append('endDate',   filters.endDate);
+            if (filters.reportType === 'B2B') base.append('formType', 'generic');
+            if (filters.reportType === 'B2C') base.append('formType', 'home_visit');
+            const bqs = base.toString() ? `&${base.toString()}` : '';
+
             const [subRes, actRes, unlRes] = await Promise.all([
-                api.get('/visits?status=submitted'),
-                api.get('/visits?status=action_required'),
-                api.get('/visits?unlockRequestSent=true')
+                api.get(`/visits?status=submitted${bqs}`),
+                api.get(`/visits?status=action_required${bqs}`),
+                api.get(`/visits?unlockRequestSent=true${bqs}`)
             ]);
             const combined = [
-                ...(subRes.data.data || []), 
+                ...(subRes.data.data || []),
                 ...(actRes.data.data || []),
                 ...(unlRes.data.data || [])
             ];
-            
+
             // Deduplicate
             const unique = [];
             const seen = new Set();
             for (const v of combined) {
-                if (!seen.has(v._id)) {
-                    unique.push(v);
-                    seen.add(v._id);
-                }
+                if (!seen.has(v._id)) { unique.push(v); seen.add(v._id); }
             }
-
             unique.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
             setPendingVisits(unique);
         } catch (err) {
             console.error('Failed to fetch pending visits', err);
         }
-    }, []);
+    }, [filters.startDate, filters.endDate, filters.reportType]);
 
     useEffect(() => { fetchPendingVisits(); }, [fetchPendingVisits]);
 
@@ -322,6 +326,10 @@ const Analytics = () => {
         try {
             await api.put(`/visits/${visitId}`, { status: newStatus });
             showToast(`Visit marked as ${STATUS_LABELS[newStatus]}`);
+            // Optimistically update any open BDM modal so it shows the new status immediately
+            if (selectedBdm) {
+                setBdmVisits(prev => prev.map(v => v._id === visitId ? { ...v, status: newStatus } : v));
+            }
             fetchPendingVisits();
             fetchAnalytics();
         } catch (err) {
@@ -395,18 +403,6 @@ const Analytics = () => {
             </div>
         </div>
     );
-
-    const pieData = (summary?.statusDist || []).map(item => ({
-        name: STATUS_LABELS[item._id] || item._id,
-        value: item.count,
-        color: STATUS_COLORS[item._id] || '#CBD5E1'
-    }));
-
-    const formTypeData = (summary?.formTypeDist || []).map(item => ({
-        name: item._id === 'generic' ? 'B2B Agency' : 'B2C Home Visit',
-        value: item.count,
-        color: item._id === 'generic' ? '#284695' : '#E19D19'
-    }));
 
     const dailyData = (summary?.dailyTrends || []).map(t => ({
         date: t._id.slice(5),
@@ -566,7 +562,8 @@ const Analytics = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard title="Reviewed"         value={summary?.stats.reviewedVisits} icon={Award}    color="#00A0E3" bgColor="#E0F5FF" />
                 <StatCard title="Drafts"           value={summary?.stats.draftVisits}    icon={FileText} color="#94A3B8" bgColor="#F8FAFC" />
-                <StatCard title="Active Users"     value={summary?.stats.activeUsers}    icon={Users}    color="#9C2BE3" bgColor="#F5EDFF" />
+                <StatCard title="Active Surveyors" value={summary?.stats.activeUsers}    icon={Users}    color="#9C2BE3" bgColor="#F5EDFF"
+                    sub="with visits in this period" />
                 <StatCard title="Avg Infra Rating" icon={Star} color="#E19D19" bgColor="#FFF8E6"
                     value={detailed?.avgInfraRating > 0 ? `${detailed.avgInfraRating} / 5` : '—'}
                 />
@@ -657,48 +654,31 @@ const Analytics = () => {
                 </ChartCard>
             )}
 
-            {/* Daily Activity + Status Pie */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <ChartCard
-                    title="Daily Activity (Last 30 Days)"
-                    subtitle="Submissions per day"
-                    icon={Activity}
-                    iconColor="#00A0E3"
-                    className="lg:col-span-2"
-                >
-                    <div className="h-56">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={dailyData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="dailyGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#00A0E3" stopOpacity={0.15} />
-                                        <stop offset="95%" stopColor="#00A0E3" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                                <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 10 }} interval={4} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 10 }} />
-                                <Tooltip content={CustomTooltip} />
-                                <Area type="monotone" dataKey="visits" name="Visits" stroke="#00A0E3" strokeWidth={2.5} fill="url(#dailyGrad)" dot={false} activeDot={{ r: 4, fill: '#284695' }} isAnimationActive={false} />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </ChartCard>
-
-                <ChartCard title="Status Distribution" subtitle="By submission status" icon={PieChartIcon} iconColor="#9C2BE3">
-                    <div className="h-56">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie data={pieData} cx="50%" cy="45%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value" isAnimationActive={false}>
-                                    {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                                </Pie>
-                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 25px rgba(0,0,0,0.1)' }} />
-                                <Legend formatter={(value) => value} iconSize={8} wrapperStyle={{ fontSize: '11px', fontWeight: 600, color: '#475569' }} />
-                            </PieChart>
-                        </ResponsiveContainer>
-                    </div>
-                </ChartCard>
-            </div>
+            {/* Daily Activity */}
+            <ChartCard
+                title="Daily Activity (Last 30 Days)"
+                subtitle="Submissions per day"
+                icon={Activity}
+                iconColor="#00A0E3"
+            >
+                <div className="h-56">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={dailyData} margin={{ top: 5, right: 5, left: -25, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id="dailyGrad" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#00A0E3" stopOpacity={0.15} />
+                                    <stop offset="95%" stopColor="#00A0E3" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                            <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 10 }} interval={4} />
+                            <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 10 }} />
+                            <Tooltip content={CustomTooltip} />
+                            <Area type="monotone" dataKey="visits" name="Visits" stroke="#00A0E3" strokeWidth={2.5} fill="url(#dailyGrad)" dot={false} activeDot={{ r: 4, fill: '#284695' }} isAnimationActive={false} />
+                        </AreaChart>
+                    </ResponsiveContainer>
+                </div>
+            </ChartCard>
 
             {/* Day of Week + Funnel */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -732,89 +712,6 @@ const Analytics = () => {
                     </div>
                 </ChartCard>
             </div>
-
-            {/* Form Type + Top Pincodes */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <ChartCard title="Form Type Distribution" subtitle="B2B vs B2C breakdown" icon={BarChart2} iconColor="#284695">
-                    <div className="space-y-3">
-                        {formTypeData.map((item) => {
-                            const pct = summary?.stats.totalVisits
-                                ? Math.round((item.value / summary.stats.totalVisits) * 100) : 0;
-                            return (
-                                <div key={item.name}>
-                                    <div className="flex items-center justify-between mb-1.5">
-                                        <span className="text-sm font-semibold text-slate-700">{item.name}</span>
-                                        <span className="text-sm font-bold" style={{ color: item.color }}>
-                                            {item.value} <span className="text-slate-400 font-normal">({pct}%)</span>
-                                        </span>
-                                    </div>
-                                    <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: item.color }} />
-                                    </div>
-                                </div>
-                            );
-                        })}
-                        {formTypeData.length === 0 && <p className="text-sm text-slate-400 text-center py-8">No data available</p>}
-                    </div>
-                </ChartCard>
-
-                <ChartCard title="Top Pincodes" subtitle="Most visited area codes" icon={MapPin} iconColor="#EF7F1A">
-                    <div className="space-y-2">
-                        {(detailed?.topPincodes || []).slice(0, 6).map((pc, i) => (
-                            <div key={pc._id} className="flex items-center gap-3">
-                                <span className="text-xs font-extrabold text-slate-400 w-5 shrink-0">{i + 1}</span>
-                                <div className="flex-1 min-w-0">
-                                    <div className="flex items-center justify-between mb-1">
-                                        <span className="text-sm font-bold text-slate-700">{pc._id}</span>
-                                        <span className="text-xs font-bold text-brand-orange">{pc.count} visits</span>
-                                    </div>
-                                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                        <div className="h-full bg-brand-orange rounded-full"
-                                            style={{ width: `${(pc.count / ((detailed?.topPincodes[0]?.count) || 1)) * 100}%` }} />
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                        {!detailed?.topPincodes?.length && <p className="text-sm text-slate-400 text-center py-8">No pincode data available</p>}
-                    </div>
-                </ChartCard>
-            </div>
-
-            {/* B2B: Business Models + Countries */}
-            {(detailed?.businessModels?.length > 0 || detailed?.countriesPromoted?.length > 0) && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    {detailed?.businessModels?.length > 0 && (
-                        <ChartCard title="Business Models (B2B)" subtitle="Agency business model distribution" icon={Briefcase} iconColor="#284695">
-                            <div className="h-56">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={detailed.businessModels.slice(0, 8)} layout="vertical" margin={{ left: 10, right: 15 }}>
-                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F1F5F9" />
-                                        <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 10 }} />
-                                        <YAxis dataKey="_id" type="category" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 10, fontWeight: 600 }} width={100} />
-                                        <Tooltip content={CustomTooltip} />
-                                        <Bar dataKey="count" name="Agencies" fill="#284695" radius={[0, 6, 6, 0]} barSize={18} isAnimationActive={false} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </ChartCard>
-                    )}
-                    {detailed?.countriesPromoted?.length > 0 && (
-                        <ChartCard title="Countries Promoted (B2B)" subtitle="Top destination countries being marketed" icon={Globe} iconColor="#009846">
-                            <div className="h-56">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={detailed.countriesPromoted.slice(0, 8)} layout="vertical" margin={{ left: 10, right: 15 }}>
-                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F1F5F9" />
-                                        <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 10 }} />
-                                        <YAxis dataKey="_id" type="category" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 10, fontWeight: 600 }} width={90} />
-                                        <Tooltip content={CustomTooltip} />
-                                        <Bar dataKey="count" name="Count" fill="#009846" radius={[0, 6, 6, 0]} barSize={18} isAnimationActive={false} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </ChartCard>
-                    )}
-                </div>
-            )}
 
             {/* B2C Visit Outcomes */}
             {detailed?.visitOutcomes?.length > 0 && (
@@ -1053,10 +950,13 @@ const Analytics = () => {
                             <tr className="border-b border-slate-100">
                                 <th className="th">#</th>
                                 <th className="th">Agent</th>
-                                <th className="th text-center">Employee ID</th>
-                                <th className="th text-center">Total</th>
-                                <th className="th text-center">Submitted</th>
-                                <th className="th text-center">Closed</th>
+                                <th className="th text-center">Emp ID</th>
+                                <th className="th text-center" title="All visits including drafts">Total</th>
+                                <th className="th text-center" title="Saved but not yet submitted">Drafts</th>
+                                <th className="th text-center" title="Awaiting admin review">Pending</th>
+                                <th className="th text-center" title="Admin flagged for follow-up">Action Req.</th>
+                                <th className="th text-center" title="Reviewed by admin">Reviewed</th>
+                                <th className="th text-center" title="Resolved / closed">Closed</th>
                                 <th className="th text-center">Last Visit</th>
                                 <th className="th text-center">Details</th>
                             </tr>
@@ -1092,10 +992,19 @@ const Analytics = () => {
                                         <span className="text-sm font-extrabold text-brand-blue">{item.visitsCount}</span>
                                     </td>
                                     <td className="td text-center">
-                                        <span className="text-xs font-bold text-brand-orange">{item.submittedCount}</span>
+                                        <span className={`text-xs font-bold ${item.draftCount > 0 ? 'text-slate-400' : 'text-slate-300'}`}>{item.draftCount || 0}</span>
                                     </td>
                                     <td className="td text-center">
-                                        <span className="text-xs font-bold text-brand-green">{item.closedCount}</span>
+                                        <span className={`text-xs font-bold ${item.submittedCount > 0 ? 'text-brand-orange' : 'text-slate-300'}`}>{item.submittedCount || 0}</span>
+                                    </td>
+                                    <td className="td text-center">
+                                        <span className={`text-xs font-bold ${item.actionRequiredCount > 0 ? 'text-red-600' : 'text-slate-300'}`}>{item.actionRequiredCount || 0}</span>
+                                    </td>
+                                    <td className="td text-center">
+                                        <span className={`text-xs font-bold ${item.reviewedCount > 0 ? 'text-brand-sky' : 'text-slate-300'}`}>{item.reviewedCount || 0}</span>
+                                    </td>
+                                    <td className="td text-center">
+                                        <span className={`text-xs font-bold ${item.closedCount > 0 ? 'text-brand-green' : 'text-slate-300'}`}>{item.closedCount || 0}</span>
                                     </td>
                                     <td className="td text-center text-xs text-slate-400">
                                         {item.lastSubmission
@@ -1153,18 +1062,22 @@ const Analytics = () => {
                                     {isFetchingUser && selectedUser?._id === item._id ? '...' : 'View'}
                                 </button>
                             </div>
-                            <div className="grid grid-cols-3 gap-2 py-3 border-t border-slate-50">
+                            <div className="grid grid-cols-4 gap-2 py-3 border-t border-slate-50">
                                 <div className="text-center">
-                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-tighter mb-0.5">Visits</p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mb-0.5">Total</p>
                                     <p className="text-sm font-black text-brand-blue">{item.visitsCount}</p>
                                 </div>
                                 <div className="text-center">
-                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-tighter mb-0.5">Pend.</p>
-                                    <p className="text-sm font-black text-brand-orange">{item.submittedCount}</p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mb-0.5">Pend.</p>
+                                    <p className={`text-sm font-black ${item.submittedCount > 0 ? 'text-brand-orange' : 'text-slate-300'}`}>{item.submittedCount || 0}</p>
                                 </div>
                                 <div className="text-center">
-                                    <p className="text-xs text-slate-400 font-bold uppercase tracking-tighter mb-0.5">Closed</p>
-                                    <p className="text-sm font-black text-brand-green">{item.closedCount}</p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mb-0.5">Action</p>
+                                    <p className={`text-sm font-black ${item.actionRequiredCount > 0 ? 'text-red-500' : 'text-slate-300'}`}>{item.actionRequiredCount || 0}</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mb-0.5">Closed</p>
+                                    <p className={`text-sm font-black ${item.closedCount > 0 ? 'text-brand-green' : 'text-slate-300'}`}>{item.closedCount || 0}</p>
                                 </div>
                             </div>
                         </div>
@@ -1390,10 +1303,7 @@ const Analytics = () => {
                                                     )}
                                                     {visit.status !== 'closed' && (
                                                         <button
-                                                            onClick={async () => {
-                                                                await handleStatusUpdate(visit._id, 'closed');
-                                                                setBdmVisits(prev => prev.map(v => v._id === visit._id ? { ...v, status: 'closed' } : v));
-                                                            }}
+                                                            onClick={() => handleStatusUpdate(visit._id, 'closed')}
                                                             disabled={updatingVisitId === visit._id}
                                                             className="px-3 py-1.5 bg-green-50 text-brand-green rounded-lg text-xs font-bold hover:bg-green-100 transition-all disabled:opacity-50 flex items-center gap-1"
                                                         >

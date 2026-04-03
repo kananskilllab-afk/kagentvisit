@@ -9,26 +9,34 @@ const buildQuery = (reqQuery, user) => {
 
     const { pinCode, bdmName, rmName, officerName, status, city, startDate, endDate, reportType } = reqQuery;
 
+    // Each multi-field OR condition is wrapped in its own $and clause so that
+    // combining multiple filters means AND (not OR) between them.
+    const andConditions = [];
+
     if (pinCode && pinCode !== '') {
-        query.$or = query.$or || [];
-        query.$or.push({ 'agencyProfile.pinCode': pinCode });
-        query.$or.push({ 'location.pinCode': pinCode });
+        andConditions.push({ $or: [
+            { 'agencyProfile.pinCode': pinCode },
+            { 'location.pinCode': pinCode }
+        ]});
     }
+    if (city) {
+        andConditions.push({ $or: [
+            { 'agencyProfile.address': { $regex: city, $options: 'i' } },
+            { 'location.city': { $regex: city, $options: 'i' } },
+            { 'location.address': { $regex: city, $options: 'i' } }
+        ]});
+    }
+    if (andConditions.length > 0) query.$and = andConditions;
+
     if (bdmName) query['meta.bdmName'] = { $regex: bdmName, $options: 'i' };
     if (officerName) query['visitInfo.officer'] = { $regex: officerName, $options: 'i' };
     if (rmName) query['meta.rmName'] = { $regex: rmName, $options: 'i' };
     if (status) query.status = status;
-    if (city) {
-        query.$or = query.$or || [];
-        query.$or.push({ 'agencyProfile.address': { $regex: city, $options: 'i' } });
-        query.$or.push({ 'location.city': { $regex: city, $options: 'i' } });
-        query.$or.push({ 'location.address': { $regex: city, $options: 'i' } });
-    }
 
     if (reportType === 'B2B') query.formType = 'generic';
     if (reportType === 'B2C') query.formType = 'home_visit';
 
-    // Role-based department restriction for Admin
+    // Role-based department restriction for Admin (always wins)
     if (user.role === 'admin') {
         if (user.department === 'B2B') query.formType = 'generic';
         else if (user.department === 'B2C') query.formType = 'home_visit';
@@ -83,65 +91,66 @@ exports.getSummary = async (req, res) => {
     try {
         const query = buildQuery(req.query, req.user);
 
-        const totalVisits      = await Visit.countDocuments(query);
-        const pendingReview    = await Visit.countDocuments({ ...query, status: 'submitted' });
-        const actionRequired   = await Visit.countDocuments({ ...query, status: 'action_required' });
-        const closedVisits     = await Visit.countDocuments({ ...query, status: 'closed' });
-        const draftVisits      = await Visit.countDocuments({ ...query, status: 'draft' });
-        const reviewedVisits   = await Visit.countDocuments({ ...query, status: 'reviewed' });
-        const activeUsersCount = (req.user.role !== 'user' && req.user.role !== 'home_visit')
-            ? await User.countDocuments({ isActive: true })
-            : null;
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
 
-        // Monthly Trends – last 6 months
         const sixMonthsAgo = new Date();
         sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5);
         sixMonthsAgo.setDate(1);
 
-        const trends = await Visit.aggregate([
-            { $match: { ...query, createdAt: { $gte: sixMonthsAgo } } },
-            { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } }, count: { $sum: 1 } } },
-            { $sort: { _id: 1 } }
-        ]);
-
-        // Status Distribution
-        const statusDist = await Visit.aggregate([
+        // Single atomic aggregation for all counts — guarantees consistency
+        const [facetResult] = await Visit.aggregate([
             { $match: query },
-            { $group: { _id: '$status', count: { $sum: 1 } } }
+            {
+                $facet: {
+                    byStatus: [
+                        { $group: { _id: '$status', count: { $sum: 1 } } }
+                    ],
+                    activeSurveyors: [
+                        { $group: { _id: '$submittedBy' } },
+                        { $count: 'n' }
+                    ],
+                    dailyTrends: [
+                        { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+                        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
+                        { $sort: { _id: 1 } }
+                    ],
+                    monthlyTrends: [
+                        { $match: { createdAt: { $gte: sixMonthsAgo } } },
+                        { $group: { _id: { $dateToString: { format: '%Y-%m', date: '$createdAt' } }, count: { $sum: 1 } } },
+                        { $sort: { _id: 1 } }
+                    ]
+                }
+            }
         ]);
 
-        // Form Type Distribution
-        const formTypeDist = await Visit.aggregate([
-            { $match: query },
-            { $group: { _id: '$formType', count: { $sum: 1 } } }
-        ]);
+        // Build status map from the single aggregation result
+        const statusMap = {};
+        let totalVisits = 0;
+        for (const s of (facetResult?.byStatus || [])) {
+            statusMap[s._id] = s.count;
+            totalVisits += s.count;
+        }
 
-        // Daily trend – last 30 days
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
-
-        const dailyTrends = await Visit.aggregate([
-            { $match: { ...query, createdAt: { $gte: thirtyDaysAgo } } },
-            { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, count: { $sum: 1 } } },
-            { $sort: { _id: 1 } }
-        ]);
+        const activeSurveyors = (req.user.role !== 'user' && req.user.role !== 'home_visit')
+            ? (facetResult?.activeSurveyors[0]?.n || 0)
+            : null;
 
         res.json({
             success: true,
             data: {
                 stats: {
                     totalVisits,
-                    pendingReview,
-                    actionRequired,
-                    closedVisits,
-                    draftVisits,
-                    reviewedVisits,
-                    activeUsers: activeUsersCount
+                    pendingReview:  statusMap['submitted']       || 0,
+                    actionRequired: statusMap['action_required'] || 0,
+                    closedVisits:   statusMap['closed']          || 0,
+                    draftVisits:    statusMap['draft']           || 0,
+                    reviewedVisits: statusMap['reviewed']        || 0,
+                    // Distinct surveyors who submitted at least one visit in this period
+                    activeUsers: activeSurveyors
                 },
-                trends,
-                dailyTrends,
-                statusDist,
-                formTypeDist
+                trends:      facetResult?.monthlyTrends || [],
+                dailyTrends: facetResult?.dailyTrends   || []
             }
         });
     } catch (error) {
@@ -159,10 +168,19 @@ exports.getUserPerformance = async (req, res) => {
             {
                 $group: {
                     _id: '$submittedBy',
-                    visitsCount:     { $sum: 1 },
-                    submittedCount:  { $sum: { $cond: [{ $eq: ['$status', 'submitted'] }, 1, 0] } },
-                    closedCount:     { $sum: { $cond: [{ $eq: ['$status', 'closed'] }, 1, 0] } },
-                    lastSubmission:  { $max: '$createdAt' }
+                    // Total including drafts
+                    visitsCount:        { $sum: 1 },
+                    // Drafts (not yet submitted — don't count as work done)
+                    draftCount:         { $sum: { $cond: [{ $eq: ['$status', 'draft'] }, 1, 0] } },
+                    // Submitted (pending review)
+                    submittedCount:     { $sum: { $cond: [{ $eq: ['$status', 'submitted'] }, 1, 0] } },
+                    // Reviewed
+                    reviewedCount:      { $sum: { $cond: [{ $eq: ['$status', 'reviewed'] }, 1, 0] } },
+                    // Action required
+                    actionRequiredCount:{ $sum: { $cond: [{ $eq: ['$status', 'action_required'] }, 1, 0] } },
+                    // Closed / resolved
+                    closedCount:        { $sum: { $cond: [{ $eq: ['$status', 'closed'] }, 1, 0] } },
+                    lastSubmission:     { $max: '$createdAt' }
                 }
             },
             {
@@ -176,14 +194,17 @@ exports.getUserPerformance = async (req, res) => {
             { $unwind: '$user' },
             {
                 $project: {
-                    name:           '$user.name',
-                    employeeId:     '$user.employeeId',
-                    department:     '$user.department',
-                    region:         '$user.region',
-                    visitsCount:    1,
-                    submittedCount: 1,
-                    closedCount:    1,
-                    lastSubmission: 1
+                    name:                '$user.name',
+                    employeeId:          '$user.employeeId',
+                    department:          '$user.department',
+                    region:              '$user.region',
+                    visitsCount:         1,
+                    draftCount:          1,
+                    submittedCount:      1,
+                    reviewedCount:       1,
+                    actionRequiredCount: 1,
+                    closedCount:         1,
+                    lastSubmission:      1
                 }
             },
             { $sort: { visitsCount: -1 } }
@@ -292,14 +313,17 @@ exports.getDetailedAnalytics = async (req, res) => {
             { $group: { _id: '$outcome.status', count: { $sum: 1 } } }
         ]);
 
-        // Completion funnel
-        const funnelStages = ['draft', 'submitted', 'reviewed', 'action_required', 'closed'];
-        const funnelData = await Promise.all(
-            funnelStages.map(async (stage) => ({
-                stage,
-                count: await Visit.countDocuments({ ...query, status: stage })
-            }))
-        );
+        // Completion funnel — single aggregation, consistent with summary counts
+        const funnelAgg = await Visit.aggregate([
+            { $match: query },
+            { $group: { _id: '$status', count: { $sum: 1 } } }
+        ]);
+        const funnelMap = {};
+        for (const f of funnelAgg) funnelMap[f._id] = f.count;
+        const funnelData = ['draft', 'submitted', 'reviewed', 'action_required', 'closed'].map(stage => ({
+            stage,
+            count: funnelMap[stage] || 0
+        }));
 
         res.json({
             success: true,
