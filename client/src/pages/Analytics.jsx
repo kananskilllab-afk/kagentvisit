@@ -8,7 +8,7 @@ import {
     ChevronDown, ChevronUp, X, Star, Activity,
     FileText, CheckCircle2, AlertCircle, Loader2,
     AlertTriangle, CheckCheck, Eye, Lock, Download,
-    TrendingUp, Building2
+    TrendingUp, Building2, Briefcase
 } from 'lucide-react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
