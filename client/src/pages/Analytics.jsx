@@ -392,7 +392,7 @@ const Analytics = () => {
         </div>
     );
 
-    if (loading) return (
+    if (loading && !summary) return (
         <div className="space-y-6 animate-pulse">
             <div className="h-10 w-56 bg-slate-200 rounded-xl" />
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -443,10 +443,11 @@ const Analytics = () => {
                 <div className="flex items-center gap-2">
                     <button
                         onClick={fetchAnalytics}
-                        className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-brand-blue hover:border-brand-sky transition-all"
+                        disabled={loading}
+                        className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-brand-blue hover:border-brand-sky transition-all disabled:opacity-50"
                         title="Refresh data"
                     >
-                        <RefreshCcw className="w-4 h-4" />
+                        <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin opacity-50' : ''}`} />
                     </button>
                     <button
                         onClick={() => setShowFilters(v => !v)}
