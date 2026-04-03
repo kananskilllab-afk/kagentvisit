@@ -3,6 +3,7 @@ import MultiSelect from '../shared/MultiSelect';
 import StarRating from '../shared/StarRating';
 import PhotoUpload from './PhotoUpload';
 import AgentAutocomplete from './AgentAutocomplete';
+import RichTextEditor from '../shared/RichTextEditor';
 import { Copy, Check } from 'lucide-react';
 
 const DynamicField = ({ field, register, control, errors, watch, setValue, Controller, disabled, showCopy }) => {
@@ -32,6 +33,21 @@ const DynamicField = ({ field, register, control, errors, watch, setValue, Contr
                             disabled={disabled}
                             className={`${baseClass} h-24 resize-none`}
                             placeholder={field.placeholder || `Enter ${label.toLowerCase()}...`}
+                        />
+                    );
+                case 'richtext':
+                    return (
+                        <Controller
+                            name={name}
+                            control={control}
+                            render={({ field: { value, onChange } }) => (
+                                <RichTextEditor
+                                    value={value}
+                                    onChange={onChange}
+                                    disabled={disabled}
+                                    placeholder={field.placeholder || `Enter ${label.toLowerCase()}...`}
+                                />
+                            )}
                         />
                     );
                 case 'number':
@@ -176,7 +192,7 @@ const DynamicField = ({ field, register, control, errors, watch, setValue, Contr
         return inputElement;
     };
 
-    const isFullWidth = ['textarea', 'multi-select', 'photo-upload'].includes(type);
+    const isFullWidth = ['textarea', 'richtext', 'multi-select', 'photo-upload'].includes(type);
 
     return (
         <div className={`${isFullWidth ? 'md:col-span-2' : ''} space-y-1.5`}>
