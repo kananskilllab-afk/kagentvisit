@@ -130,18 +130,11 @@ exports.importAgents = async (req, res) => {
             const workbook = new ExcelJS.Workbook();
             await workbook.xlsx.load(req.file.buffer);
             const worksheet = workbook.getWorksheet(1);
-            
             worksheet.eachRow((row, rowNumber) => {
                 if (rowNumber === 1) return; // Skip header
-                const name = (row.getCell(2).value?.toString() || '').trim();
-                if (!name) return;
-
-                const rawDate = row.getCell(14).value;
-                const onboardingDate = parseCommonDate(rawDate);
-
                 const agentData = {
                     rank: row.getCell(1).value?.toString() || '',
-                    name: name,
+                    name: (row.getCell(2).value?.toString() || '').trim(),
                     categoryType: row.getCell(3).value?.toString() || '',
                     agentType: row.getCell(4).value?.toString() || '',
                     emailId: row.getCell(5).value?.toString() || '',
@@ -151,13 +144,14 @@ exports.importAgents = async (req, res) => {
                     zone: row.getCell(9).value?.toString() || '',
                     team: row.getCell(10).value?.toString() || '',
                     rmName: row.getCell(11).value?.toString() || '',
-                    onboardingDate,
-                    bdmName: row.getCell(15).value?.toString() || '',
-                    region: row.getCell(16).value?.toString() || '',
-                    autoRegionMapping: row.getCell(17).value?.toString() || '',
-                    isActive: true,
+                    onboardingDate: parseCommonDate(row.getCell(14).value),
+                    allowRegistration: row.getCell(16).value === 'false' || row.getCell(16).value === false ? false : true,
+                    accountUrl: row.getCell(17).value?.toString() || '',
+                    bdmName: row.getCell(18).value?.toString() || '',
+                    region: row.getCell(19).value?.toString() || '',
                     createdBy: req.user._id
                 };
+                agentData.isActive = row.getCell(12).value === 'false' || row.getCell(12).value === false ? false : true;
                 agents.push(agentData);
             });
         } else if (isCsv) {
@@ -193,8 +187,6 @@ exports.importAgents = async (req, res) => {
                 const name = (cells[1] || '').trim();
                 if (!name) continue;
 
-                const onboardingDate = parseCommonDate(cells[13]);
-                
                 const agentData = {
                     rank: cells[0] || '',
                     name: name,
@@ -207,11 +199,12 @@ exports.importAgents = async (req, res) => {
                     zone: cells[8] || '',
                     team: cells[9] || '',
                     rmName: cells[10] || '',
-                    onboardingDate,
-                    bdmName: cells[14] || '',
-                    region: cells[15] || '',
-                    autoRegionMapping: cells[16] || '',
-                    isActive: true,
+                    isActive: cells[11] === 'false' || cells[11] === false ? false : true,
+                    onboardingDate: parseCommonDate(cells[13]),
+                    allowRegistration: cells[15] === 'false' || cells[15] === false ? false : true,
+                    accountUrl: cells[16] || '',
+                    bdmName: cells[17] || '',
+                    region: cells[18] || '',
                     createdBy: req.user._id
                 };
                 agents.push(agentData);

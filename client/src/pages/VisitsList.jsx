@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
-import { FileText, Search, MapPin, Calendar, Building2, Trash2, Edit, PlusCircle, Filter, X } from 'lucide-react';
+import { FileText, Search, MapPin, Calendar, Building2, Trash2, Edit, PlusCircle, Filter, X, Lock, Bell } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 const STATUS_CFG = {
@@ -23,7 +23,7 @@ const StatusBadge = ({ status }) => {
 };
 
 const VisitsList = () => {
-    const { user } = useAuth();
+    const { user, isAdmin } = useAuth();
     const [visits, setVisits] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -34,7 +34,7 @@ const VisitsList = () => {
     const [searchParams] = useSearchParams();
     const urlFormType = searchParams.get('formType');
 
-    const isHomeVisit = urlFormType === 'home_visit' || user.department === 'B2C' || user.role === 'home_visit';
+    const isHomeVisit = urlFormType === 'home_visit' || user?.department === 'B2C' || user?.role === 'home_visit';
 
     const fetchVisits = async () => {
         setLoading(true);
@@ -50,6 +50,19 @@ const VisitsList = () => {
     };
 
     useEffect(() => { fetchVisits(); }, [urlFormType]);
+
+    const handleApproveUnlock = async (visitId) => {
+        setIsSubmitting(true);
+        try {
+            await api.put(`/visits/${visitId}/approve-unlock`, { unlock: true });
+            fetchVisits();
+            alert('Visit unlocked successfully');
+        } catch (err) {
+            alert('Failed to approve unlock: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     const handleDeleteVisit = async () => {
         if (!visitToDelete) return;
@@ -78,7 +91,7 @@ const VisitsList = () => {
         return matchesSearch && matchesStatus;
     });
 
-    const isAdmin = user.role === 'superadmin' || user.role === 'admin';
+
 
     return (
         <div className="space-y-5 page-enter">
@@ -186,11 +199,20 @@ const VisitsList = () => {
                                                     <Building2 className="w-4 h-4" />
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <p className="text-sm font-bold text-slate-800 truncate group-hover:text-brand-blue transition-colors">
+                                                    <p className="text-sm font-bold text-slate-800 truncate group-hover:text-brand-blue transition-colors flex items-center gap-1.5">
                                                         {visit?.studentInfo?.name || visit?.meta?.companyName || 'Untitled'}
+                                                        {visit.isLocked && <Lock className="w-3 h-3 text-red-400" title="Locked" />}
+                                                        {isAdmin && visit.unlockRequestSent && (
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[8px] font-black uppercase tracking-tighter bg-red-100 text-red-600 animate-pulse">
+                                                                Unlock Req
+                                                            </span>
+                                                        )}
+                                                        {!isAdmin && visit.status === 'action_required' && (
+                                                            <Bell className="w-3 h-3 text-red-500 animate-bounce" title="Action Required By Admin" />
+                                                        )}
                                                     </p>
                                                     <p className="text-xs text-slate-400 truncate mt-0.5">
-                                                        By: {visit?.submittedBy?.name || user.name}
+                                                        By: {visit?.submittedBy?.name || user?.name}
                                                     </p>
                                                 </div>
                                             </div>
@@ -214,7 +236,18 @@ const VisitsList = () => {
                                         </td>
                                         <td className="td text-right" onClick={(e) => e.stopPropagation()}>
                                             <div className="flex justify-end gap-1.5">
-                                                {(isAdmin || visit.submittedBy?._id === user._id) && (
+                                                {isAdmin && visit.unlockRequestSent && (
+                                                    <button
+                                                        onClick={() => handleApproveUnlock(visit._id)}
+                                                        disabled={isSubmitting}
+                                                        className="p-1.5 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-all flex items-center gap-1.5 text-[10px] font-black uppercase pointer-events-auto"
+                                                        title="Approve Unlock"
+                                                    >
+                                                        <Lock className="w-3.5 h-3.5" />
+                                                        Unlock
+                                                    </button>
+                                                )}
+                                                {(isAdmin || visit.submittedBy?._id === user?._id) && (
                                                     <button
                                                         onClick={() => navigate(`/edit-visit/${visit._id}`)}
                                                         className="p-1.5 rounded-lg border border-brand-blue/20 text-brand-blue hover:bg-brand-blue/5 transition-all"
@@ -223,7 +256,7 @@ const VisitsList = () => {
                                                         <Edit className="w-3.5 h-3.5" />
                                                     </button>
                                                 )}
-                                                {(user.role === 'superadmin' || visit.submittedBy?._id === user._id) && (
+                                                {(user?.role === 'superadmin' || visit.submittedBy?._id === user?._id) && (
                                                     <button
                                                         onClick={() => setVisitToDelete(visit)}
                                                         className="p-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-all"
@@ -254,16 +287,35 @@ const VisitsList = () => {
                                             <Building2 className="w-5 h-5" />
                                         </div>
                                         <div className="min-w-0">
-                                            <p className="text-sm font-bold text-slate-800 truncate">
+                                            <p className="text-sm font-bold text-slate-800 truncate flex items-center gap-1.5">
                                                 {visit?.studentInfo?.name || visit?.meta?.companyName || 'Untitled'}
+                                                {visit.isLocked && <Lock className="w-3 h-3 text-red-400" />}
                                             </p>
-                                            <p className="text-xs text-slate-400 mt-0.5">
-                                                {new Date(visit.createdAt).toLocaleDateString()}
-                                            </p>
+                                            <div className="flex items-center gap-2 mt-0.5">
+                                                <p className="text-xs text-slate-400">
+                                                    {new Date(visit.createdAt).toLocaleDateString()}
+                                                </p>
+                                                {isAdmin && visit.unlockRequestSent && (
+                                                    <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-600 text-[8px] font-black uppercase">
+                                                        Unlock Req
+                                                    </span>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-                                        {(isAdmin || visit.submittedBy?._id === user._id) && (
+                                        {isAdmin && visit.unlockRequestSent && (
+                                            <button
+                                                onClick={() => handleApproveUnlock(visit._id)}
+                                                disabled={isSubmitting}
+                                                className="p-2 rounded-lg border border-red-200 bg-red-50 text-red-600 hover:bg-red-100 transition-all flex items-center gap-1.5 text-[10px] font-black uppercase"
+                                                title="Approve Unlock"
+                                            >
+                                                <Lock className="w-4 h-4" />
+                                                Unlock
+                                            </button>
+                                        )}
+                                        {(isAdmin || visit.submittedBy?._id === user?._id) && (
                                             <button
                                                 onClick={() => navigate(`/edit-visit/${visit._id}`)}
                                                 className="p-2 rounded-lg border border-brand-blue/20 text-brand-blue hover:bg-brand-blue/5"
@@ -271,7 +323,7 @@ const VisitsList = () => {
                                                 <Edit className="w-4 h-4" />
                                             </button>
                                         )}
-                                        {(user.role === 'superadmin' || visit.submittedBy?._id === user._id) && (
+                                        {(user?.role === 'superadmin' || visit.submittedBy?._id === user?._id) && (
                                             <button
                                                 onClick={() => setVisitToDelete(visit)}
                                                 className="p-2 rounded-lg border border-red-200 text-red-500 hover:bg-red-50"

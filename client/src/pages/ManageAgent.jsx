@@ -17,6 +17,7 @@ const ManageAgent = () => {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const [editingAgent, setEditingAgent] = useState(null);
+    const [showImportModal, setShowImportModal] = useState(false);
     const fileInputRef = useRef(null);
 
     useEffect(() => {
@@ -46,6 +47,7 @@ const ManageAgent = () => {
         try {
             const res = await api.post('/agents/import', formData);
             alert(res.data.message);
+            setShowImportModal(false);
             fetchAgents();
         } catch (err) {
             alert(err.response?.data?.message || 'Error importing agents');
@@ -62,6 +64,7 @@ const ManageAgent = () => {
             const formData = new FormData(e.currentTarget);
             const data = Object.fromEntries(formData.entries());
             data.isActive = data.isActive === 'on' || data.isActive === 'true';
+            data.allowRegistration = data.allowRegistration === 'on' || data.allowRegistration === 'true';
 
             if (editingAgent) {
                 await api.put(`/agents/${editingAgent._id}`, data);
@@ -86,6 +89,24 @@ const ManageAgent = () => {
         } catch (err) {
             alert('Failed to delete agent');
         }
+    };
+
+    const downloadTemplate = () => {
+        const headers = [
+            'Rank', 'K-Apply Account Name', 'Category Type', 'Type', 'EmailId', 'Mobile', 
+            'City', 'State', 'Zone', 'Team', 'RM Name', 'Active', 'Created On', 
+            'OnBoarded Date', 'Updated Date', 'Allow Registration', 'AccountUrl', 'BDM', 'Region'
+        ];
+        const csvContent = headers.join(',') + '\n';
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'agent_import_template.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const handleDeleteAll = async () => {
@@ -143,12 +164,11 @@ const ManageAgent = () => {
                         className="hidden" 
                     />
                     <button 
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isImporting}
-                        className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-500 font-bold text-xs hover:bg-slate-50 transition-all disabled:opacity-50"
+                        onClick={() => setShowImportModal(true)}
+                        className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-500 font-bold text-xs hover:bg-slate-50 transition-all"
                         title="Bulk Import (CSV/Excel)"
                     >
-                        {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                        <Upload className="w-4 h-4" />
                         Import
                     </button>
                     <button 
@@ -195,8 +215,8 @@ const ManageAgent = () => {
                                 <div className="space-y-4">
                                     <h4 className="text-[10px] font-black uppercase tracking-widest text-brand-purple">Identification</h4>
                                     <div>
-                                        <label className="label">Agent Name</label>
-                                        <input name="name" required className="input-field" placeholder="Agency Name" defaultValue={editingAgent?.name || ''} />
+                                        <label className="label">K-Apply Account Name</label>
+                                        <input name="name" required className="input-field" placeholder="K-Apply Profile Name" defaultValue={editingAgent?.name || ''} />
                                     </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
@@ -232,6 +252,10 @@ const ManageAgent = () => {
                                         <label className="label">Mobile Number</label>
                                         <input name="mobile" className="input-field" placeholder="+91 ..." defaultValue={editingAgent?.mobile || ''} />
                                     </div>
+                                    <div>
+                                        <label className="label">Account URL</label>
+                                        <input name="accountUrl" className="input-field" placeholder="https://..." defaultValue={editingAgent?.accountUrl || ''} />
+                                    </div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <label className="label">City</label>
@@ -252,7 +276,7 @@ const ManageAgent = () => {
                                 <div className="space-y-4">
                                     <h4 className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Governance</h4>
                                     <div>
-                                        <label className="label">BDM Name</label>
+                                        <label className="label">BDM</label>
                                         <input name="bdmName" className="input-field" placeholder="Assigned BDM" defaultValue={editingAgent?.bdmName || ''} />
                                     </div>
                                     <div>
@@ -294,12 +318,30 @@ const ManageAgent = () => {
                                 <div className="space-y-4">
                                     <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-400">System Dates</h4>
                                     <div>
-                                        <label className="label">Onboarded Date</label>
+                                        <label className="label">OnBoarded Date</label>
                                         <input name="onboardingDate" type="date" className="input-field" defaultValue={editingAgent?.onboardingDate ? new Date(editingAgent.onboardingDate).toISOString().split('T')[0] : ''} />
                                     </div>
-                                    <div className="flex items-center gap-3 py-2">
-                                        <input type="checkbox" name="isActive" id="isActive" defaultChecked={editingAgent ? editingAgent.isActive : true} className="w-5 h-5 rounded-lg border-slate-200 text-brand-purple focus:ring-brand-purple/20" />
-                                        <label htmlFor="isActive" className="text-sm font-bold text-slate-700">Agent Account Active</label>
+                                    {editingAgent && (
+                                        <div className="grid grid-cols-2 gap-3 text-[10px] text-slate-400 font-bold uppercase">
+                                            <div>
+                                                <p className="mb-1">Created On</p>
+                                                <p className="bg-slate-50 p-2 rounded-lg">{new Date(editingAgent.createdAt).toLocaleDateString()}</p>
+                                            </div>
+                                            <div>
+                                                <p className="mb-1">Updated Date</p>
+                                                <p className="bg-slate-50 p-2 rounded-lg">{new Date(editingAgent.updatedAt).toLocaleDateString()}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="flex flex-col gap-2 py-2">
+                                        <div className="flex items-center gap-3">
+                                            <input type="checkbox" name="isActive" id="isActive" defaultChecked={editingAgent ? editingAgent.isActive : true} className="w-5 h-5 rounded-lg border-slate-200 text-brand-purple focus:ring-brand-purple/20" />
+                                            <label htmlFor="isActive" className="text-sm font-bold text-slate-700">Active</label>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <input type="checkbox" name="allowRegistration" id="allowRegistration" defaultChecked={editingAgent ? editingAgent.allowRegistration : true} className="w-5 h-5 rounded-lg border-slate-200 text-brand-purple focus:ring-brand-purple/20" />
+                                            <label htmlFor="allowRegistration" className="text-sm font-bold text-slate-700">Allow Registration</label>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -315,7 +357,70 @@ const ManageAgent = () => {
                 </div>
             )}
 
-            {/* Statistics Summary */}
+            {/* Import Modal */}
+            {showImportModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-fade-in">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                            <div>
+                                <h3 className="text-xl font-black text-slate-800">Bulk Import Agents</h3>
+                                <p className="text-xs text-slate-500 font-medium">Upload CSV or Excel file to import many agents</p>
+                            </div>
+                            <button onClick={() => setShowImportModal(false)} className="p-2 hover:bg-white rounded-xl transition-all shadow-sm border border-transparent hover:border-slate-100">
+                                <X className="w-5 h-5 text-slate-400" />
+                            </button>
+                        </div>
+                        
+                        <div className="p-8 space-y-6">
+                            <div className="p-6 border-2 border-dashed border-slate-100 rounded-3xl bg-slate-50/50 flex flex-col items-center text-center gap-4">
+                                <div className="w-16 h-16 rounded-2xl bg-white shadow-sm flex items-center justify-center text-brand-purple">
+                                    <Upload className="w-8 h-8" />
+                                </div>
+                                <div className="space-y-1">
+                                    <p className="text-sm font-bold text-slate-700">Select your directory file</p>
+                                    <p className="text-[10px] text-slate-400 font-medium uppercase tracking-wider">Supports .csv, .xlsx, .xls</p>
+                                </div>
+                                
+                                <button 
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={isImporting}
+                                    className="px-6 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-50 transition-all shadow-sm"
+                                >
+                                    {isImporting ? 'Processing File...' : 'Choose File'}
+                                </button>
+                            </div>
+
+                            <div className="space-y-4">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Resources</p>
+                                <button 
+                                    onClick={downloadTemplate}
+                                    className="w-full flex items-center justify-between p-4 bg-indigo-50/50 border border-indigo-100 rounded-2xl group hover:bg-indigo-50 transition-all"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="p-2.5 bg-white rounded-xl text-indigo-500 shadow-sm border border-indigo-50">
+                                            <Calendar className="w-5 h-5" />
+                                        </div>
+                                        <div className="text-left">
+                                            <p className="text-sm font-bold text-slate-800">CSV Template</p>
+                                            <p className="text-xs text-slate-500">Download formatted structure</p>
+                                        </div>
+                                    </div>
+                                    <ChevronRight className="w-5 h-5 text-indigo-300 group-hover:translate-x-1 transition-transform" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="p-6 border-t border-slate-100 bg-slate-50/50 flex gap-3">
+                            <button 
+                                onClick={() => setShowImportModal(false)}
+                                className="flex-1 px-4 py-3 rounded-2xl bg-white border border-slate-200 text-sm font-bold text-slate-500 hover:bg-slate-100 transition-all"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {[
                     { label: 'Total Agents', value: agents.length, color: 'brand-purple', icon: Building2 },
@@ -389,7 +494,7 @@ const ManageAgent = () => {
                     <table className="w-full text-left">
                         <thead>
                             <tr className="bg-slate-50/80 border-b border-slate-100">
-                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Agency Name</th>
+                                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">K-Apply Account Name</th>
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400 text-center">Contact</th>
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">Region/Location</th>
                                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-slate-400">BDM/RM</th>

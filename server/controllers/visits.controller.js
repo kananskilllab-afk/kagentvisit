@@ -12,9 +12,11 @@ exports.getVisits = async (req, res) => {
         }
 
         // Additional filters from query params
-        const { status, companyName, startDate, endDate, city, formType, submittedBy, agentId } = req.query;
+        const { status, companyName, startDate, endDate, city, formType, submittedBy, agentId, unlockRequestSent, bdmName } = req.query;
         if (status) query.status = status;
         if (agentId) query['meta.agentId'] = agentId;
+        if (bdmName) query['meta.bdmName'] = { $regex: bdmName, $options: 'i' };
+        if (unlockRequestSent === 'true') query.unlockRequestSent = true;
 
         // Admin/superadmin can filter by specific user
         if (submittedBy && (req.user.role === 'admin' || req.user.role === 'superadmin')) {
@@ -62,7 +64,18 @@ exports.getVisits = async (req, res) => {
             .select('-__v')
             .sort({ createdAt: -1 });
 
-        res.json({ success: true, count: visits.length, data: visits });
+        // Add logical lock status to results
+        const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+        const visitsWithLocked = visits.map(v => {
+            const vObj = v.toObject();
+            const isWindowExpired = v.createdAt < twentyFourHoursAgo;
+            vObj.isLocked = !isAdmin && isWindowExpired && !v.isAdminUnlocked;
+            return vObj;
+        });
+
+        res.json({ success: true, count: visits.length, data: visitsWithLocked });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -110,7 +123,15 @@ exports.getVisitById = async (req, res) => {
             return res.status(403).json({ success: false, message: 'Not authorized to view this visit' });
         }
 
-        res.json({ success: true, data: visit });
+        // Calculate lock status for frontend
+        const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const isWindowExpired = visit.createdAt < twentyFourHoursAgo;
+        
+        const visitObj = visit.toObject();
+        visitObj.isLocked = !isAdmin && isWindowExpired && !visit.isAdminUnlocked;
+
+        res.json({ success: true, data: visitObj });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -134,11 +155,18 @@ exports.updateVisit = async (req, res) => {
             return res.status(403).json({ success: false, message: 'Not authorized to update this visit' });
         }
 
-        // 24-hour edit lock check for NON-admins (if not draft)
-        if (!isAdmin && visit.status !== 'draft') {
+        // 24-hour edit lock check for NON-admins
+        if (!isAdmin) {
             const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-            if (visit.updatedAt < twentyFourHoursAgo) {
-                return res.status(403).json({ success: false, message: 'Edit window (24h) has expired' });
+            const isWindowExpired = visit.createdAt < twentyFourHoursAgo;
+            
+            // If window expired and NOT admin-unlocked, block edit
+            if (isWindowExpired && !visit.isAdminUnlocked) {
+                return res.status(403).json({ 
+                    success: false, 
+                    message: 'Edit window (24h) has expired. Please contact admin to unlock.',
+                    isLocked: true 
+                });
             }
         }
 
@@ -146,14 +174,16 @@ exports.updateVisit = async (req, res) => {
         let updateData = { ...req.body };
 
         // Handle Admin-specific notes
-        if (isAdmin && req.body.adminNote) {
+        if (isAdmin && (req.body.adminNote || req.body.adminNoteObj)) {
+            const noteData = req.body.adminNoteObj || { note: req.body.adminNote };
             updateData.$push = {
                 adminNotes: {
-                    note: req.body.adminNote,
+                    ...noteData,
                     addedBy: req.user._id
                 }
             };
             delete updateData.adminNote;
+            delete updateData.adminNoteObj;
         }
 
         // Record history
@@ -229,6 +259,46 @@ exports.deleteVisit = async (req, res) => {
         }
 
         res.status(403).json({ success: false, message: 'Not authorized to delete this visit' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// @desc    Request visit unlock
+exports.requestVisitUnlock = async (req, res) => {
+    try {
+        const visit = await Visit.findById(req.params.id);
+        if (!visit) {
+            return res.status(404).json({ success: false, message: 'Visit not found' });
+        }
+        if (visit.submittedBy.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ success: false, message: 'Not authorized' });
+        }
+        
+        visit.unlockRequestSent = true;
+        await visit.save();
+        
+        res.json({ success: true, message: 'Unlock request sent to admin' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// @desc    Approve/Override visit unlock (Admin only)
+exports.approveVisitUnlock = async (req, res) => {
+    try {
+        const visit = await Visit.findById(req.params.id);
+        if (!visit) {
+            return res.status(404).json({ success: false, message: 'Visit not found' });
+        }
+        
+        const unlock = req.body.unlock !== false; 
+        visit.isAdminUnlocked = unlock;
+        if (unlock) visit.unlockRequestSent = false; 
+        
+        await visit.save();
+        
+        res.json({ success: true, message: unlock ? 'Visit unlocked for editing' : 'Visit lock maintained' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

@@ -38,12 +38,11 @@ const RolePill = ({ role }) => {
 };
 
 const Layout = () => {
-    const { user, logout } = useAuth();
+    const { user, logout, isAdmin, isSuperAdmin } = useAuth();
     const location = useLocation();
     const [mobileOpen, setMobileOpen] = useState(false);
 
-    const isAdmin   = user.role === 'admin' || user.role === 'superadmin';
-    const isB2C     = user.department === 'B2C' || user.role === 'home_visit';
+    const isB2C     = user?.department === 'B2C' || user?.role === 'home_visit';
 
     const isActive = (path) => {
         const fullPath = location.pathname + location.search;
@@ -68,7 +67,7 @@ const Layout = () => {
         { label: 'Analytics',     icon: BarChart3,      path: '/analytics',    roles: ['admin','superadmin'] },
         { label: 'Users',         icon: Users,          path: '/users',        roles: ['superadmin'] },
         { label: 'Form Builder',  icon: Settings,       path: '/form-builder', roles: ['superadmin'] },
-    ].filter(item => item.roles.includes(user.role));
+    ].filter(item => item.roles.includes(user?.role));
 
     const Sidebar = ({ onClose }) => (
         <div className="flex flex-col h-full bg-sidebar-gradient">
@@ -105,11 +104,11 @@ const Layout = () => {
                     className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/10 transition-all group"
                 >
                     <div className="w-9 h-9 rounded-xl bg-brand-gold/20 flex items-center justify-center text-brand-gold font-bold text-sm shrink-0 ring-2 ring-brand-gold/20">
-                        {user.name.charAt(0).toUpperCase()}
+                        {user?.name?.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-white truncate">{user.name}</p>
-                        <RolePill role={user.role} />
+                        <p className="text-sm font-semibold text-white truncate">{user?.name}</p>
+                        <RolePill role={user?.role} />
                     </div>
                 </Link>
                 <button

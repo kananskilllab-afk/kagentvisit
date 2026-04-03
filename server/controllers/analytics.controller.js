@@ -47,6 +47,37 @@ const buildQuery = (reqQuery, user) => {
     return query;
 };
 
+// ── BDM Report ────────────────────────────────────────────────────────────────
+exports.getBdmReport = async (req, res) => {
+    try {
+        const query = buildQuery(req.query, req.user);
+
+        // BDM-wise aggregation (B2B only)
+        const bdmStats = await Visit.aggregate([
+            { $match: { ...query, formType: 'generic', 'meta.bdmName': { $exists: true, $ne: '' } } },
+            {
+                $group: {
+                    _id: '$meta.bdmName',
+                    totalVisits:    { $sum: 1 },
+                    pendingCount:   { $sum: { $cond: [{ $eq: ['$status', 'submitted'] }, 1, 0] } },
+                    actionRequired: { $sum: { $cond: [{ $eq: ['$status', 'action_required'] }, 1, 0] } },
+                    closedCount:    { $sum: { $cond: [{ $eq: ['$status', 'closed'] }, 1, 0] } },
+                    reviewedCount:  { $sum: { $cond: [{ $eq: ['$status', 'reviewed'] }, 1, 0] } },
+                    draftCount:     { $sum: { $cond: [{ $eq: ['$status', 'draft'] }, 1, 0] } },
+                    companies:      { $addToSet: '$meta.companyName' },
+                    lastVisit:      { $max: '$createdAt' },
+                    avgInfraRating: { $avg: '$agencyProfile.infraRating' }
+                }
+            },
+            { $sort: { totalVisits: -1 } }
+        ]);
+
+        res.json({ success: true, data: bdmStats });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
 // ── Summary ───────────────────────────────────────────────────────────────────
 exports.getSummary = async (req, res) => {
     try {

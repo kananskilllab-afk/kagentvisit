@@ -24,6 +24,9 @@ const agentSchema = new mongoose.Schema({
     bdmName: { type: String, index: true },
     region: { type: String },
     autoRegionMapping: { type: String },
+
+    allowRegistration: { type: Boolean, default: true },
+    accountUrl: { type: String },
     
     // Track counts and stats
     visitCount: { type: Number, default: 0 },

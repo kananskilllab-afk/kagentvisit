@@ -1,7 +1,7 @@
 import React from 'react';
-import { Check } from 'lucide-react';
+import { Check, AlertCircle } from 'lucide-react';
 
-const StepIndicator = ({ currentStep, steps = [] }) => {
+const StepIndicator = ({ currentStep, steps = [], errorSteps = [] }) => {
     const scrollRef = React.useRef(null);
 
     React.useEffect(() => {
@@ -56,8 +56,9 @@ const StepIndicator = ({ currentStep, steps = [] }) => {
                                 ${done   ? 'bg-brand-green text-white shadow-lg shadow-brand-green/20 rotate-0' : ''}
                                 ${active ? 'bg-brand-blue text-white ring-4 ring-brand-blue/10 scale-105 shadow-lg shadow-brand-blue/20' : ''}
                                 ${!done && !active ? 'bg-white border-2 border-slate-100 text-slate-300' : ''}
+                                ${errorSteps.includes(index) ? 'ring-4 ring-red-500/20 !bg-red-500 !text-white' : ''}
                             `}>
-                                {done ? <Check className="w-4 h-4" /> : index + 1}
+                                {errorSteps.includes(index) ? <AlertCircle className="w-4 h-4" /> : (done ? <Check className="w-4 h-4" /> : index + 1)}
                             </div>
 
                             {/* Label */}

@@ -8,7 +8,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import StepIndicator from '../components/SurveyForm/StepIndicator';
 import DynamicField from '../components/FormBuilder/DynamicField';
-import { Save, ChevronLeft, ChevronRight, CheckCircle, Info, Clock, Loader2, MapPin, AlertCircle } from 'lucide-react';
+import { Save, ChevronLeft, ChevronRight, CheckCircle, Info, Clock, Loader2, MapPin, AlertCircle, Bell, ShieldAlert } from 'lucide-react';
 
 const NewVisit = () => {
     const [currentStep, setCurrentStep] = useState(0);
@@ -22,11 +22,16 @@ const NewVisit = () => {
     const { id } = useParams();
     const [searchParams] = useSearchParams();
     const timerRef = useRef(null);
-    const { user } = useAuth();
+    const { user, isAdmin } = useAuth();
     const [gpsLocation, setGpsLocation] = useState(null);
     const [fetchingLocation, setFetchingLocation] = useState(false);
     const [locationError, setLocationError] = useState(null);
     const [gpsCoords, setGpsCoords] = useState({ lat: null, lng: null });
+    const [isLocked, setIsLocked] = useState(false);
+    const [unlockRequestSent, setUnlockRequestSent] = useState(false);
+    const [createdAt, setCreatedAt] = useState(null);
+    const [visitStatus, setVisitStatus] = useState('draft');
+    const [adminNotes, setAdminNotes] = useState([]);
 
     const fetchExactLocation = () => {
         if (!navigator.geolocation) {
@@ -314,6 +319,18 @@ const NewVisit = () => {
                     if (visitData.meta?.meetingEnd) visitData.meta.meetingEnd = new Date(visitData.meta.meetingEnd).toISOString().slice(0, 16);
                     if (visitData.gpsLocation) setGpsLocation(visitData.gpsLocation);
                     if (visitData.gpsCoordinates?.lat) setGpsCoords({ lat: visitData.gpsCoordinates.lat, lng: visitData.gpsCoordinates.lng });
+                    setIsLocked(!!visitData.isLocked);
+                    setUnlockRequestSent(!!visitData.unlockRequestSent);
+                    setCreatedAt(visitData.createdAt);
+                    setVisitStatus(visitData.status || 'draft');
+                    setAdminNotes(visitData.adminNotes || []);
+                    
+                    // Handle deep link to specific step
+                    const stepParam = searchParams.get('step');
+                    if (stepParam !== null && !isNaN(parseInt(stepParam))) {
+                        setCurrentStep(parseInt(stepParam));
+                    }
+
                     reset(visitData);
                 }
             } catch (err) {
@@ -362,6 +379,35 @@ const NewVisit = () => {
             setSaveStatus(`Saved at ${new Date().toLocaleTimeString()}`);
         } catch {
             setSaveStatus('Draft save failed');
+        }
+    };
+
+    const requestUnlock = async () => {
+        if (!visitId) return;
+        setIsSaving(true);
+        try {
+            await api.post(`/visits/${visitId}/request-unlock`);
+            setUnlockRequestSent(true);
+            alert('Unlock request sent to administrator.');
+        } catch (err) {
+            alert('Failed to send request: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const toggleUnlock = async (unlock) => {
+        if (!visitId) return;
+        setIsSaving(true);
+        try {
+            await api.put(`/visits/${visitId}/approve-unlock`, { unlock });
+            setIsLocked(!unlock);
+            setUnlockRequestSent(false);
+            alert(unlock ? 'Visit Unlocked' : 'Visit Locked');
+        } catch (err) {
+            alert('Admin Action Failed: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -487,6 +533,15 @@ const NewVisit = () => {
 
     const isHomeVisit = config?.formType === 'home_visit' || urlFormType === 'home_visit';
 
+    // 24h Notifications Logic
+    const getWindowInfo = () => {
+        if (!visitId || !id) return null;
+        // Mocking creation time if not available, but it should be in payload if we fetched it
+        // Let's assume we have createdAt from visitData
+        // We need to store it in state
+        return null; // Placeholder as I need to store createdAt in state
+    };
+
     return (
         <div className="pb-32 page-enter">
             {/* Header */}
@@ -499,14 +554,44 @@ const NewVisit = () => {
                         <p className="text-sm text-slate-500 mt-1 font-medium">Complete the field report below</p>
                     </div>
 
-                    <button
-                        onClick={saveDraft}
-                        className="btn-outline shrink-0 flex items-center justify-center gap-2 py-2.5 sm:py-2 px-6 shadow-sm hover:shadow-md transition-all sm:w-auto w-full"
-                    >
-                        <Save className="w-4 h-4 text-brand-blue" />
-                        <span className="font-bold">Save Draft</span>
-                    </button>
+                    {!isLocked && (
+                        <button
+                            onClick={saveDraft}
+                            className="btn-outline shrink-0 flex items-center justify-center gap-2 py-2.5 sm:py-2 px-6 shadow-sm hover:shadow-md transition-all sm:w-auto w-full"
+                        >
+                            <Save className="w-4 h-4 text-brand-blue" />
+                            <span className="font-bold">Save Draft</span>
+                        </button>
+                    )}
                 </div>
+
+                {isLocked && (
+                    <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center justify-between gap-4 animate-shake">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-white rounded-xl text-red-500 shadow-sm border border-red-50">
+                                <AlertCircle className="w-5 h-5" />
+                            </div>
+                            <div>
+                                <h4 className="text-sm font-black text-red-800 uppercase tracking-tight leading-none mb-1">Visit Locked</h4>
+                                <p className="text-xs text-red-600/70 font-bold">24h edit window has expired. Contact admin to unlock.</p>
+                            </div>
+                        </div>
+                        <button 
+                            type="button" 
+                            disabled={(unlockRequestSent && !isAdmin) || isSaving}
+                            onClick={isAdmin ? () => toggleUnlock(true) : requestUnlock}
+                            className={`px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg transition-all ${
+                                (unlockRequestSent && !isAdmin)
+                                ? 'bg-slate-100 text-slate-400 cursor-default' 
+                                : isAdmin 
+                                    ? 'bg-brand-blue text-white shadow-brand-blue/20 hover:scale-105 active:scale-95'
+                                    : 'bg-red-500 text-white shadow-red-500/20 hover:scale-105 active:scale-95'
+                            }`}
+                        >
+                            {isAdmin ? 'ADMIN: UNLOCK' : unlockRequestSent ? 'Request Sent' : 'Request Unlock'}
+                        </button>
+                    </div>
+                )}
 
                 {/* Status Badges Row */}
                 <div className="flex flex-wrap items-center gap-2.5">
@@ -534,11 +619,90 @@ const NewVisit = () => {
                             <><MapPin className="w-3.5 h-3.5" /> <span>Location pending</span></>
                         )}
                     </div>
+
+                    {/* Status Badge */}
+                    {id && (
+                        <div className={`px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider border flex items-center gap-1.5 shadow-sm transition-all ${
+                            visitStatus === 'reviewed' ? 'bg-blue-50 text-brand-sky border-blue-100' :
+                            visitStatus === 'action_required' ? 'bg-red-50 text-red-600 border-red-100 animate-pulse' :
+                            visitStatus === 'closed' ? 'bg-green-50 text-brand-green border-green-100' :
+                            visitStatus === 'submitted' ? 'bg-orange-50 text-brand-orange border-orange-100' :
+                            'bg-slate-50 text-slate-500 border-slate-100'
+                        }`}>
+                            <div className={`w-1.5 h-1.5 rounded-full ${
+                                visitStatus === 'reviewed' ? 'bg-brand-sky' :
+                                visitStatus === 'action_required' ? 'bg-red-600' :
+                                visitStatus === 'closed' ? 'bg-brand-green' :
+                                visitStatus === 'submitted' ? 'bg-brand-orange' :
+                                'bg-slate-400'
+                            }`} />
+                            {visitStatus === 'action_required' ? 'Action Needed' : visitStatus === 'submitted' ? 'Pending Review' : visitStatus}
+                        </div>
+                    )}
                 </div>
             </div>
 
+            {/* Status-specific alert instead of global notes feed */}
+            {visitStatus === 'action_required' && (
+                <div className="mb-6 p-4 bg-red-600 text-white rounded-2xl flex items-center gap-4 shadow-xl shadow-red-100 animate-bounce-subtle">
+                    <div className="p-2 bg-white/20 rounded-xl">
+                        <AlertCircle className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                        <h4 className="text-sm font-black uppercase tracking-tight leading-none mb-1 text-white">Action Required</h4>
+                        <p className="text-[11px] font-bold text-white/90">Please refer to the Dashboard for specific admin instructions and update the flagged sections.</p>
+                    </div>
+                </div>
+            )}
+
+            {/* In-Window Notifications */}
+            {!isLocked && id && createdAt && (
+                <div className="mb-6 space-y-3">
+                    {(() => {
+                        const createdDate = new Date(createdAt);
+                        const now = new Date();
+                        const hoursElapsed = (now - createdDate) / (1000 * 60 * 60);
+                        const hoursLeft = 24 - hoursElapsed;
+                        
+                        if (hoursLeft > 0) {
+                            // Logic: Show 1st notification if < 18h passed, 2nd if > 18h passed (more urgent)
+                            const isUrgent = hoursElapsed > 18;
+                            return (
+                                <div className={`p-4 rounded-2xl border flex items-start gap-4 shadow-sm animate-pulse-subtle transition-all ${
+                                    isUrgent 
+                                    ? 'bg-amber-50 border-amber-200 text-amber-800' 
+                                    : 'bg-brand-blue/5 border-brand-blue/10 text-brand-blue'
+                                }`}>
+                                    <div className={`p-2 rounded-xl shrink-0 ${isUrgent ? 'bg-white text-amber-600' : 'bg-white text-brand-blue'}`}>
+                                        {isUrgent ? <ShieldAlert className="w-5 h-5" /> : <Bell className="w-5 h-5" />}
+                                    </div>
+                                    <div>
+                                        <h4 className="text-sm font-black uppercase tracking-tight leading-none mb-1">
+                                            {isUrgent ? 'Urgent Correction Required' : 'Visit Completion Reminder'}
+                                        </h4>
+                                        <p className="text-xs font-bold opacity-80">
+                                            {isUrgent 
+                                                ? `Second Warning: You have only ${Math.ceil(hoursLeft)}h left to complete this report before it locks.` 
+                                                : `First Warning: Please ensure all required fields are filled within the next ${Math.ceil(hoursLeft)}h.`}
+                                        </p>
+                                    </div>
+                                </div>
+                            );
+                        }
+                        return null;
+                    })()}
+                </div>
+            )}
+
             {/* Step Indicator */}
-            <StepIndicator currentStep={currentStep} steps={groups} />
+            {/* Dashboard Deep-Link Logic is already implemented in Dashboard.jsx via navigate */}
+            
+            {/* Step Indicator with Error State */}
+            <StepIndicator 
+                currentStep={currentStep} 
+                steps={groups.map(g => g.title)} 
+                errorSteps={adminNotes.filter(n => n.stepIndex !== undefined).map(n => n.stepIndex)}
+            />
 
             {/* Form */}
             <form onSubmit={handleSubmit(onSubmit, onValidationError)} className="space-y-6 max-w-4xl mx-auto">
@@ -668,7 +832,7 @@ const NewVisit = () => {
                             <button
                                 type="button"
                                 onClick={handleSubmit(onSubmit, onValidationError)}
-                                disabled={isSaving}
+                                disabled={isSaving || isLocked}
                                 className="btn-primary flex items-center justify-center gap-2 px-5 sm:px-8 py-3 rounded-2xl font-bold bg-brand-gradient text-white shadow-lg shadow-brand-blue/20 hover:shadow-brand-blue/30 transition-all active:scale-95 disabled:opacity-70 disabled:grayscale text-sm sm:text-base"
                             >
                                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" /> Submit</>}

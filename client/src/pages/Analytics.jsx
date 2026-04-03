@@ -7,7 +7,8 @@ import {
     Calendar as CalendarIcon, Clock, Target, Award,
     ChevronDown, ChevronUp, X, Star, Activity, Globe,
     FileText, CheckCircle2, AlertCircle, Loader2,
-    AlertTriangle, CheckCheck, Eye
+    AlertTriangle, CheckCheck, Eye, Lock, Download,
+    TrendingUp, Building2, Phone
 } from 'lucide-react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -95,6 +96,49 @@ const StatusPill = ({ status }) => {
     );
 };
 
+// ── CSV Export Utility ────────────────────────────────────────────────────────
+const exportVisitsToCSV = (visits, filename) => {
+    const headers = [
+        'Company Name', 'BDM Name', 'RM Name', 'Visit Date', 'Meeting Start', 'Meeting End',
+        'Agency Address', 'Pincode', 'Contact Number', 'Business Models', 'Infra Rating',
+        'Total Staff', 'Countries Promoted', 'Avg Daily Walk-ins', 'Total Visa/Year',
+        'Action Points', 'Remarks', 'Interested Services', 'Biggest Challenge', 'Status', 'Submitted By'
+    ];
+    const rows = visits.map(v => [
+        v.meta?.companyName || '',
+        v.meta?.bdmName || '',
+        v.meta?.rmName || '',
+        v.createdAt ? new Date(v.createdAt).toLocaleDateString('en-IN') : '',
+        v.meta?.meetingStart ? new Date(v.meta.meetingStart).toLocaleString('en-IN') : '',
+        v.meta?.meetingEnd ? new Date(v.meta.meetingEnd).toLocaleString('en-IN') : '',
+        v.agencyProfile?.address || '',
+        v.agencyProfile?.pinCode || '',
+        v.agencyProfile?.contactNumber || '',
+        (v.agencyProfile?.businessModel || []).join('; '),
+        v.agencyProfile?.infraRating || '',
+        v.promoterTeam?.totalStaff || '',
+        (v.promoterTeam?.countriesPromoted || []).join('; '),
+        v.marketingOps?.avgDailyWalkins || '',
+        v.marketingOps?.totalVisaYear || '',
+        v.postVisit?.actionPoints || '',
+        v.postVisit?.remarks || '',
+        (v.support?.interestedServices || []).join('; '),
+        v.support?.biggestChallenge || '',
+        STATUS_LABELS[v.status] || v.status || '',
+        v.submittedBy?.name || ''
+    ]);
+    const csv = [headers, ...rows]
+        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${filename}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+};
+
 const Analytics = () => {
     const { user } = useAuth();
     const [summary, setSummary] = useState(null);
@@ -111,9 +155,19 @@ const Analytics = () => {
     const [updatingVisitId, setUpdatingVisitId] = useState(null);
     const [noteVisit, setNoteVisit] = useState(null);
     const [noteText, setNoteText] = useState('');
+    const [noteStepIndex, setNoteStepIndex] = useState('');
+    const [visitFormSections, setVisitFormSections] = useState([]);
     const [toast, setToast] = useState(null);
     const [pincodes, setPincodes] = useState([]);
     const [showFilters, setShowFilters] = useState(false);
+
+    // BDM Report state
+    const [bdmReport, setBdmReport] = useState([]);
+    const [selectedBdm, setSelectedBdm] = useState(null);
+    const [bdmVisits, setBdmVisits] = useState([]);
+    const [isFetchingBdm, setIsFetchingBdm] = useState(false);
+    const [isExportingBdm, setIsExportingBdm] = useState(false);
+    const [bdmSearchTerm, setBdmSearchTerm] = useState('');
 
     const [filters, setFilters] = useState({
         pinCode: '', bdmName: '', rmName: '', officerName: '', status: '',
@@ -142,13 +196,29 @@ const Analytics = () => {
     // Fetch pending/action-required visits for admin action panel
     const fetchPendingVisits = useCallback(async () => {
         try {
-            const [subRes, actRes] = await Promise.all([
+            const [subRes, actRes, unlRes] = await Promise.all([
                 api.get('/visits?status=submitted'),
-                api.get('/visits?status=action_required')
+                api.get('/visits?status=action_required'),
+                api.get('/visits?unlockRequestSent=true')
             ]);
-            const combined = [...(subRes.data.data || []), ...(actRes.data.data || [])];
-            combined.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-            setPendingVisits(combined);
+            const combined = [
+                ...(subRes.data.data || []), 
+                ...(actRes.data.data || []),
+                ...(unlRes.data.data || [])
+            ];
+            
+            // Deduplicate
+            const unique = [];
+            const seen = new Set();
+            for (const v of combined) {
+                if (!seen.has(v._id)) {
+                    unique.push(v);
+                    seen.add(v._id);
+                }
+            }
+
+            unique.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            setPendingVisits(unique);
         } catch (err) {
             console.error('Failed to fetch pending visits', err);
         }
@@ -164,21 +234,59 @@ const Analytics = () => {
             Object.entries(filters).forEach(([k, v]) => { if (v) params.append(k, v); });
             const qs = params.toString() ? `?${params.toString()}` : '';
 
-            const [sumRes, perfRes, detRes] = await Promise.all([
+            const requests = [
                 api.get(`/analytics/summary${qs}`),
                 api.get(`/analytics/performance${qs}`),
                 api.get(`/analytics/detailed${qs}`)
-            ]);
+            ];
+            // BDM report only for B2B / superadmin
+            const showBdm = user.role === 'superadmin' || user.department === 'B2B';
+            if (showBdm) requests.push(api.get(`/analytics/bdm-report${qs}`));
+
+            const [sumRes, perfRes, detRes, bdmRes] = await Promise.all(requests);
             setSummary(sumRes.data.data);
             setPerformance(perfRes.data.data || []);
             setDetailed(detRes.data.data);
+            if (bdmRes) setBdmReport(bdmRes.data.data || []);
         } catch (err) {
             console.error('Analytics fetch error', err);
             setError(err.response?.data?.message || 'Failed to load analytics. Please try again.');
         } finally {
             setLoading(false);
         }
-    }, [filters]);
+    }, [filters, user.role, user.department]);
+
+    const fetchBdmVisits = async (bdmName) => {
+        setIsFetchingBdm(true);
+        setBdmVisits([]);
+        try {
+            const res = await api.get(`/visits?bdmName=${encodeURIComponent(bdmName)}`);
+            setBdmVisits(res.data.data || []);
+        } catch (err) {
+            console.error('Error fetching BDM visits', err);
+        } finally {
+            setIsFetchingBdm(false);
+        }
+    };
+
+    const handleOpenBdm = (bdmRow) => {
+        setSelectedBdm(bdmRow);
+        fetchBdmVisits(bdmRow._id);
+    };
+
+    const handleExportBdm = async (bdmRow) => {
+        setIsExportingBdm(bdmRow._id);
+        try {
+            const res = await api.get(`/visits?bdmName=${encodeURIComponent(bdmRow._id)}`);
+            const visits = res.data.data || [];
+            exportVisitsToCSV(visits, `BDM_Report_${bdmRow._id.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}`);
+            showToast(`Exported ${visits.length} visits for ${bdmRow._id}`);
+        } catch (err) {
+            showToast('Export failed', 'error');
+        } finally {
+            setIsExportingBdm(null);
+        }
+    };
 
     useEffect(() => { fetchAnalytics(); }, [fetchAnalytics]);
 
@@ -193,6 +301,19 @@ const Analytics = () => {
             console.error('Error fetching user data:', err);
         } finally {
             setIsFetchingUser(false);
+        }
+    };
+
+    const handleApproveUnlock = async (visitId) => {
+        setUpdatingVisitId(visitId);
+        try {
+            await api.put(`/visits/${visitId}/approve-unlock`, { unlock: true });
+            showToast('Visit unlocked successfully');
+            fetchPendingVisits();
+        } catch (err) {
+            showToast(err.response?.data?.message || 'Approval failed', 'error');
+        } finally {
+            setUpdatingVisitId(null);
         }
     };
 
@@ -214,16 +335,33 @@ const Analytics = () => {
         if (!noteText.trim() || !noteVisit) return;
         setUpdatingVisitId(noteVisit._id);
         try {
-            await api.put(`/visits/${noteVisit._id}`, { adminNote: noteText });
+            const adminNoteObj = { 
+                note: noteText,
+                stepIndex: noteStepIndex !== '' ? parseInt(noteStepIndex) : undefined,
+                stepName: noteStepIndex !== '' ? visitFormSections[parseInt(noteStepIndex)]?.title : undefined
+            };
+            await api.put(`/visits/${noteVisit._id}`, { adminNoteObj });
             showToast('Note added successfully');
             setNoteVisit(null);
             setNoteText('');
+            setNoteStepIndex('');
         } catch (err) {
             showToast(err.response?.data?.message || 'Failed to add note', 'error');
         } finally {
             setUpdatingVisitId(null);
         }
     };
+
+    // Load form sections for note modal
+    useEffect(() => {
+        if (noteVisit) {
+            api.get(`/form-config?formType=${noteVisit.formType || 'generic'}`)
+               .then(res => setVisitFormSections(res.data.data?.sections || []))
+               .catch(() => setVisitFormSections([]));
+        } else {
+            setVisitFormSections([]);
+        }
+    }, [noteVisit]);
 
     const sq = searchTerm.toLowerCase();
     const filteredPerformance = !sq ? performance : performance.filter(p =>
@@ -493,6 +631,19 @@ const Analytics = () => {
                                         }
                                         Close
                                     </button>
+                                    {visit.unlockRequestSent && (
+                                        <button
+                                            onClick={() => handleApproveUnlock(visit._id)}
+                                            disabled={updatingVisitId === visit._id}
+                                            className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-bold hover:bg-red-200 transition-all disabled:opacity-50 flex items-center gap-1"
+                                        >
+                                            {updatingVisitId === visit._id
+                                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                                : <Lock className="w-3 h-3" />
+                                            }
+                                            Approve Unlock
+                                        </button>
+                                    )}
                                     <button
                                         onClick={() => { setNoteVisit(visit); setNoteText(''); }}
                                         className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-all"
@@ -720,6 +871,160 @@ const Analytics = () => {
                 </div>
             </ChartCard>
 
+            {/* BDM Visit Report Table */}
+            {bdmReport.length > 0 && (
+                <div className="card p-0 overflow-hidden">
+                    <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div>
+                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                <TrendingUp className="w-4 h-4 text-brand-blue" />
+                                BDM Visit Report
+                            </h3>
+                            <p className="text-xs text-slate-400 mt-0.5">{bdmReport.length} BDMs · Click "View" to see visit details &amp; export</p>
+                        </div>
+                        <div className="relative w-full sm:w-60">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                            <input
+                                type="text"
+                                placeholder="Search BDM..."
+                                className="input-field pl-9 h-9 text-sm"
+                                value={bdmSearchTerm}
+                                onChange={(e) => setBdmSearchTerm(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <div className="hidden sm:block overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="border-b border-slate-100">
+                                    <th className="th">#</th>
+                                    <th className="th">BDM Name</th>
+                                    <th className="th text-center">Total</th>
+                                    <th className="th text-center">Pending</th>
+                                    <th className="th text-center">Action Req.</th>
+                                    <th className="th text-center">Reviewed</th>
+                                    <th className="th text-center">Closed</th>
+                                    <th className="th text-center">Companies</th>
+                                    <th className="th text-center">Last Visit</th>
+                                    <th className="th text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {bdmReport
+                                    .filter(b => !bdmSearchTerm || (b._id || '').toLowerCase().includes(bdmSearchTerm.toLowerCase()))
+                                    .map((bdm, index) => (
+                                    <tr key={bdm._id} className="hover:bg-blue-50/20 transition-colors">
+                                        <td className="td">
+                                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-extrabold ${
+                                                index === 0 ? 'bg-brand-gold/20 text-brand-gold' :
+                                                index === 1 ? 'bg-slate-200 text-slate-600' :
+                                                index === 2 ? 'bg-brand-orange/20 text-brand-orange' :
+                                                'bg-slate-100 text-slate-500'
+                                            }`}>
+                                                {index + 1}
+                                            </div>
+                                        </td>
+                                        <td className="td">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-8 h-8 rounded-full bg-brand-blue/10 text-brand-blue flex items-center justify-center text-xs font-bold">
+                                                    {bdm._id?.charAt(0)?.toUpperCase() || '?'}
+                                                </div>
+                                                <span className="text-sm font-bold text-slate-800">{bdm._id || '—'}</span>
+                                            </div>
+                                        </td>
+                                        <td className="td text-center">
+                                            <span className="text-sm font-extrabold text-brand-blue">{bdm.totalVisits}</span>
+                                        </td>
+                                        <td className="td text-center">
+                                            <span className={`text-xs font-bold ${bdm.pendingCount > 0 ? 'text-brand-orange' : 'text-slate-300'}`}>{bdm.pendingCount}</span>
+                                        </td>
+                                        <td className="td text-center">
+                                            <span className={`text-xs font-bold ${bdm.actionRequired > 0 ? 'text-red-600' : 'text-slate-300'}`}>{bdm.actionRequired}</span>
+                                        </td>
+                                        <td className="td text-center">
+                                            <span className="text-xs font-bold text-brand-sky">{bdm.reviewedCount}</span>
+                                        </td>
+                                        <td className="td text-center">
+                                            <span className="text-xs font-bold text-brand-green">{bdm.closedCount}</span>
+                                        </td>
+                                        <td className="td text-center">
+                                            <span className="text-xs text-slate-500">{(bdm.companies || []).filter(Boolean).length}</span>
+                                        </td>
+                                        <td className="td text-center text-xs text-slate-400">
+                                            {bdm.lastVisit ? new Date(bdm.lastVisit).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' }) : '—'}
+                                        </td>
+                                        <td className="td text-center">
+                                            <div className="flex items-center justify-center gap-1.5">
+                                                <button
+                                                    onClick={() => handleOpenBdm(bdm)}
+                                                    className="px-3 py-1.5 bg-brand-blue/5 text-brand-blue hover:bg-brand-blue/10 rounded-lg text-xs font-bold transition-all"
+                                                >
+                                                    View
+                                                </button>
+                                                <button
+                                                    onClick={() => handleExportBdm(bdm)}
+                                                    disabled={isExportingBdm === bdm._id}
+                                                    className="px-2.5 py-1.5 bg-brand-green/5 text-brand-green hover:bg-brand-green/10 rounded-lg text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-1"
+                                                    title="Export this BDM's visits as CSV"
+                                                >
+                                                    {isExportingBdm === bdm._id
+                                                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                                                        : <Download className="w-3 h-3" />
+                                                    }
+                                                    Export
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    {/* Mobile BDM cards */}
+                    <div className="sm:hidden space-y-3 p-4">
+                        {bdmReport
+                            .filter(b => !bdmSearchTerm || (b._id || '').toLowerCase().includes(bdmSearchTerm.toLowerCase()))
+                            .map((bdm, index) => (
+                            <div key={bdm._id} className="p-4 rounded-2xl border border-slate-100 bg-white shadow-sm">
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black ${
+                                            index === 0 ? 'bg-brand-gold text-white' :
+                                            index === 1 ? 'bg-slate-300 text-slate-700' :
+                                            index === 2 ? 'bg-brand-orange text-white' :
+                                            'bg-slate-100 text-slate-500'
+                                        }`}>{index + 1}</div>
+                                        <p className="text-sm font-bold text-slate-800">{bdm._id || '—'}</p>
+                                    </div>
+                                    <div className="flex gap-1.5">
+                                        <button onClick={() => handleOpenBdm(bdm)} className="px-3 py-1.5 bg-brand-blue/10 text-brand-blue rounded-lg text-xs font-bold">View</button>
+                                        <button onClick={() => handleExportBdm(bdm)} disabled={isExportingBdm === bdm._id} className="px-2.5 py-1.5 bg-brand-green/10 text-brand-green rounded-lg text-xs font-bold disabled:opacity-50 flex items-center gap-1">
+                                            {isExportingBdm === bdm._id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-4 gap-2 pt-3 border-t border-slate-50 text-center">
+                                    {[
+                                        { label: 'Total', value: bdm.totalVisits, color: 'text-brand-blue' },
+                                        { label: 'Pend.', value: bdm.pendingCount, color: 'text-brand-orange' },
+                                        { label: 'Action', value: bdm.actionRequired, color: 'text-red-500' },
+                                        { label: 'Closed', value: bdm.closedCount, color: 'text-brand-green' },
+                                    ].map(({ label, value, color }) => (
+                                        <div key={label}>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tighter mb-0.5">{label}</p>
+                                            <p className={`text-sm font-black ${color}`}>{value}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                    {bdmReport.filter(b => !bdmSearchTerm || (b._id || '').toLowerCase().includes(bdmSearchTerm.toLowerCase())).length === 0 && (
+                        <div className="py-12 text-center text-slate-400 text-sm">No BDMs found</div>
+                    )}
+                </div>
+            )}
+
             {/* Performance Table */}
             <div className="card p-0 overflow-hidden">
                 <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -938,6 +1243,188 @@ const Analytics = () => {
                 </div>
             )}
 
+            {/* BDM Visit Detail Modal */}
+            {selectedBdm && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-3xl shadow-2xl animate-fade-in overflow-hidden max-h-[90vh] flex flex-col">
+                        <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+                            <div className="flex items-center gap-3">
+                                <div className="w-12 h-12 rounded-xl bg-brand-blue/10 text-brand-blue flex items-center justify-center font-bold text-lg">
+                                    {selectedBdm._id?.charAt(0)?.toUpperCase() || '?'}
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-slate-900">{selectedBdm._id}</h3>
+                                    <p className="text-xs text-slate-400">{selectedBdm.totalVisits} visits · {(selectedBdm.companies || []).filter(Boolean).length} companies</p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    onClick={() => {
+                                        if (bdmVisits.length > 0) {
+                                            exportVisitsToCSV(bdmVisits, `BDM_Report_${selectedBdm._id.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}`);
+                                            showToast(`Exported ${bdmVisits.length} visits`);
+                                        }
+                                    }}
+                                    disabled={isFetchingBdm || bdmVisits.length === 0}
+                                    className="flex items-center gap-2 px-4 py-2 bg-brand-green text-white rounded-xl text-sm font-bold hover:opacity-90 transition-all disabled:opacity-40"
+                                >
+                                    <Download className="w-4 h-4" />
+                                    Export CSV
+                                </button>
+                                <button
+                                    onClick={() => { setSelectedBdm(null); setBdmVisits([]); }}
+                                    className="p-2 hover:bg-slate-100 rounded-xl transition-all"
+                                >
+                                    <X className="w-5 h-5 text-slate-400" />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Summary stats */}
+                        <div className="px-5 pt-4 pb-2 grid grid-cols-2 sm:grid-cols-5 gap-3 shrink-0">
+                            {[
+                                { label: 'Total',    value: selectedBdm.totalVisits,    color: '#284695', bg: '#EEF4FF' },
+                                { label: 'Pending',  value: selectedBdm.pendingCount,   color: '#EF7F1A', bg: '#FFF4EA' },
+                                { label: 'Action',   value: selectedBdm.actionRequired, color: '#DC2626', bg: '#FEF2F2' },
+                                { label: 'Reviewed', value: selectedBdm.reviewedCount,  color: '#00A0E3', bg: '#E0F5FF' },
+                                { label: 'Closed',   value: selectedBdm.closedCount,    color: '#009846', bg: '#ECFDF5' },
+                            ].map(({ label, value, color, bg }) => (
+                                <div key={label} className="rounded-xl p-3 text-center" style={{ backgroundColor: bg }}>
+                                    <p className="text-xl font-extrabold" style={{ color }}>{value}</p>
+                                    <p className="text-[10px] font-bold text-slate-500 mt-0.5">{label}</p>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="p-5 overflow-y-auto flex-1">
+                            {isFetchingBdm ? (
+                                <div className="py-10 flex items-center justify-center gap-2 text-slate-400">
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Loading visits…
+                                </div>
+                            ) : bdmVisits.length === 0 ? (
+                                <div className="py-10 text-center text-slate-400 text-sm">No visits found</div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {bdmVisits.map(visit => (
+                                        <div key={visit._id} className="p-4 rounded-xl border border-slate-100 hover:border-brand-sky/30 hover:bg-slate-50/60 transition-all">
+                                            <div className="flex flex-col sm:flex-row sm:items-start gap-3">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                                                        <p className="text-sm font-bold text-slate-800">
+                                                            {visit.meta?.companyName || 'Untitled'}
+                                                        </p>
+                                                        <StatusPill status={visit.status} />
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
+                                                        <span className="flex items-center gap-1">
+                                                            <CalendarIcon className="w-3 h-3" />
+                                                            {new Date(visit.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                                        </span>
+                                                        {visit.meta?.rmName && (
+                                                            <span className="flex items-center gap-1">
+                                                                <Users className="w-3 h-3" />
+                                                                RM: {visit.meta.rmName}
+                                                            </span>
+                                                        )}
+                                                        {visit.agencyProfile?.pinCode && (
+                                                            <span className="flex items-center gap-1">
+                                                                <MapPin className="w-3 h-3" />
+                                                                {visit.agencyProfile.pinCode}
+                                                            </span>
+                                                        )}
+                                                        {visit.agencyProfile?.infraRating && (
+                                                            <span className="flex items-center gap-1">
+                                                                <Star className="w-3 h-3" />
+                                                                Infra: {visit.agencyProfile.infraRating}/5
+                                                            </span>
+                                                        )}
+                                                        {visit.submittedBy?.name && (
+                                                            <span className="flex items-center gap-1">
+                                                                <Building2 className="w-3 h-3" />
+                                                                By: {visit.submittedBy.name}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {visit.postVisit?.actionPoints && (
+                                                        <div className="mt-2 p-2.5 bg-orange-50 rounded-lg border-l-2 border-brand-orange">
+                                                            <p className="text-[10px] font-bold text-brand-orange uppercase tracking-wide mb-0.5">Action Points</p>
+                                                            <p className="text-xs text-slate-700 leading-relaxed">{visit.postVisit.actionPoints}</p>
+                                                        </div>
+                                                    )}
+                                                    {visit.postVisit?.remarks && (
+                                                        <div className="mt-2 p-2.5 bg-blue-50 rounded-lg border-l-2 border-brand-sky">
+                                                            <p className="text-[10px] font-bold text-brand-sky uppercase tracking-wide mb-0.5">Remarks</p>
+                                                            <p className="text-xs text-slate-700 leading-relaxed">{visit.postVisit.remarks}</p>
+                                                        </div>
+                                                    )}
+                                                    {visit.support?.interestedServices?.length > 0 && (
+                                                        <div className="mt-2 flex flex-wrap gap-1">
+                                                            {visit.support.interestedServices.map(s => (
+                                                                <span key={s} className="text-[10px] px-2 py-0.5 bg-purple-50 text-purple-600 rounded-full font-semibold">{s}</span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="flex sm:flex-col gap-1.5 shrink-0">
+                                                    {visit.status !== 'reviewed' && visit.status !== 'closed' && (
+                                                        <button
+                                                            onClick={() => handleStatusUpdate(visit._id, 'reviewed')}
+                                                            disabled={updatingVisitId === visit._id}
+                                                            className="px-3 py-1.5 bg-blue-50 text-brand-sky rounded-lg text-xs font-bold hover:bg-blue-100 transition-all disabled:opacity-50 flex items-center gap-1"
+                                                        >
+                                                            <Eye className="w-3 h-3" />
+                                                            Reviewed
+                                                        </button>
+                                                    )}
+                                                    {visit.status !== 'action_required' && visit.status !== 'closed' && (
+                                                        <button
+                                                            onClick={() => handleStatusUpdate(visit._id, 'action_required')}
+                                                            disabled={updatingVisitId === visit._id}
+                                                            className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-xs font-bold hover:bg-red-100 transition-all disabled:opacity-50 flex items-center gap-1"
+                                                        >
+                                                            <AlertCircle className="w-3 h-3" />
+                                                            Action
+                                                        </button>
+                                                    )}
+                                                    {visit.status !== 'closed' && (
+                                                        <button
+                                                            onClick={async () => {
+                                                                await handleStatusUpdate(visit._id, 'closed');
+                                                                setBdmVisits(prev => prev.map(v => v._id === visit._id ? { ...v, status: 'closed' } : v));
+                                                            }}
+                                                            disabled={updatingVisitId === visit._id}
+                                                            className="px-3 py-1.5 bg-green-50 text-brand-green rounded-lg text-xs font-bold hover:bg-green-100 transition-all disabled:opacity-50 flex items-center gap-1"
+                                                        >
+                                                            {updatingVisitId === visit._id
+                                                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                                                : <CheckCheck className="w-3 h-3" />
+                                                            }
+                                                            Close
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => { setNoteVisit(visit); setNoteText(''); }}
+                                                        className="px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-200 transition-all"
+                                                    >
+                                                        Note
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                        <div className="p-4 bg-slate-50 border-t border-slate-100 shrink-0 flex justify-between items-center">
+                            <p className="text-xs text-slate-400">{bdmVisits.length} visits loaded</p>
+                            <button onClick={() => { setSelectedBdm(null); setBdmVisits([]); }} className="btn-ghost px-5">Close</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Add Note Modal */}
             {noteVisit && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
@@ -948,18 +1435,38 @@ const Analytics = () => {
                                 <X className="w-5 h-5 text-slate-400" />
                             </button>
                         </div>
-                        <div className="p-5">
-                            <p className="text-sm text-slate-600 mb-3">
+                        <div className="p-5 space-y-4">
+                            <p className="text-sm text-slate-600">
                                 Visit: <strong>{noteVisit.meta?.companyName || noteVisit.studentInfo?.name || 'Untitled'}</strong>
                             </p>
-                            <textarea
-                                rows={4}
-                                placeholder="Enter your note..."
-                                className="input-field text-sm resize-none w-full"
-                                value={noteText}
-                                onChange={(e) => setNoteText(e.target.value)}
-                                autoFocus
-                            />
+                            
+                            <div>
+                                <label className="label mb-2 block">Which step (page) has the issue?</label>
+                                <select 
+                                    className="input-field text-sm"
+                                    value={noteStepIndex}
+                                    onChange={(e) => setNoteStepIndex(e.target.value)}
+                                >
+                                    <option value="">General Issue (Overall)</option>
+                                    {visitFormSections.map((s, i) => (
+                                        <option key={i} value={i}>
+                                            Step {i + 1}: {s.title}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="label mb-2 block">Instruction for the User</label>
+                                <textarea
+                                    rows={4}
+                                    placeholder="e.g. Please update the promoter email address..."
+                                    className="input-field text-sm resize-none w-full"
+                                    value={noteText}
+                                    onChange={(e) => setNoteText(e.target.value)}
+                                    autoFocus
+                                />
+                            </div>
                         </div>
                         <div className="p-4 bg-slate-50 border-t border-slate-100 flex gap-3">
                             <button onClick={() => setNoteVisit(null)} className="flex-1 btn-outline py-2.5">Cancel</button>
@@ -969,7 +1476,7 @@ const Analytics = () => {
                                 className="flex-1 btn-primary py-2.5 disabled:opacity-50 flex items-center justify-center gap-2"
                             >
                                 {updatingVisitId === noteVisit._id && <Loader2 className="w-4 h-4 animate-spin" />}
-                                Save Note
+                                Save Instruction
                             </button>
                         </div>
                     </div>

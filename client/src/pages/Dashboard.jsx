@@ -5,7 +5,7 @@ import api from '../utils/api';
 import {
     FileText, Clock, CheckCircle2, AlertCircle,
     TrendingUp, MapPin, Calendar, ArrowRight, PlusCircle,
-    Users, XCircle
+    Users, XCircle, Lock, Unlock
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -68,22 +68,43 @@ const Dashboard = () => {
     const [visits, setVisits] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    const [unlockRequests, setUnlockRequests] = useState([]);
+
     useEffect(() => {
         (async () => {
             try {
-                const [sRes, vRes] = await Promise.all([
+                const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+                const requests = [
                     api.get('/analytics/summary'),
                     api.get('/visits?limit=6')
-                ]);
+                ];
+
+                if (isAdmin) {
+                    requests.push(api.get('/visits?unlockRequestSent=true'));
+                }
+
+                const [sRes, vRes, uRes] = await Promise.all(requests);
+                
                 setStats(sRes.data.data);
                 setVisits(vRes.data.data || []);
+                if (uRes) setUnlockRequests(uRes.data.data || []);
             } catch (err) {
                 console.error('Dashboard fetch error', err);
             } finally {
                 setLoading(false);
             }
         })();
-    }, []);
+    }, [user]);
+
+    const handleApproveUnlock = async (visitId) => {
+        try {
+            await api.put(`/visits/${visitId}/approve-unlock`, { unlock: true });
+            setUnlockRequests(prev => prev.filter(v => v._id !== visitId));
+            alert('Visit unlocked successfully');
+        } catch (err) {
+            alert('Failed to approve: ' + (err.response?.data?.message || err.message));
+        }
+    };
 
     if (loading) return (
         <div className="space-y-6 animate-pulse">
@@ -100,6 +121,7 @@ const Dashboard = () => {
 
     const isUser = user.role === 'user' || user.role === 'home_visit';
     const trendData = (stats?.trends || []).map(t => ({ month: t._id, count: t.count }));
+    const attentionNeeded = visits.filter(v => v.status === 'action_required');
 
     const kpis = [
         {
@@ -157,6 +179,94 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 {kpis.map(k => <KPICard key={k.title} {...k} />)}
             </div>
+
+            {/* Admin: Unlock Requests Section */}
+            {(user?.role === 'admin' || user?.role === 'superadmin') && unlockRequests.length > 0 && (
+                <div className="card border-blue-100 bg-brand-blue/5 overflow-hidden">
+                    <div className="px-5 py-3 border-b border-blue-100 bg-brand-blue/10 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-brand-blue font-black text-xs uppercase tracking-widest">
+                            <Lock className="w-4 h-4" />
+                            Pending Unlock Requests
+                        </div>
+                        <span className="text-[10px] font-bold text-brand-blue bg-white px-2 py-0.5 rounded-full border border-blue-100">
+                            {unlockRequests.length} Request{unlockRequests.length > 1 ? 's' : ''}
+                        </span>
+                    </div>
+                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {unlockRequests.map(visit => (
+                            <div 
+                                key={visit._id}
+                                className="p-4 bg-white rounded-2xl border border-blue-100 shadow-sm hover:shadow-md transition-all group"
+                            >
+                                <div className="flex justify-between items-start gap-3 mb-3">
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-black text-slate-800 truncate">
+                                            {visit.meta?.companyName || visit.studentInfo?.name || 'Untitled Report'}
+                                        </p>
+                                        <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                            By: {visit.submittedBy?.name || 'Unknown'}
+                                        </p>
+                                    </div>
+                                    <div className="p-2 bg-red-50 rounded-lg text-red-500">
+                                        <Lock className="w-4 h-4" />
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={() => handleApproveUnlock(visit._id)}
+                                    className="w-full py-2 bg-brand-blue text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-brand-blue-dark transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-blue/20"
+                                >
+                                    <Unlock className="w-3.5 h-3.5" />
+                                    Approve Unlock
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Attention Needed Section (Surveyor Only) */}
+            {isUser && attentionNeeded.length > 0 && (
+                <div className="card border-red-100 bg-red-50/20 overflow-hidden">
+                    <div className="px-5 py-3 border-b border-red-100 bg-red-50/50 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-red-600 font-black text-xs uppercase tracking-widest">
+                            <AlertCircle className="w-4 h-4" />
+                            Action Required by You
+                        </div>
+                        <span className="text-[10px] font-bold text-red-400 bg-white px-2 py-0.5 rounded-full border border-red-100">
+                            {attentionNeeded.length} Task{attentionNeeded.length > 1 ? 's' : ''}
+                        </span>
+                    </div>
+                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {attentionNeeded.map(visit => {
+                            const latestNote = visit.adminNotes?.[visit.adminNotes.length - 1];
+                            return (
+                                <div 
+                                    key={visit._id}
+                                    onClick={() => navigate(`/edit-visit/${visit._id}${latestNote?.stepIndex !== undefined ? `?step=${latestNote.stepIndex}` : ''}`)}
+                                    className="p-4 bg-white rounded-2xl border border-red-100 shadow-sm hover:shadow-md hover:border-red-200 transition-all cursor-pointer group"
+                                >
+                                    <div className="flex justify-between items-start gap-3 mb-2">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-black text-slate-800 truncate group-hover:text-red-600 transition-colors">
+                                                {visit.meta?.companyName || visit.studentInfo?.name || 'Untitled Report'}
+                                            </p>
+                                            {latestNote?.stepName && (
+                                                <p className="text-[10px] font-black text-red-500 uppercase tracking-tighter mt-0.5">
+                                                    Issue in {latestNote.stepName}
+                                                </p>
+                                            )}
+                                        </div>
+                                        <ArrowRight className="w-4 h-4 text-red-300 group-hover:translate-x-1 transition-all" />
+                                    </div>
+                                    <p className="text-xs text-slate-500 font-medium line-clamp-2 italic bg-slate-50 p-2 rounded-lg border border-slate-100/50">
+                                        "{latestNote?.note || 'No specific instruction provided'}"
+                                    </p>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
 
             {/* Charts + Recent */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

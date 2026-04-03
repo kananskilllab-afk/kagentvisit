@@ -3,9 +3,11 @@ const mongoose = require('mongoose');
 // ─── Sub-schemas ─────────────────────────────────────────────────────────────
 
 const adminNoteSchema = new mongoose.Schema({
-    note:     { type: String, required: true },
-    addedBy:  { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    addedAt:  { type: Date, default: Date.now }
+    note:      { type: String, required: true },
+    stepIndex: { type: Number },
+    stepName:  { type: String },
+    addedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    addedAt:   { type: Date, default: Date.now }
 }, { _id: true });
 
 const editHistorySchema = new mongoose.Schema({
@@ -226,7 +228,11 @@ const visitSchema = new mongoose.Schema({
     },
 
     adminNotes:  [adminNoteSchema],
-    editHistory: [editHistorySchema]
+    editHistory: [editHistorySchema],
+
+    // Locking & Unlocking (B2B visit 24h rule)
+    isAdminUnlocked:   { type: Boolean, default: false },
+    unlockRequestSent: { type: Boolean, default: false }
 
 }, {
     timestamps: true
