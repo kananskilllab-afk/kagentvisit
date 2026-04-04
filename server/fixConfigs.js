@@ -29,8 +29,8 @@ async function run() {
             // Step 1 – Visit Meta
             { id: 'meta.companyName', group: 'Visit Meta', label: 'Agent/Company Name', type: 'text', required: true },
             { id: 'meta.email', group: 'Visit Meta', label: 'Email Address', type: 'text', required: false },
-            { id: 'meta.bdmName', group: 'Visit Meta', label: 'BDM Name', type: 'text', required: true },
-            { id: 'meta.rmName', group: 'Visit Meta', label: 'RM Name', type: 'text', required: true },
+            { id: 'meta.bdmName', group: 'Visit Meta', label: 'BDM Name', type: 'dynamic-list', required: true },
+            { id: 'meta.rmName', group: 'Visit Meta', label: 'RM Name', type: 'dynamic-list', required: true },
             { id: 'meta.meetingStart', group: 'Visit Meta', label: 'Meeting Start', type: 'datetime', required: true },
             { id: 'meta.meetingEnd', group: 'Visit Meta', label: 'Meeting End', type: 'datetime', required: true },
 
@@ -38,15 +38,15 @@ async function run() {
             { id: 'agencyProfile.address', group: 'Agency Profile', label: 'Office Address', type: 'textarea', required: true },
             { id: 'agencyProfile.nearestLandmark', group: 'Agency Profile', label: 'Nearest Landmark', type: 'text', required: false },
             { id: 'agencyProfile.pinCode', group: 'Agency Profile', label: 'PIN Code', type: 'text', required: true },
-            { id: 'agencyProfile.contactNumber', group: 'Agency Profile', label: 'Contact Number', type: 'text', required: true },
+            { id: 'agencyProfile.contactNumber', group: 'Agency Profile', label: 'Contact Numbers', type: 'dynamic-contacts', required: true },
             { id: 'agencyProfile.emailId', group: 'Agency Profile', label: 'Agency Email ID', type: 'text', required: false },
             { id: 'agencyProfile.website', group: 'Agency Profile', label: 'Website', type: 'text', required: false },
             { id: 'agencyProfile.gmbLink', group: 'Agency Profile', label: 'GMB Page Link', type: 'text', required: false },
             { id: 'agencyProfile.establishmentYear', group: 'Agency Profile', label: 'Establishment Year', type: 'number', required: true },
 
             // Step 3 – Business Model & Infrastructure
-            { id: 'agencyProfile.businessModel', group: 'Business & Infra', label: 'Primary Business Model', type: 'multi-select', required: true, options: ['Hybrid', 'Only IELTS/Coaching', 'Only Study Visa', 'Immigration', 'Other'] },
-            { id: 'agencyProfile.officeArea', group: 'Business & Infra', label: 'Office Space Area (sq.ft)', type: 'number', required: false },
+            { id: 'agencyProfile.businessModel', group: 'Business & Infra', label: 'Primary Business Model', type: 'multi-select', required: true, options: ['Coaching', 'Visa', 'Immigration', 'Onshore Services', 'Offline', 'Online', 'Others'] },
+            { id: 'agencyProfile.officeAreaType', group: 'Business & Infra', label: 'Office Space Area', type: 'office-area-combo', required: false, options: ['Small', 'Average', 'Above Average', 'Extra Ordinary'] },
             { id: 'agencyProfile.infraRating', group: 'Business & Infra', label: 'Infrastructure Rating', type: 'star-rating', required: true },
             { id: 'agencyProfile.hasComputerLab', group: 'Business & Infra', label: 'Computer Lab?', type: 'toggle', required: false },
             { id: 'agencyProfile.numComputers', group: 'Business & Infra', label: 'Number of Computers (If Yes)', type: 'number', required: false },
@@ -110,8 +110,8 @@ async function run() {
             { id: 'support.needTech', group: 'Support Needs', label: 'Need Support: Technology Adoption', type: 'toggle', required: false },
             { id: 'support.needPartners', group: 'Support Needs', label: 'Need Support: Institutional Partners', type: 'toggle', required: false },
             { id: 'support.needVAS', group: 'Support Needs', label: 'Need Support: Improving VAS offerings', type: 'toggle', required: false },
-            { id: 'support.painPoints', group: 'Support Needs', label: 'Agent Pain Points', type: 'textarea', required: true },
-            { id: 'support.solutions', group: 'Support Needs', label: 'Solutions Provided', type: 'textarea', required: true },
+            { id: 'support.painPoints', group: 'Support Needs', label: 'Agent pain points / problem faced by agent', type: 'dynamic-list', required: true },
+            { id: 'support.solutions', group: 'Support Needs', label: 'Solution provided ?(enter respectively to the problems)', type: 'dynamic-list', required: true },
 
             // Step 11 – Final Summary
             { id: 'postVisit.actionPoints', group: 'Final Summary', label: 'Action Points', type: 'textarea', required: true },

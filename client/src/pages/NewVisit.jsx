@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import axios from 'axios';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,8 +8,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import StepIndicator from '../components/SurveyForm/StepIndicator';
 import DynamicField from '../components/FormBuilder/DynamicField';
-import RichTextEditor from '../components/shared/RichTextEditor';
-import { Save, ChevronLeft, ChevronRight, CheckCircle, Info, Clock, Loader2, MapPin, AlertCircle, Bell, ShieldAlert } from 'lucide-react';
+import { Save, ChevronLeft, ChevronRight, CheckCircle, Info, Loader2, MapPin, AlertCircle, Bell, ShieldAlert, FileText } from 'lucide-react';
 
 const NewVisit = () => {
     const [currentStep, setCurrentStep] = useState(0);
@@ -31,13 +30,12 @@ const NewVisit = () => {
     const [isLocked, setIsLocked] = useState(false);
     const [unlockRequestSent, setUnlockRequestSent] = useState(false);
     const [createdAt, setCreatedAt] = useState(null);
+    const [submittedAt, setSubmittedAt] = useState(null);
     const [visitStatus, setVisitStatus] = useState('draft');
     const [adminNotes, setAdminNotes] = useState([]);
-    
-    const [followUpMeetings, setFollowUpMeetings] = useState([]);
-    const [newMeetingDate, setNewMeetingDate] = useState(new Date().toISOString().slice(0, 10));
-    const [newMeetingNotes, setNewMeetingNotes] = useState('');
-    const [addingMeeting, setAddingMeeting] = useState(false);
+
+    // --- Draft logic helpers ---
+    const isDraft = visitStatus === 'draft';
 
     const fetchExactLocation = () => {
         if (!navigator.geolocation) {
@@ -86,12 +84,11 @@ const NewVisit = () => {
             switch (field.type) {
                 case 'number':
                 case 'star-rating':
-                    // Preprocess to handle empty strings/NaN from number inputs
                     fieldSchema = z.preprocess((val) => {
                         if (val === '' || val === undefined || val === null || isNaN(Number(val))) return undefined;
                         return Number(val);
                     }, field.required ? z.number({ invalid_type_error: `${field.label} must be a number` }).min(0) : z.number().optional());
-                    
+
                     if (field.required) {
                         fieldSchema = fieldSchema.refine(val => val !== undefined, { message: `${field.label} is required` });
                     }
@@ -117,6 +114,31 @@ const NewVisit = () => {
                 case 'photo-upload':
                     fieldSchema = z.string().optional().or(z.literal(''));
                     break;
+                case 'dynamic-list':
+                    fieldSchema = z.array(z.string());
+                    if (field.required) {
+                        fieldSchema = fieldSchema.min(1, `${field.label} requires at least one entry`).refine(arr => arr.some(v => v.trim() !== ''), { message: `${field.label} cannot be entirely empty` });
+                    } else {
+                        fieldSchema = fieldSchema.optional();
+                    }
+                    break;
+                case 'dynamic-contacts':
+                    const contactObjSchema = z.object({
+                        name: z.string().optional().or(z.literal('')),
+                        designation: z.string().optional().or(z.literal('')),
+                        number: z.string().optional().or(z.literal(''))
+                    });
+                    fieldSchema = z.array(contactObjSchema);
+                    if (field.required) {
+                        fieldSchema = fieldSchema.min(1, `${field.label} requires at least one entry`).refine(arr => arr.some(v => v.name || v.designation || v.number), { message: `At least one contact must have some details entered` });
+                    } else {
+                        fieldSchema = fieldSchema.optional();
+                    }
+                    break;
+                case 'office-area-combo':
+                    fieldSchema = z.string().optional().or(z.literal(''));
+                    if (field.required) fieldSchema = z.string().min(1, `${field.label} is required`);
+                    break;
                 default:
                     fieldSchema = z.string();
                     if (field.required) fieldSchema = fieldSchema.min(1, `${field.label} is required`);
@@ -127,24 +149,41 @@ const NewVisit = () => {
                 const [group, key] = parts;
                 if (!shape[group]) shape[group] = {};
                 shape[group][key] = fieldSchema;
+
+                // Dynamically allow Other variants without strict fails
+                if (['dropdown', 'multi-select'].includes(field.type)) {
+                    shape[group][`other${key.charAt(0).toUpperCase() + key.slice(1)}`] = z.string().optional().or(z.literal(''));
+                }
+                if (field.id === 'kananTools.useAcademyPortal') shape[group]['academyPortalOther'] = z.string().optional().or(z.literal(''));
+                if (field.id === 'kananTools.useBooks') shape[group]['booksOther'] = z.string().optional().or(z.literal(''));
             } else {
                 shape[field.id] = fieldSchema;
             }
         });
 
-        // Add special handling for teamMembers array
-        if (!shape.visitInfo) shape.visitInfo = {};
-        shape.visitInfo = {
-            ...shape.visitInfo,
-            teamMembers: z.array(z.string()).optional()
-        };
+        // Add officeArea explicitly since office-area-combo only maps the Type field in fixConfigs
+        if (shape.agencyProfile) {
+            shape.agencyProfile.officeArea = z.preprocess((val) => {
+                if (val === '' || val === undefined || val === null || isNaN(Number(val))) return undefined;
+                return Number(val);
+            }, z.number().optional());
+        }
 
-        // Add special handling for Checklist fields
-        if (!shape.checklist) shape.checklist = {};
-        shape.checklist = {
-            ...shape.checklist,
-            waGroupName: z.string().optional()
-        };
+        // Add teamMembers only if visitInfo fields exist in config (B2C only)
+        if (shape.visitInfo) {
+            shape.visitInfo = {
+                ...shape.visitInfo,
+                teamMembers: z.array(z.string()).optional()
+            };
+        }
+
+        // Add waGroupName only if checklist fields exist in config (B2C only)
+        if (shape.checklist) {
+            shape.checklist = {
+                ...shape.checklist,
+                waGroupName: z.string().optional()
+            };
+        }
 
         const finalShape = {};
         Object.keys(shape).forEach(key => {
@@ -162,7 +201,6 @@ const NewVisit = () => {
             const isPrepcomOrBoth = ['Prepcom', 'Both'].includes(prepcomStatus);
 
             if (isPrepcomOrBoth) {
-                // 1. Portal Courses
                 if (!data.kananTools?.portalCourses || data.kananTools.portalCourses.length === 0) {
                     ctx.addIssue({
                         code: z.ZodIssueCode.custom,
@@ -171,16 +209,6 @@ const NewVisit = () => {
                     });
                 }
 
-                // 2. Is using Kanan Books (Toggle assumes boolean, but let's check)
-                // If it's a toggle, we might want to ensure they explicitly checked it if that's what "mandatory" means
-                // But usually mandatory for a toggle means "must be true" if that's the logic, or "must be touched".
-                // User said "Is using Kanan Books? this section should mandatory". 
-                // I'll interpret this as they must select something (Yes/No). 
-                // Since toggle is usually Yes/No, it's always "selected". 
-                // However, if they meant it MUST be Yes, that's different.
-                // Let's assume they mean it must be filled/considered.
-
-                // 3. Courses for which Books used
                 if (!data.kananTools?.bookCourses || data.kananTools.bookCourses.length === 0) {
                     ctx.addIssue({
                         code: z.ZodIssueCode.custom,
@@ -189,10 +217,6 @@ const NewVisit = () => {
                     });
                 }
 
-                // 4. Classroom Content
-                // Same as Books, if it's a toggle it's already there.
-
-                // 5. Trainer Rating
                 if (!data.kananTools?.trainerRating || data.kananTools.trainerRating === 0) {
                     ctx.addIssue({
                         code: z.ZodIssueCode.custom,
@@ -217,7 +241,7 @@ const NewVisit = () => {
         const handleBeforeUnload = (e) => {
             if (isDirty) {
                 e.preventDefault();
-                e.returnValue = ''; // Required for most browsers to show the default confirm dialog
+                e.returnValue = '';
             }
         };
         window.addEventListener('beforeunload', handleBeforeUnload);
@@ -248,7 +272,6 @@ const NewVisit = () => {
                     console.error('Error fetching PIN code:', err);
                 }
             } else if (pinCodeValue?.length < 6) {
-                // If user deletes PIN, re-enable fields (optional, but good UX)
                 if (disabledFields['location.city']) {
                     setDisabledFields(prev => {
                         const next = { ...prev };
@@ -272,13 +295,13 @@ const NewVisit = () => {
             try {
                 const date = new Date(visitDateValue);
                 if (isNaN(date.getTime())) return;
-                
+
                 const d = date.getDate();
                 const m = date.getMonth() + 1;
                 const y = date.getFullYear();
                 const cleanName = studentNameValue.replace(/\s+/g, '').toLowerCase();
                 const groupName = `${d}${m}${y}-${cleanName}`;
-                
+
                 setValue('checklist.waGroupName', groupName);
                 if (!disabledFields['checklist.waGroupName']) {
                     setDisabledFields(prev => ({ ...prev, 'checklist.waGroupName': true }));
@@ -325,13 +348,16 @@ const NewVisit = () => {
                     if (visitData.meta?.meetingEnd) visitData.meta.meetingEnd = new Date(visitData.meta.meetingEnd).toISOString().slice(0, 16);
                     if (visitData.gpsLocation) setGpsLocation(visitData.gpsLocation);
                     if (visitData.gpsCoordinates?.lat) setGpsCoords({ lat: visitData.gpsCoordinates.lat, lng: visitData.gpsCoordinates.lng });
-                    setIsLocked(!!visitData.isLocked);
+
+                    // Only lock if NOT a draft — drafts are always editable
+                    const isVisitDraft = visitData.status === 'draft';
+                    setIsLocked(isVisitDraft ? false : !!visitData.isLocked);
                     setUnlockRequestSent(!!visitData.unlockRequestSent);
                     setCreatedAt(visitData.createdAt);
+                    setSubmittedAt(visitData.submittedAt || null);
                     setVisitStatus(visitData.status || 'draft');
                     setAdminNotes(visitData.adminNotes || []);
-                    if (visitData.followUpMeetings) setFollowUpMeetings(visitData.followUpMeetings);
-                    
+
                     // Handle deep link to specific step
                     const stepParam = searchParams.get('step');
                     if (stepParam !== null && !isNaN(parseInt(stepParam))) {
@@ -350,18 +376,11 @@ const NewVisit = () => {
         if (user) loadForm();
     }, [user, id, urlFormType, reset]);
 
+    // saveDraft — defined before auto-save effects so refs are never stale
+    const saveDraftRef = useRef(null);
 
-    useEffect(() => {
-        if (isSaving || loadingConfig) return;
-        if (timerRef.current) clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(() => {
-            const hasIdentifier = formData.meta?.companyName || formData.studentInfo?.name;
-            if (hasIdentifier) saveDraft();
-        }, 60000);
-        return () => clearTimeout(timerRef.current);
-    }, [formData, isSaving, loadingConfig]);
-
-    const saveDraft = async () => {
+    const saveDraft = useCallback(async () => {
+        if (isLocked) return;
         const identifier = formData.meta?.companyName || formData.studentInfo?.name;
         if (!identifier) {
             setSaveStatus('Draft needs Company/Student name to save');
@@ -383,11 +402,36 @@ const NewVisit = () => {
                 const res = await api.post('/visits', payload);
                 setVisitId(res.data.data._id);
             }
-            setSaveStatus(`Saved at ${new Date().toLocaleTimeString()}`);
+            setSaveStatus(`Draft saved at ${new Date().toLocaleTimeString()}`);
         } catch {
             setSaveStatus('Draft save failed');
         }
-    };
+    }, [formData, gpsLocation, gpsCoords, config, visitId, isLocked]);
+
+    // Keep a stable ref so timeouts/event listeners always call the latest version
+    useEffect(() => { saveDraftRef.current = saveDraft; }, [saveDraft]);
+
+    // Auto-save draft every 30s of inactivity
+    useEffect(() => {
+        if (isSaving || loadingConfig || !isDraft) return;
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+            saveDraftRef.current?.();
+        }, 30000);
+        return () => clearTimeout(timerRef.current);
+    }, [formData, isSaving, loadingConfig, isDraft]);
+
+    // Auto-save when user switches tabs or leaves the page
+    useEffect(() => {
+        if (!isDraft) return;
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') {
+                saveDraftRef.current?.();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+    }, [isDraft]);
 
     const requestUnlock = async () => {
         if (!visitId) return;
@@ -400,26 +444,6 @@ const NewVisit = () => {
             alert('Failed to send request: ' + (err.response?.data?.message || err.message));
         } finally {
             setIsSaving(false);
-        }
-    };
-
-    const handleAddMeeting = async () => {
-        if (!newMeetingNotes.trim()) return alert("Notes are required");
-        setAddingMeeting(true);
-        try {
-            const res = await api.post(`/visits/${visitId}/follow-ups`, {
-                date: newMeetingDate,
-                notes: newMeetingNotes
-            });
-            if (res.data?.success) {
-                setFollowUpMeetings(res.data.data.followUpMeetings);
-                setNewMeetingNotes('');
-                alert("Follow-up meeting added!");
-            }
-        } catch (err) {
-            alert('Failed to add follow-up meeting: ' + (err.response?.data?.message || err.message));
-        } finally {
-            setAddingMeeting(false);
         }
     };
 
@@ -440,20 +464,17 @@ const NewVisit = () => {
 
     const onValidationError = (errors) => {
         console.error('Submission Validation Errors:', errors);
-        
-        // Flatten nested errors to find the first error's field ID
+
         const getFirstErrorId = (errs, prefix = '') => {
             if (!errs || typeof errs !== 'object') return null;
-            
-            // Check if this object itself has a message (e.g. at this level)
             if (errs.message) return prefix;
 
             for (const key in errs) {
                 const fullPath = prefix ? `${prefix}.${key}` : key;
                 const fieldError = errs[key];
-                
+
                 if (fieldError?.message) return fullPath;
-                
+
                 if (typeof fieldError === 'object') {
                     const nested = getFirstErrorId(fieldError, fullPath);
                     if (nested) return nested;
@@ -464,7 +485,6 @@ const NewVisit = () => {
 
         const firstErrorId = getFirstErrorId(errors);
         if (firstErrorId) {
-            // Check for hardcoded fields first (e.g. visitInfo which is always on Step 1)
             if (firstErrorId.startsWith('visitInfo')) {
                 alert(`Submission blocked: Please check "Visit Team Details" in Step 1 (Visit Meta)\n\nError: ${errors.visitInfo?.teamSize?.message || errors.visitInfo?.teamMembers?.[0]?.message || 'Missing team information'}`);
                 setCurrentStep(0);
@@ -472,8 +492,6 @@ const NewVisit = () => {
                 return;
             }
 
-            // Find which step (group) this field belongs to
-            // Split prefix (e.g. 'kananTools.portalCourses' -> 'kananTools')
             const field = config.fields.find(f => f.id === firstErrorId || firstErrorId.startsWith(f.id));
             if (field) {
                 const targetStep = groups.indexOf(field.group);
@@ -481,7 +499,7 @@ const NewVisit = () => {
                     const firstPart = firstErrorId.split('.')[0];
                     const secondPart = firstErrorId.split('.')[1];
                     const errorMsg = errors[firstPart]?.[secondPart]?.message || errors[firstErrorId]?.message || 'Missing required information';
-                    
+
                     alert(`Submission blocked: Please check "${field.label}" in Step ${targetStep + 1} (${field.group})\n\nError: ${errorMsg}`);
                     setCurrentStep(targetStep);
                     window.scrollTo(0, 0);
@@ -508,6 +526,7 @@ const NewVisit = () => {
             } else {
                 await api.post('/visits', payload);
             }
+            setVisitStatus('submitted');
             setSaveStatus('Submitted successfully!');
             setTimeout(() => navigate('/'), 1500);
         } catch (err) {
@@ -527,12 +546,14 @@ const NewVisit = () => {
         const stepFieldIds = config.fields.filter(f => f.group === currentGroup).map(f => f.id);
         const isStepValid = await trigger(stepFieldIds);
         if (isStepValid) {
+            if (isDraft) saveDraftRef.current?.();
             setCurrentStep(prev => Math.min(prev + 1, groups.length - 1));
             window.scrollTo(0, 0);
         }
     };
 
     const prevStep = () => {
+        if (isDraft) saveDraftRef.current?.();
         setCurrentStep(prev => Math.max(prev - 1, 0));
         window.scrollTo(0, 0);
     };
@@ -560,14 +581,20 @@ const NewVisit = () => {
 
     const isHomeVisit = config?.formType === 'home_visit' || urlFormType === 'home_visit';
 
-    // 24h Notifications Logic
-    const getWindowInfo = () => {
-        if (!visitId || !id) return null;
-        // Mocking creation time if not available, but it should be in payload if we fetched it
-        // Let's assume we have createdAt from visitData
-        // We need to store it in state
-        return null; // Placeholder as I need to store createdAt in state
+    // 24h window info — only relevant for SUBMITTED visits, never drafts
+    const getEditWindowInfo = () => {
+        if (!id || isDraft) return null;
+        const anchor = submittedAt || createdAt;
+        if (!anchor) return null;
+        const anchorDate = new Date(anchor);
+        const now = new Date();
+        const hoursElapsed = (now - anchorDate) / (1000 * 60 * 60);
+        const hoursLeft = 24 - hoursElapsed;
+        if (hoursLeft <= 0) return null;
+        return { hoursLeft, hoursElapsed, isUrgent: hoursElapsed > 18 };
     };
+
+    const editWindow = getEditWindowInfo();
 
     return (
         <div className="pb-32 page-enter">
@@ -581,17 +608,24 @@ const NewVisit = () => {
                         <p className="text-sm text-slate-500 mt-1 font-medium">Complete the field report below</p>
                     </div>
 
+                    {/* Draft save button — always visible for drafts, hidden when locked */}
                     {!isLocked && (
                         <button
                             onClick={saveDraft}
-                            className="btn-outline shrink-0 flex items-center justify-center gap-2 py-2.5 sm:py-2 px-6 shadow-sm hover:shadow-md transition-all sm:w-auto w-full"
+                            disabled={isSaving}
+                            className="btn-outline shrink-0 flex items-center justify-center gap-2 py-2.5 sm:py-2 px-6 shadow-sm hover:shadow-md transition-all sm:w-auto w-full disabled:opacity-50"
                         >
-                            <Save className="w-4 h-4 text-brand-blue" />
-                            <span className="font-bold">Save Draft</span>
+                            {isSaving ? (
+                                <Loader2 className="w-4 h-4 animate-spin text-brand-blue" />
+                            ) : (
+                                <Save className="w-4 h-4 text-brand-blue" />
+                            )}
+                            <span className="font-bold">{isDraft ? 'Save Draft' : 'Save Changes'}</span>
                         </button>
                     )}
                 </div>
 
+                {/* Locked banner — only for submitted visits past 24h */}
                 {isLocked && (
                     <div className="p-4 bg-red-50 border border-red-100 rounded-2xl flex items-center justify-between gap-4 animate-shake">
                         <div className="flex items-center gap-3">
@@ -600,17 +634,17 @@ const NewVisit = () => {
                             </div>
                             <div>
                                 <h4 className="text-sm font-black text-red-800 uppercase tracking-tight leading-none mb-1">Visit Locked</h4>
-                                <p className="text-xs text-red-600/70 font-bold">24h edit window has expired. Contact admin to unlock.</p>
+                                <p className="text-xs text-red-600/70 font-bold">24h edit window has expired since submission. Contact admin to unlock.</p>
                             </div>
                         </div>
-                        <button 
-                            type="button" 
+                        <button
+                            type="button"
                             disabled={(unlockRequestSent && !isAdmin) || isSaving}
                             onClick={isAdmin ? () => toggleUnlock(true) : requestUnlock}
                             className={`px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg transition-all ${
                                 (unlockRequestSent && !isAdmin)
-                                ? 'bg-slate-100 text-slate-400 cursor-default' 
-                                : isAdmin 
+                                ? 'bg-slate-100 text-slate-400 cursor-default'
+                                : isAdmin
                                     ? 'bg-brand-blue text-white shadow-brand-blue/20 hover:scale-105 active:scale-95'
                                     : 'bg-red-500 text-white shadow-red-500/20 hover:scale-105 active:scale-95'
                             }`}
@@ -622,9 +656,17 @@ const NewVisit = () => {
 
                 {/* Status Badges Row */}
                 <div className="flex flex-wrap items-center gap-2.5">
+                    {/* Draft indicator */}
+                    {isDraft && (
+                        <div className="flex items-center gap-2 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl shadow-sm">
+                            <FileText className="w-3.5 h-3.5" />
+                            Draft — not submitted yet
+                        </div>
+                    )}
+
                     {/* Auto-save status */}
                     <div className="flex items-center gap-2 text-[11px] font-bold text-slate-600 bg-white shadow-sm border border-slate-100 px-3 py-2 rounded-xl">
-                        <div className="w-2 h-2 rounded-full bg-brand-sky animate-pulse" />
+                        <div className={`w-2 h-2 rounded-full ${isDraft ? 'bg-amber-400' : 'bg-brand-sky'} animate-pulse`} />
                         {saveStatus}
                     </div>
 
@@ -647,8 +689,8 @@ const NewVisit = () => {
                         )}
                     </div>
 
-                    {/* Status Badge */}
-                    {id && (
+                    {/* Status Badge — only for existing visits that are not drafts */}
+                    {id && !isDraft && (
                         <div className={`px-3 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider border flex items-center gap-1.5 shadow-sm transition-all ${
                             visitStatus === 'reviewed' ? 'bg-blue-50 text-brand-sky border-blue-100' :
                             visitStatus === 'action_required' ? 'bg-red-50 text-red-600 border-red-100 animate-pulse' :
@@ -669,7 +711,7 @@ const NewVisit = () => {
                 </div>
             </div>
 
-            {/* Status-specific alert instead of global notes feed */}
+            {/* Action required alert */}
             {visitStatus === 'action_required' && (
                 <div className="mb-6 p-4 bg-red-600 text-white rounded-2xl flex items-center gap-4 shadow-xl shadow-red-100 animate-bounce-subtle">
                     <div className="p-2 bg-white/20 rounded-xl">
@@ -682,80 +724,67 @@ const NewVisit = () => {
                 </div>
             )}
 
-            {/* In-Window Notifications */}
-            {!isLocked && id && createdAt && (
+            {/* Edit window notifications — only for submitted visits, NEVER for drafts */}
+            {!isLocked && !isDraft && id && editWindow && (
                 <div className="mb-6 space-y-3">
-                    {(() => {
-                        const createdDate = new Date(createdAt);
-                        const now = new Date();
-                        const hoursElapsed = (now - createdDate) / (1000 * 60 * 60);
-                        const hoursLeft = 24 - hoursElapsed;
-                        
-                        if (hoursLeft > 0) {
-                            // Logic: Show 1st notification if < 18h passed, 2nd if > 18h passed (more urgent)
-                            const isUrgent = hoursElapsed > 18;
-                            return (
-                                <div className={`p-4 rounded-2xl border flex items-start gap-4 shadow-sm animate-pulse-subtle transition-all ${
-                                    isUrgent 
-                                    ? 'bg-amber-50 border-amber-200 text-amber-800' 
-                                    : 'bg-brand-blue/5 border-brand-blue/10 text-brand-blue'
-                                }`}>
-                                    <div className={`p-2 rounded-xl shrink-0 ${isUrgent ? 'bg-white text-amber-600' : 'bg-white text-brand-blue'}`}>
-                                        {isUrgent ? <ShieldAlert className="w-5 h-5" /> : <Bell className="w-5 h-5" />}
-                                    </div>
-                                    <div>
-                                        <h4 className="text-sm font-black uppercase tracking-tight leading-none mb-1">
-                                            {isUrgent ? 'Urgent Correction Required' : 'Visit Completion Reminder'}
-                                        </h4>
-                                        <p className="text-xs font-bold opacity-80">
-                                            {isUrgent 
-                                                ? `Second Warning: You have only ${Math.ceil(hoursLeft)}h left to complete this report before it locks.` 
-                                                : `First Warning: Please ensure all required fields are filled within the next ${Math.ceil(hoursLeft)}h.`}
-                                        </p>
-                                    </div>
-                                </div>
-                            );
-                        }
-                        return null;
-                    })()}
+                    <div className={`p-4 rounded-2xl border flex items-start gap-4 shadow-sm transition-all ${
+                        editWindow.isUrgent
+                        ? 'bg-amber-50 border-amber-200 text-amber-800'
+                        : 'bg-brand-blue/5 border-brand-blue/10 text-brand-blue'
+                    }`}>
+                        <div className={`p-2 rounded-xl shrink-0 ${editWindow.isUrgent ? 'bg-white text-amber-600' : 'bg-white text-brand-blue'}`}>
+                            {editWindow.isUrgent ? <ShieldAlert className="w-5 h-5" /> : <Bell className="w-5 h-5" />}
+                        </div>
+                        <div>
+                            <h4 className="text-sm font-black uppercase tracking-tight leading-none mb-1">
+                                {editWindow.isUrgent ? 'Urgent — Edit Window Closing' : 'Edit Window Active'}
+                            </h4>
+                            <p className="text-xs font-bold opacity-80">
+                                {editWindow.isUrgent
+                                    ? `Only ${Math.ceil(editWindow.hoursLeft)}h left to make corrections before this visit locks.`
+                                    : `You have ${Math.ceil(editWindow.hoursLeft)}h remaining to edit this submitted visit.`}
+                            </p>
+                        </div>
+                    </div>
                 </div>
             )}
 
             {/* Step Indicator */}
-            {/* Dashboard Deep-Link Logic is already implemented in Dashboard.jsx via navigate */}
-            
-            {/* Step Indicator with Error State */}
-            <StepIndicator 
-                currentStep={currentStep} 
-                steps={groups.map(g => g.title)} 
+            <StepIndicator
+                currentStep={currentStep}
+                steps={groups.map(g => g.title || g)}
                 errorSteps={adminNotes.filter(n => n.stepIndex !== undefined).map(n => n.stepIndex)}
             />
 
             {/* Form */}
             <form onSubmit={handleSubmit(onSubmit, onValidationError)} className="space-y-6 max-w-4xl mx-auto">
-                <div className="card shadow-premium animate-fade-in">
+                <div className="glass p-5 sm:p-10 lg:p-12 rounded-[2rem] border border-white/60 animate-fade-in relative overflow-hidden">
+                    {/* Subtle ambient light */}
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-brand-blue/5 rounded-full blur-[80px] pointer-events-none -z-10" />
+
                     {/* Section Header */}
-                    <div className="flex items-center gap-4 mb-8 pb-6 border-b border-slate-100/60">
-                        <div className="w-11 h-11 rounded-2xl bg-brand-blue flex items-center justify-center text-white font-black text-lg shadow-lg shadow-brand-blue/20 shrink-0">
+                    <div className="flex items-center gap-5 mb-10 pb-6 border-b border-slate-100/60 relative z-10">
+                        <div className="w-12 h-12 rounded-[1.25rem] bg-gradient-to-br from-brand-blue to-brand-sky flex items-center justify-center text-white font-black text-xl shadow-glass shrink-0">
                             {currentStep + 1}
                         </div>
-                        <div>
-                            <h3 className="text-lg font-extrabold text-slate-900 tracking-tight leading-none mb-1">{groups[currentStep]}</h3>
-                            <p className="text-xs text-slate-500 font-medium tracking-tight">Required details for this visit step</p>
+                        <div className="min-w-0 flex-1">
+                            <h3 className="text-xl font-extrabold text-slate-800 tracking-tight leading-none mb-1.5 truncate">{groups[currentStep]}</h3>
+                            <p className="text-xs font-medium text-slate-500 tracking-tight">
+                                {isDraft ? 'Fill in the details — you can save as draft anytime' : 'Required details for this visit step'}
+                            </p>
                         </div>
-                        <div className="ml-auto flex items-center gap-1.5 bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-100/50">
+                        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl shadow-sm border border-slate-100 shrink-0">
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Step</span>
-                            <span className="text-sm font-black text-brand-blue">{currentStep + 1}</span>
+                            <span className="text-base font-black text-brand-blue">{currentStep + 1}</span>
                             <span className="text-sm font-bold text-slate-200">/</span>
-                            <span className="text-sm font-black text-slate-400">{groups.length}</span>
+                            <span className="text-sm font-bold text-slate-400">{groups.length}</span>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-7 relative z-10">
                         {config.fields
                             .filter(f => f.group === groups[currentStep])
                             .map(field => {
-                                // 1. Render the main field
                                 const mainField = (
                                     <React.Fragment key={`main_${field.id}`}>
                                         <DynamicField
@@ -766,7 +795,7 @@ const NewVisit = () => {
                                             watch={watch}
                                             setValue={setValue}
                                             Controller={Controller}
-                                            disabled={disabledFields[field.id]}
+                                            disabled={isLocked || disabledFields[field.id]}
                                         />
                                         {field.id === 'checklist.waGroup' && waGroupValue && (
                                             <DynamicField
@@ -791,7 +820,6 @@ const NewVisit = () => {
                                     </React.Fragment>
                                 );
 
-                                // 2. If it's the teamSize field, inject additional fields
                                 if (field.id === 'visitInfo.teamSize' && teamSize > 1) {
                                     const extraFields = [];
                                     for (let i = 1; i < teamSize; i++) {
@@ -805,6 +833,7 @@ const NewVisit = () => {
                                                     {...register(`visitInfo.teamMembers.${i - 1}`)}
                                                     className={`input-field ${errors.visitInfo?.teamMembers?.[i - 1] ? 'border-red-400' : ''}`}
                                                     placeholder={`Enter member ${i + 1} name...`}
+                                                    disabled={isLocked}
                                                 />
                                                 {errors.visitInfo?.teamMembers?.[i - 1] && (
                                                     <p className="text-xs text-red-500 font-medium mt-1">{errors.visitInfo.teamMembers[i - 1].message}</p>
@@ -830,6 +859,7 @@ const NewVisit = () => {
                     </div>
                 </div>
 
+                {/* Bottom navigation bar */}
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-4xl z-40">
                     <div className="card glass flex items-center justify-between gap-2 p-2.5 sm:p-5 shadow-premium backdrop-blur-xl border-white/40 ring-1 ring-brand-blue/5">
                         <button
@@ -842,14 +872,15 @@ const NewVisit = () => {
                             <span className="sm:inline hidden">Back</span>
                         </button>
 
-                        <div className="flex items-center gap-2">
+                        {/* Mini segmented progress in bottom bar */}
+                        <div className="flex items-center gap-1">
                             {groups.map((_, i) => (
-                                <div 
-                                    key={i} 
-                                    className={`h-1.5 rounded-full transition-all duration-500 ${
-                                        i === currentStep ? 'w-6 sm:w-8 bg-brand-blue shadow-sm' : 
-                                        i < currentStep ? 'w-1.5 bg-brand-green' : 
-                                        'w-1.5 bg-slate-200'
+                                <div
+                                    key={i}
+                                    className={`rounded-full transition-all duration-500 ${
+                                        i === currentStep ? 'w-6 sm:w-8 h-1.5 bg-brand-blue shadow-sm' :
+                                        i < currentStep ? 'w-1.5 h-1.5 bg-green-500' :
+                                        'w-1.5 h-1.5 bg-slate-200'
                                     }`}
                                 />
                             ))}
@@ -878,69 +909,6 @@ const NewVisit = () => {
                 </div>
             </form>
 
-            {/* Follow Up Meetings Section */}
-            {id && (
-                <div className="max-w-4xl mx-auto mt-8 mb-40">
-                    <div className="card shadow-md border-t-4 border-brand-orange">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="p-3 bg-brand-orange/10 rounded-xl text-brand-orange">
-                                <Clock className="w-6 h-6" />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-bold text-slate-800 tracking-tight">Follow-up Meetings</h3>
-                                <p className="text-xs text-slate-500 font-medium">Log subsequent interactions with this agent/student.</p>
-                            </div>
-                        </div>
-
-                        {/* List */}
-                        {followUpMeetings.length > 0 && (
-                            <div className="space-y-4 mb-8">
-                                {followUpMeetings.map((mtg, i) => (
-                                    <div key={i} className="p-4 bg-slate-50 border border-slate-100 rounded-xl">
-                                        <div className="flex items-center justify-between mb-2">
-                                            <span className="text-sm font-bold text-brand-blue">Meeting {i + 2}</span>
-                                            <span className="text-xs text-slate-500 bg-white px-2 py-1 rounded-md border">{new Date(mtg.date).toLocaleDateString()}</span>
-                                        </div>
-                                        <div className="text-sm text-slate-700 bg-white p-3 rounded-lg border border-slate-100 mt-2 whitespace-pre-wrap" dangerouslySetInnerHTML={{ __html: mtg.notes }} />
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* Add New */}
-                        <div className="p-5 bg-orange-50 border border-orange-100 rounded-2xl">
-                            <h4 className="text-sm font-bold text-orange-800 mb-4">Log New Meeting</h4>
-                            <div className="space-y-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-slate-700">Meeting Date</label>
-                                    <input 
-                                        type="date" 
-                                        value={newMeetingDate} 
-                                        onChange={e => setNewMeetingDate(e.target.value)}
-                                        className="input-field max-w-xs"
-                                    />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-xs font-bold text-slate-700">Meeting Notes</label>
-                                    <RichTextEditor 
-                                        value={newMeetingNotes} 
-                                        onChange={setNewMeetingNotes}
-                                        placeholder="Discussed new intake options, agent requested brochures..."
-                                    />
-                                </div>
-                                <button 
-                                    type="button"
-                                    onClick={handleAddMeeting} 
-                                    disabled={addingMeeting}
-                                    className="btn-primary mt-2 px-6 py-2"
-                                >
-                                    {addingMeeting ? 'Adding...' : 'Add Follow-up'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

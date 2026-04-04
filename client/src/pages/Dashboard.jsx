@@ -31,18 +31,27 @@ const StatusDot = ({ status }) => {
 };
 
 const KPICard = ({ title, value, icon: Icon, color, bgColor, trend }) => (
-    <div className="card hover:shadow-card-lg transition-all duration-200 group">
+    <div className="card-hover group relative overflow-visible bg-white/60 backdrop-blur-3xl border border-white p-6 rounded-[2rem] shadow-glass isolate">
+        {/* Subtle glowing ambient light behind the card */}
+        <div
+            className="absolute -top-10 -right-10 w-32 h-32 rounded-full blur-[40px] opacity-20 pointer-events-none transition-all group-hover:scale-150 group-hover:opacity-40 -z-10"
+            style={{ backgroundColor: color }}
+        />
         <div className="flex items-start justify-between">
-            <div className="space-y-2">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{title}</p>
-                <p className="text-3xl font-extrabold tracking-tight" style={{ color }}>{value ?? '—'}</p>
+            <div className="space-y-1">
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{title}</p>
+                <p className="text-4xl font-extrabold tracking-tight text-slate-800">
+                    {value ?? '—'}
+                </p>
             </div>
-            <div className="p-2.5 rounded-xl group-hover:scale-110 transition-transform" style={{ backgroundColor: bgColor }}>
-                <Icon className="w-5 h-5" style={{ color }} />
+            <div className="p-3.5 rounded-2xl group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300 bg-white shadow-sm ring-1 ring-slate-100" style={{ color }}>
+                <Icon className="w-6 h-6" />
             </div>
         </div>
         {trend !== undefined && (
-            <p className="mt-3 text-[11px] font-medium text-slate-400">{trend}</p>
+            <p className="mt-4 text-[11px] font-medium text-slate-400 flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                {trend}
+            </p>
         )}
     </div>
 );
@@ -272,30 +281,31 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
                 {/* Trend Chart */}
-                <div className="lg:col-span-2 card">
-                    <div className="flex items-center justify-between mb-6">
+                <div className="lg:col-span-2 glass p-6 sm:p-8 rounded-[2rem]">
+                    <div className="flex items-center justify-between mb-8">
                         <div>
-                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                                <TrendingUp className="w-4 h-4 text-brand-sky" />
+                            <h3 className="font-extrabold text-lg text-slate-800 flex items-center gap-2">
+                                <TrendingUp className="w-5 h-5 text-brand-blue" />
                                 Visit Trends
                             </h3>
-                            <p className="text-xs text-slate-400 mt-0.5">Last 6 months</p>
+                            <p className="text-sm font-medium text-slate-400 mt-1">Last 6 months</p>
                         </div>
                     </div>
-                    <div className="h-64">
+                    <div className="h-[280px]">
                         <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={trendData} margin={{ top: 5, right: 5, left: -20, bottom: 0 }}>
+                            <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%"  stopColor="#00A0E3" stopOpacity={0.15}/>
-                                        <stop offset="95%" stopColor="#00A0E3" stopOpacity={0}/>
+                                        <stop offset="5%"  stopColor="#3B82F6" stopOpacity={0.25}/>
+                                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
                                     </linearGradient>
                                 </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 11 }} dy={6} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 11 }} />
-                                <Tooltip content={<CustomTooltip />} />
-                                <Area type="monotone" dataKey="count" stroke="#00A0E3" strokeWidth={2.5} fill="url(#areaGrad)" dot={{ fill: '#00A0E3', r: 4 }} activeDot={{ r: 5, fill: '#284695' }} />
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" opacity={0.6} />
+                                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 11, fontWeight: 500 }} dy={10} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 11, fontWeight: 500 }} />
+                                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3B82F6', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                <Area type="monotone" dataKey="count" stroke="#3B82F6" strokeWidth={3.5} fill="url(#areaGrad)" 
+                                      activeDot={{ r: 6, fill: '#FFFFFF', stroke: '#3B82F6', strokeWidth: 2 }} className="drop-shadow-sm" />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
@@ -351,16 +361,22 @@ const Dashboard = () => {
 
             {/* Status Distribution Bar */}
             {stats?.statusDist && stats.statusDist.length > 0 && (
-                <div className="card">
-                    <h3 className="font-bold text-slate-800 mb-5">Status Overview</h3>
-                    <div className="h-48">
+                <div className="glass p-6 sm:p-8 rounded-[2rem]">
+                    <h3 className="font-extrabold text-lg text-slate-800 mb-8">Status Overview</h3>
+                    <div className="h-[240px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={stats.statusDist.map(s => ({ name: STATUS_CFG[s._id]?.label || s._id, count: s.count }))} margin={{ left: -20 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 11 }} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#94A3B8', fontSize: 11 }} />
-                                <Tooltip content={<CustomTooltip />} />
-                                <Bar dataKey="count" fill="#284695" radius={[6, 6, 0, 0]} barSize={36} />
+                                <defs>
+                                    <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#3B82F6" />
+                                        <stop offset="100%" stopColor="#8B5CF6" />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" opacity={0.6} />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 11, fontWeight: 500 }} dy={10} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 11, fontWeight: 500 }} />
+                                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(59, 130, 246, 0.05)' }} />
+                                <Bar dataKey="count" fill="url(#barGrad)" radius={[8, 8, 0, 0]} barSize={42} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>

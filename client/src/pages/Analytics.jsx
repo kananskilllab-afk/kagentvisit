@@ -825,7 +825,7 @@ const Analytics = () => {
                                         <td className="td">
                                             <div className="flex items-center gap-2">
                                                 <div className="w-8 h-8 rounded-full bg-brand-blue/10 text-brand-blue flex items-center justify-center text-xs font-bold">
-                                                    {bdm._id?.charAt(0)?.toUpperCase() || '?'}
+                                                    {(typeof bdm._id === 'string' ? bdm._id : Array.isArray(bdm._id) ? bdm._id.join(', ') : String(bdm._id || ''))?.charAt(0)?.toUpperCase() || '?'}
                                                 </div>
                                                 <span className="text-sm font-bold text-slate-800">{bdm._id || '—'}</span>
                                             </div>
@@ -1164,7 +1164,7 @@ const Analytics = () => {
                         <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
                             <div className="flex items-center gap-3">
                                 <div className="w-12 h-12 rounded-xl bg-brand-blue/10 text-brand-blue flex items-center justify-center font-bold text-lg">
-                                    {selectedBdm._id?.charAt(0)?.toUpperCase() || '?'}
+                                    {(typeof selectedBdm._id === 'string' ? selectedBdm._id : Array.isArray(selectedBdm._id) ? selectedBdm._id.join(', ') : String(selectedBdm._id || ''))?.charAt(0)?.toUpperCase() || '?'}
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-slate-900">{selectedBdm._id}</h3>

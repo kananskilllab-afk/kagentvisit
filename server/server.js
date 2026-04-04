@@ -271,6 +271,7 @@ const auditLogRoutes = require('./routes/auditLogs.routes');
 const pincodeRoutes = require('./routes/pincode.routes');
 const uploadRoutes = require('./routes/upload.routes');
 const agentRoutes = require('./routes/agents.routes');
+const aiRoutes = require('./routes/ai.routes');
 
 // Use Routes
 app.use('/api/auth', authRoutes);
@@ -283,6 +284,7 @@ app.use('/api/audit-logs', auditLogRoutes);
 app.use('/api/pincodes', pincodeRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/agents', agentRoutes);
+app.use('/api/visits/:id/ai', aiRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
@@ -295,9 +297,25 @@ app.use((err, req, res, next) => {
 
 if (process.env.NODE_ENV !== 'production' || require.main === module) {
     const PORT = process.env.PORT || 5000;
-    app.listen(PORT, () => {
-        console.log(`Server running on port ${PORT}`);
-    });
+    
+    // Auto-connect to MongoDB when server starts
+    connectDB()
+        .then(() => {
+            console.log('MongoDB auto-connected successfully on startup.');
+            return seedData(); // Ensure B2B/B2C configurations are synced
+        })
+        .then(() => {
+            app.listen(PORT, () => {
+                console.log(`Server running on port ${PORT}`);
+            });
+        })
+        .catch(err => {
+            console.error('Initial startup Database Connection Error:', err);
+            // Start server even if initial DB connection fails (fallback to lazy connect)
+            app.listen(PORT, () => {
+                console.log(`Server running on port ${PORT} (Notice: DB connection pending)`);
+            });
+        });
 }
 
 module.exports = app;

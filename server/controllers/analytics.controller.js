@@ -28,7 +28,7 @@ const buildQuery = (reqQuery, user) => {
     }
     if (andConditions.length > 0) query.$and = andConditions;
 
-    if (bdmName) query['meta.bdmName'] = { $regex: bdmName, $options: 'i' };
+    if (bdmName) query['meta.bdmName'] = { $elemMatch: { $regex: bdmName, $options: 'i' } };
     if (officerName) query['visitInfo.officer'] = { $regex: officerName, $options: 'i' };
     if (rmName) query['meta.rmName'] = { $regex: rmName, $options: 'i' };
     if (status) query.status = status;
@@ -63,9 +63,27 @@ exports.getBdmReport = async (req, res) => {
         // BDM-wise aggregation (B2B only)
         const bdmStats = await Visit.aggregate([
             { $match: { ...query, formType: 'generic', 'meta.bdmName': { $exists: true, $ne: '' } } },
+            // Normalize bdmName: if it's an array, unwind each element; if string, keep it
+            {
+                $addFields: {
+                    bdmNameNormalized: {
+                        $cond: [
+                            { $isArray: '$meta.bdmName' },
+                            '$meta.bdmName',
+                            { $cond: [
+                                { $and: [{ $ne: ['$meta.bdmName', ''] }, { $ne: ['$meta.bdmName', null] }] },
+                                ['$meta.bdmName'],
+                                []
+                            ]}
+                        ]
+                    }
+                }
+            },
+            { $unwind: { path: '$bdmNameNormalized', preserveNullAndEmptyArrays: false } },
+            { $match: { bdmNameNormalized: { $ne: '', $type: 'string' } } },
             {
                 $group: {
-                    _id: '$meta.bdmName',
+                    _id: '$bdmNameNormalized',
                     totalVisits:    { $sum: 1 },
                     pendingCount:   { $sum: { $cond: [{ $eq: ['$status', 'submitted'] }, 1, 0] } },
                     actionRequired: { $sum: { $cond: [{ $eq: ['$status', 'action_required'] }, 1, 0] } },

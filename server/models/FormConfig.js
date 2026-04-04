@@ -6,7 +6,12 @@ const fieldSchema = new mongoose.Schema({
     label: { type: String, required: true },
     type: {
         type: String,
-        enum: ['text', 'textarea', 'richtext', 'number', 'date', 'datetime', 'dropdown', 'multi-select', 'toggle', 'star-rating', 'file', 'photo-upload', 'autocomplete-agent'],
+        enum: [
+            'text', 'textarea', 'richtext', 'number', 'date', 'datetime',
+            'dropdown', 'multi-select', 'toggle', 'star-rating', 'file',
+            'photo-upload', 'autocomplete-agent',
+            'dynamic-list', 'dynamic-contacts', 'office-area-combo'
+        ],
         required: true
     },
     required:    { type: Boolean, default: false },
@@ -21,8 +26,7 @@ const fieldSchema = new mongoose.Schema({
 const formConfigSchema = new mongoose.Schema({
     version: {
         type: String,
-        required: true,
-        unique: true
+        required: true
     },
     isActive: {
         type: Boolean,

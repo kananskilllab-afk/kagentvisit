@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
-import { FileText, Search, MapPin, Calendar, Building2, Trash2, Edit, PlusCircle, Filter, X, Lock, Bell } from 'lucide-react';
+import { FileText, Search, MapPin, Calendar, Building2, Trash2, Edit, PlusCircle, Filter, X, Lock, Bell, Eye } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import VisitDetailModal from '../components/VisitDetailModal';
 
 const STATUS_CFG = {
     submitted:       { label: 'Pending Review',  bg: 'bg-orange-50',  text: 'text-brand-orange', dot: 'bg-brand-orange', ring: 'ring-brand-orange/20' },
@@ -30,6 +31,7 @@ const VisitsList = () => {
     const [statusFilter, setStatusFilter] = useState('');
     const [visitToDelete, setVisitToDelete] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [selectedVisit, setSelectedVisit] = useState(null);
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const urlFormType = searchParams.get('formType');
@@ -106,7 +108,7 @@ const VisitsList = () => {
                 {(user.role === 'user' || user.role === 'home_visit') && (
                     <button
                         onClick={() => navigate('/new-visit')}
-                        className="btn-primary shrink-0 flex items-center gap-2"
+                        className="btn-primary shrink-0 flex items-center gap-2 px-6 shadow-brand-blue/30 hover:shadow-brand-blue/40"
                     >
                         <PlusCircle className="w-4 h-4" />
                         New Report
@@ -115,7 +117,7 @@ const VisitsList = () => {
             </div>
 
             {/* Search + Filter Bar */}
-            <div className="card p-3 sm:p-4">
+            <div className="glass p-4 rounded-3xl border border-white/60 shadow-glass">
                 <div className="flex flex-col sm:flex-row gap-3">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -175,7 +177,7 @@ const VisitsList = () => {
             ) : (
                 <>
                     {/* Desktop Table */}
-                    <div className="hidden md:block card p-0 overflow-hidden">
+                    <div className="hidden md:block glass rounded-[2rem] p-0 overflow-hidden shadow-glass border border-white/60">
                         <table className="w-full text-left">
                             <thead>
                                 <tr className="border-b border-slate-100">
@@ -190,7 +192,7 @@ const VisitsList = () => {
                                 {filteredVisits.map((visit) => (
                                     <tr
                                         key={visit._id}
-                                        onClick={() => navigate(`/edit-visit/${visit._id}`)}
+                                        onClick={() => setSelectedVisit(visit)}
                                         className="hover:bg-blue-50/30 cursor-pointer transition-colors group"
                                     >
                                         <td className="td">
@@ -236,6 +238,13 @@ const VisitsList = () => {
                                         </td>
                                         <td className="td text-right" onClick={(e) => e.stopPropagation()}>
                                             <div className="flex justify-end gap-1.5">
+                                                <button
+                                                    onClick={() => setSelectedVisit(visit)}
+                                                    className="p-1.5 rounded-lg border border-brand-sky/20 text-brand-sky hover:bg-brand-sky/5 transition-all"
+                                                    title="View Details"
+                                                >
+                                                    <Eye className="w-3.5 h-3.5" />
+                                                </button>
                                                 {isAdmin && visit.unlockRequestSent && (
                                                     <button
                                                         onClick={() => handleApproveUnlock(visit._id)}
@@ -274,12 +283,12 @@ const VisitsList = () => {
                     </div>
 
                     {/* Mobile Cards */}
-                    <div className="md:hidden space-y-3">
+                    <div className="md:hidden space-y-4">
                         {filteredVisits.map((visit) => (
                             <div
                                 key={visit._id}
-                                onClick={() => navigate(`/edit-visit/${visit._id}`)}
-                                className="card hover:border-brand-sky/30 hover:shadow-card-lg cursor-pointer transition-all"
+                                onClick={() => setSelectedVisit(visit)}
+                                className="glass rounded-[2rem] p-5 border border-white/60 shadow-glass hover:shadow-glow hover:-translate-y-1 cursor-pointer transition-all duration-300"
                             >
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -347,6 +356,18 @@ const VisitsList = () => {
                         ))}
                     </div>
                 </>
+            )}
+
+            {/* Visit Detail Modal */}
+            {selectedVisit && (
+                <VisitDetailModal
+                    visit={selectedVisit}
+                    onClose={() => setSelectedVisit(null)}
+                    onEdit={() => {
+                        setSelectedVisit(null);
+                        navigate(`/edit-visit/${selectedVisit._id}`);
+                    }}
+                />
             )}
 
             {/* Delete Modal */}

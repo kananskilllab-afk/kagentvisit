@@ -64,12 +64,12 @@ const Profile = () => {
     const avatarLetter = user.name?.charAt(0)?.toUpperCase() || 'U';
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6 page-enter">
+        <div className="max-w-4xl mx-auto space-y-8 page-enter">
             {/* Profile Header */}
-            <div className="card bg-gradient-to-r from-brand-navy to-brand-blue text-white overflow-hidden relative">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
+            <div className="glass bg-gradient-to-r from-brand-blue to-brand-sky text-white overflow-hidden relative rounded-[2rem] border-white/40 shadow-glow p-8 sm:p-10">
+                <div className="absolute top-0 right-0 w-80 h-80 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl pointer-events-none" />
                 <div className="relative flex flex-col sm:flex-row sm:items-center gap-5">
-                    <div className="w-20 h-20 rounded-2xl bg-brand-gold/20 border-2 border-brand-gold/40 flex items-center justify-center text-3xl font-extrabold text-brand-gold shrink-0">
+                    <div className="w-24 h-24 rounded-[2rem] bg-white text-brand-blue flex items-center justify-center text-4xl font-extrabold shadow-glass shrink-0 ring-4 ring-white/20">
                         {avatarLetter}
                     </div>
                     <div className="flex-1">
@@ -99,8 +99,8 @@ const Profile = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Personal Info */}
-                <div className="lg:col-span-1 card">
-                    <h3 className="font-bold text-slate-800 mb-4 pb-3 border-b border-slate-100">Personal Details</h3>
+                <div className="lg:col-span-1 glass rounded-[2rem] p-6 shadow-glass border border-white/60">
+                    <h3 className="font-extrabold text-slate-800 mb-5 pb-4 border-b border-slate-100">Personal Details</h3>
                     <div className="space-y-4">
                         {[
                             { icon: Mail,      label: 'Email',      value: user.email },
@@ -122,9 +122,9 @@ const Profile = () => {
                 </div>
 
                 {/* Security Column */}
-                <div className="lg:col-span-2 space-y-5">
+                <div className="lg:col-span-2 space-y-6">
                     {/* Password Section */}
-                    <div className="card">
+                    <div className="glass rounded-[2rem] p-6 shadow-glass border border-white/60">
                         <div className="flex items-center justify-between mb-5 pb-4 border-b border-slate-100">
                             <h3 className="font-bold text-slate-800 flex items-center gap-2">
                                 <Lock className="w-4 h-4 text-brand-gold" />
@@ -209,7 +209,7 @@ const Profile = () => {
                     </div>
 
                     {/* Sign Out */}
-                    <div className="card border-red-100 bg-red-50/50 flex items-center justify-between">
+                    <div className="glass rounded-[2rem] p-6 bg-red-50/50 border border-red-100 flex items-center justify-between shadow-sm">
                         <div>
                             <h4 className="font-bold text-slate-800">Sign Out</h4>
                             <p className="text-sm text-slate-500 mt-0.5">Securely end your current session.</p>

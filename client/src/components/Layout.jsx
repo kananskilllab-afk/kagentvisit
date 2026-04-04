@@ -70,13 +70,13 @@ const Layout = () => {
     ].filter(item => item.roles.includes(user?.role));
 
     const Sidebar = ({ onClose }) => (
-        <div className="flex flex-col h-full bg-sidebar-gradient">
+        <div className="flex flex-col h-full bg-white/80 backdrop-blur-xl border-r border-slate-200/50">
             {/* Logo */}
-            <div className="px-5 py-6 border-b border-white/10">
+            <div className="px-6 py-8">
                 <div className="flex items-center justify-between">
-                    <img src="/logo.png" alt="Kanan" className="h-9 w-auto object-contain brightness-0 invert" />
+                    <img src="/logo.png" alt="Kanan" className="h-10 w-auto object-contain" />
                     {onClose && (
-                        <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-white/10 text-white/60 hover:text-white transition-all">
+                        <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100/50 text-slate-400 hover:text-slate-600 transition-all">
                             <X className="w-5 h-5" />
                         </button>
                     )}
@@ -84,8 +84,8 @@ const Layout = () => {
             </div>
 
             {/* Nav */}
-            <nav className="flex-1 px-3 py-5 space-y-0.5 overflow-y-auto no-scrollbar">
-                <p className="px-3 mb-3 text-[9px] font-bold uppercase tracking-widest text-white/30">Navigation</p>
+            <nav className="flex-1 px-4 py-2 space-y-1.5 overflow-y-auto no-scrollbar">
+                <p className="px-4 mb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Navigation</p>
                 {menuItems.map(item => (
                     <SidebarLink
                         key={item.path}
@@ -97,23 +97,23 @@ const Layout = () => {
             </nav>
 
             {/* User Footer */}
-            <div className="px-3 py-4 border-t border-white/10 space-y-1">
+            <div className="p-4 m-4 rounded-3xl bg-slate-50/50 border border-slate-100/60 backdrop-blur-sm space-y-2">
                 <Link
                     to="/profile"
                     onClick={onClose}
-                    className="flex items-center gap-3 p-3 rounded-xl hover:bg-white/10 transition-all group"
+                    className="flex items-center gap-3 p-2 rounded-2xl hover:bg-white transition-all group"
                 >
-                    <div className="w-9 h-9 rounded-xl bg-brand-gold/20 flex items-center justify-center text-brand-gold font-bold text-sm shrink-0 ring-2 ring-brand-gold/20">
+                    <div className="w-10 h-10 rounded-xl bg-brand-blue/10 flex items-center justify-center text-brand-blue font-bold text-sm shrink-0 ring-2 ring-brand-blue/5">
                         {user?.name?.charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-white truncate">{user?.name}</p>
+                        <p className="text-sm font-bold text-slate-800 truncate">{user?.name}</p>
                         <RolePill role={user?.role} />
                     </div>
                 </Link>
                 <button
                     onClick={logout}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/15 hover:text-red-300 transition-all"
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 hover:text-red-600 transition-all"
                 >
                     <LogOut className="w-4 h-4" />
                     Sign Out
@@ -123,11 +123,13 @@ const Layout = () => {
     );
 
     return (
-        <div className="min-h-screen flex" style={{ backgroundColor: 'var(--bg-page)' }}>
+        <div className="min-h-screen flex bg-transparent">
 
-            {/* Desktop Sidebar */}
-            <aside className="hidden lg:flex w-64 xl:w-72 flex-col fixed left-0 top-0 h-screen z-30 shadow-sidebar">
-                <Sidebar />
+            {/* Desktop Sidebar - Detached floating effect */}
+            <aside className="hidden lg:flex w-72 flex-col fixed left-0 top-0 h-screen z-30 p-4">
+                <div className="h-full w-full rounded-[2rem] shadow-glass overflow-hidden">
+                    <Sidebar />
+                </div>
             </aside>
 
             {/* Mobile overlay */}
@@ -158,8 +160,8 @@ const Layout = () => {
             </header>
 
             {/* Main Content */}
-            <main className="flex-1 lg:ml-64 xl:ml-72 min-h-screen">
-                <div className="max-w-7xl mx-auto p-3 sm:p-6 lg:p-8 pt-20 lg:pt-8">
+            <main className="flex-1 lg:ml-72 min-h-screen">
+                <div className="max-w-7xl mx-auto p-3 sm:p-6 lg:p-8 pt-20 lg:pt-8 w-full transition-all duration-300">
                     <ErrorBoundary key={location.pathname}>
                         <Outlet />
                     </ErrorBoundary>

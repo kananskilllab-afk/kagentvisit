@@ -65,12 +65,15 @@ exports.getVisits = async (req, res) => {
             .sort({ createdAt: -1 });
 
         // Add logical lock status to results
+        // Drafts are NEVER locked. Only submitted forms lock 24h after submittedAt.
         const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
         const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
         const visitsWithLocked = visits.map(v => {
             const vObj = v.toObject();
-            const isWindowExpired = v.createdAt < twentyFourHoursAgo;
+            const isSubmitted = v.status !== 'draft';
+            const lockAnchor = v.submittedAt || v.createdAt;
+            const isWindowExpired = isSubmitted && lockAnchor < twentyFourHoursAgo;
             vObj.isLocked = !isAdmin && isWindowExpired && !v.isAdminUnlocked;
             return vObj;
         });
@@ -90,8 +93,13 @@ exports.createVisit = async (req, res) => {
             status: req.body.status || 'draft'
         };
 
+        // Set submittedAt when creating directly as submitted
+        if (visitData.status === 'submitted') {
+            visitData.submittedAt = new Date();
+        }
+
         const visit = await Visit.create(visitData);
-        
+
         // Update Agent visit stats if submitted
         if (visit.status === 'submitted' && visit.meta?.agentId) {
             await Agent.findByIdAndUpdate(visit.meta.agentId, {
@@ -124,10 +132,13 @@ exports.getVisitById = async (req, res) => {
         }
 
         // Calculate lock status for frontend
+        // Drafts are NEVER locked. Lock timer starts from submittedAt.
         const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
         const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-        const isWindowExpired = visit.createdAt < twentyFourHoursAgo;
-        
+        const isSubmitted = visit.status !== 'draft';
+        const lockAnchor = visit.submittedAt || visit.createdAt;
+        const isWindowExpired = isSubmitted && lockAnchor < twentyFourHoursAgo;
+
         const visitObj = visit.toObject();
         visitObj.isLocked = !isAdmin && isWindowExpired && !visit.isAdminUnlocked;
 
@@ -156,16 +167,18 @@ exports.updateVisit = async (req, res) => {
         }
 
         // 24-hour edit lock check for NON-admins
-        if (!isAdmin) {
+        // Drafts are NEVER locked — lock only applies after submission
+        if (!isAdmin && visit.status !== 'draft') {
             const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
-            const isWindowExpired = visit.createdAt < twentyFourHoursAgo;
-            
+            const lockAnchor = visit.submittedAt || visit.createdAt;
+            const isWindowExpired = lockAnchor < twentyFourHoursAgo;
+
             // If window expired and NOT admin-unlocked, block edit
             if (isWindowExpired && !visit.isAdminUnlocked) {
-                return res.status(403).json({ 
-                    success: false, 
+                return res.status(403).json({
+                    success: false,
                     message: 'Edit window (24h) has expired. Please contact admin to unlock.',
-                    isLocked: true 
+                    isLocked: true
                 });
             }
         }
@@ -184,6 +197,11 @@ exports.updateVisit = async (req, res) => {
             };
             delete updateData.adminNote;
             delete updateData.adminNoteObj;
+        }
+
+        // Set submittedAt when transitioning from draft to submitted
+        if (visit.status === 'draft' && updateData.status === 'submitted' && !visit.submittedAt) {
+            updateData.submittedAt = new Date();
         }
 
         // Record history
@@ -314,7 +332,10 @@ exports.addFollowUpMeeting = async (req, res) => {
 
         const newMeeting = {
             date: req.body.date || new Date(),
+            meetingStart: req.body.meetingStart || null,
+            meetingEnd: req.body.meetingEnd || null,
             notes: req.body.notes,
+            keyOutcomes: req.body.keyOutcomes || null,
             addedBy: req.user._id
         };
 

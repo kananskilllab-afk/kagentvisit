@@ -15,7 +15,11 @@ exports.getFormConfig = async (req, res) => {
 
 exports.updateFormConfig = async (req, res) => {
     try {
-        const { version, fields, formType } = req.body;
+        const { fields, formType } = req.body;
+        let { version } = req.body;
+
+        // Append timestamp to ensure version is always unique
+        version = `${version}-${Date.now()}`;
 
         // Deactivate others of same type if this one will be active
         if (req.body.isActive) {
@@ -24,11 +28,13 @@ exports.updateFormConfig = async (req, res) => {
 
         const config = await FormConfig.create({
             ...req.body,
+            version,
             createdBy: req.user._id
         });
 
         res.status(201).json({ success: true, data: config });
     } catch (error) {
+        console.error('updateFormConfig error:', error);
         res.status(400).json({ success: false, message: error.message });
     }
 };

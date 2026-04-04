@@ -17,10 +17,13 @@ const editHistorySchema = new mongoose.Schema({
 }, { _id: true });
 
 const followUpMeetingSchema = new mongoose.Schema({
-    date:    { type: Date, required: true },
-    notes:   { type: String, required: true },
-    addedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    addedAt: { type: Date, default: Date.now }
+    date:         { type: Date, required: true },
+    meetingStart: { type: Date },
+    meetingEnd:   { type: Date },
+    notes:        { type: String, required: true },
+    keyOutcomes:  { type: String },
+    addedBy:      { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    addedAt:      { type: Date, default: Date.now }
 }, { _id: true });
 
 // ─── Main Schema ─────────────────────────────────────────────────────────────
@@ -59,8 +62,8 @@ const visitSchema = new mongoose.Schema({
         email:        { type: String },
         meetingStart: { type: Date },
         meetingEnd:   { type: Date },
-        rmName:       { type: String },
-        bdmName:      { type: String, index: true }
+        rmName:       { type: mongoose.Schema.Types.Mixed },
+        bdmName:      { type: mongoose.Schema.Types.Mixed, index: true }
     },
 
     // Step 2 – Agency Profile
@@ -68,12 +71,14 @@ const visitSchema = new mongoose.Schema({
         address:           { type: String },
         nearestLandmark:   { type: String },
         pinCode:           { type: String, index: true },
-        contactNumber:     { type: String },
+        contactNumber:     { type: mongoose.Schema.Types.Mixed },
         emailId:           { type: String },
         website:           { type: String },
         gmbLink:           { type: String },
         establishmentYear: { type: Number },
         businessModel:     [{ type: String }],
+        otherBusinessModel: { type: String },
+        officeAreaType:    { type: String },
         officeArea:        { type: Number },
         infraRating:       { type: Number, min: 1, max: 5 },
         hasComputerLab:    { type: Boolean, default: false },
@@ -91,8 +96,11 @@ const visitSchema = new mongoose.Schema({
         coachingTeamSize: { type: Number, default: 0 },
         countryTeamSize:  { type: Number, default: 0 },
         countriesPromoted: [{ type: String }],
+        otherCountriesPromoted: { type: String },
         coachingPromoted:  [{ type: String }],
-        vas:               [{ type: String }]
+        otherCoachingPromoted: { type: String },
+        vas:               [{ type: String }],
+        otherVas:          { type: String }
     },
 
     // Step 4 – Marketing & Ops
@@ -126,6 +134,7 @@ const visitSchema = new mongoose.Schema({
     // Step 7 – Partnership
     partnership: {
         workingCountries: [{ type: String }],
+        otherWorkingCountries: { type: String },
         onshoreReferral:  { type: Boolean, default: false },
         feedback:         { type: String }
     },
@@ -141,8 +150,10 @@ const visitSchema = new mongoose.Schema({
     kananTools: {
         useAcademyPortal:    { type: Boolean, default: false },
         portalCourses:       [{ type: String }],
+        academyPortalOther:  { type: String },
         useBooks:            { type: Boolean, default: false },
         bookCourses:         [{ type: String }],
+        booksOther:          { type: String },
         useClassroomContent: { type: Boolean, default: false },
         trainerRating:       { type: Number },
         counsellorRating:    { type: Number }
@@ -168,8 +179,8 @@ const visitSchema = new mongoose.Schema({
         needTech:           { type: Boolean, default: false },
         needPartners:       { type: Boolean, default: false },
         needVAS:            { type: Boolean, default: false },
-        painPoints:         { type: String },
-        solutions:          { type: String }
+        painPoints:         { type: mongoose.Schema.Types.Mixed },
+        solutions:          { type: mongoose.Schema.Types.Mixed }
     },
 
     // Step 11 – Summary
@@ -238,7 +249,25 @@ const visitSchema = new mongoose.Schema({
     editHistory: [editHistorySchema],
     followUpMeetings: [followUpMeetingSchema],
 
-    // Locking & Unlocking (B2B visit 24h rule)
+    aiInsights: {
+        summary: { type: String },
+        bulletPoints: [{ type: String }],
+        suggestions: { type: String },
+        generatedAt: { type: Date }
+    },
+    adminAuditEval: {
+        status:      { type: String, enum: ['successful', 'needs_improvement', 'failed'] },
+        score:       { type: Number, min: 1, max: 10 },
+        strengths:   [{ type: String }],
+        weaknesses:  [{ type: String }],
+        reasoning:   { type: String },
+        evaluatedAt: { type: Date }
+    },
+
+    // Submission timestamp (lock timer starts from here, NOT createdAt)
+    submittedAt: { type: Date, default: null },
+
+    // Locking & Unlocking (24h rule from submission, NOT creation)
     isAdminUnlocked:   { type: Boolean, default: false },
     unlockRequestSent: { type: Boolean, default: false }
 

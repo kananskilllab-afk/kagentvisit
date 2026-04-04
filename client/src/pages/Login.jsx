@@ -42,96 +42,97 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/40 flex items-center justify-center p-4">
+        <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-slate-50">
+            {/* Ambient Background Mesh */}
+            <div className="absolute inset-0 z-0">
+                <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-brand-blue/10 blur-[100px]" />
+                <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-brand-sky/20 blur-[120px]" />
+                <div className="absolute top-[20%] right-[10%] w-[40%] h-[40%] rounded-full bg-brand-purple/10 blur-[100px]" />
+            </div>
 
-            {/* Background accent circles */}
-            <div className="absolute top-0 left-0 w-96 h-96 bg-brand-navy/5 rounded-full -translate-x-1/2 -translate-y-1/2 blur-3xl pointer-events-none" />
-            <div className="absolute bottom-0 right-0 w-96 h-96 bg-brand-sky/5 rounded-full translate-x-1/2 translate-y-1/2 blur-3xl pointer-events-none" />
-
-            <div className="relative w-full max-w-md animate-fade-in">
+            <div className="relative z-10 w-full max-w-md animate-fade-in">
                 {/* Header */}
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-brand-navy rounded-2xl shadow-lg mb-5">
-                        <img src="/logo.png" alt="Kanan" className="h-10 w-auto object-contain brightness-0 invert" />
+                <div className="text-center mb-10">
+                    <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-[2rem] shadow-glass mb-6">
+                        <img src="/logo.png" alt="Kanan" className="h-10 w-auto object-contain" />
                     </div>
-                    <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Agent Visit Portal</h1>
-                    <p className="text-slate-500 mt-1.5 text-sm">Sign in to manage your visit reports</p>
+                    <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Agent Portal</h1>
+                    <p className="text-slate-500 mt-2 text-sm font-medium">Sign in to manage your visit reports.</p>
                 </div>
 
                 {/* Card */}
-                <div className="bg-white rounded-3xl shadow-card-lg border border-slate-100 overflow-hidden">
-                    {/* Top color bar */}
-                    <div className="h-1.5 bg-brand-gradient" />
+                <div className="bg-white/70 backdrop-blur-3xl rounded-[2rem] shadow-glass border border-white/60 overflow-hidden transition-all duration-300">
+                    <div className="h-1.5 w-full bg-gradient-to-r from-brand-blue to-brand-sky" />
 
-                    <div className="p-8">
+                    <div className="p-8 sm:p-10">
                         {/* Error */}
                         {error && (
-                            <div className="mb-6 flex items-start gap-3 p-4 bg-red-50 border border-red-100 rounded-2xl text-red-700 animate-slide-down">
-                                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-                                <p className="text-sm font-medium">{error}</p>
+                            <div className="mb-6 flex items-start gap-3 p-4 bg-red-50/80 backdrop-blur-sm border border-red-100 rounded-2xl text-red-700 animate-slide-down shadow-sm">
+                                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-red-500" />
+                                <p className="text-sm font-semibold">{error}</p>
                             </div>
                         )}
 
-                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                             {/* Email */}
                             <div>
-                                <label className="label">Email Address</label>
-                                <div className="relative">
-                                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                                <label className="label text-[10px] text-slate-400">Email Address</label>
+                                <div className="relative group">
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-brand-blue transition-colors pointer-events-none" />
                                     <input
                                         {...register('email')}
                                         type="email"
                                         autoComplete="email"
-                                        className={`input-field pl-10 ${errors.email ? 'border-red-400 focus:ring-red-300/30 focus:border-red-400' : ''}`}
+                                        className={`input-field pl-11 py-3.5 ${errors.email ? 'border-red-400 focus:ring-red-400/20' : ''}`}
                                         placeholder="name@kanan.co"
                                     />
                                 </div>
-                                {errors.email && <p className="mt-1.5 text-xs text-red-500 font-medium">{errors.email.message}</p>}
+                                {errors.email && <p className="mt-2 text-[11px] text-red-500 font-bold">{errors.email.message}</p>}
                             </div>
 
                             {/* Password */}
                             <div>
-                                <label className="label">Password</label>
-                                <div className="relative">
-                                    <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+                                <label className="label text-[10px] text-slate-400">Password</label>
+                                <div className="relative group">
+                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-brand-blue transition-colors pointer-events-none" />
                                     <input
                                         {...register('password')}
                                         type={showPass ? 'text' : 'password'}
                                         autoComplete="current-password"
-                                        className={`input-field pl-10 pr-11 ${errors.password ? 'border-red-400 focus:ring-red-300/30 focus:border-red-400' : ''}`}
+                                        className={`input-field pl-11 pr-12 py-3.5 ${errors.password ? 'border-red-400 focus:ring-red-400/20' : ''}`}
                                         placeholder="••••••••"
                                     />
                                     <button
                                         type="button"
                                         onClick={() => setShowPass(v => !v)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-brand-blue transition-colors"
                                     >
                                         {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                     </button>
                                 </div>
-                                {errors.password && <p className="mt-1.5 text-xs text-red-500 font-medium">{errors.password.message}</p>}
+                                {errors.password && <p className="mt-2 text-[11px] text-red-500 font-bold">{errors.password.message}</p>}
                             </div>
 
                             {/* Submit */}
                             <button
                                 type="submit"
                                 disabled={isLoading}
-                                className="w-full mt-2 h-12 bg-brand-gradient text-white rounded-xl font-semibold text-sm flex items-center justify-center gap-2.5 hover:opacity-95 active:scale-[0.99] transition-all shadow-md shadow-brand-blue/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                                className="w-full mt-4 h-14 bg-gradient-to-r from-brand-blue to-brand-sky text-white rounded-2xl font-bold text-[15px] tracking-wide flex items-center justify-center gap-2.5 hover:shadow-glow hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
                             >
                                 {isLoading ? (
-                                    <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                                    <svg className="w-6 h-6 animate-spin text-white/50" viewBox="0 0 24 24" fill="none">
                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
                                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
                                     </svg>
                                 ) : (
-                                    <>Sign In <ArrowRight className="w-4 h-4" /></>
+                                    <>Sign In <ArrowRight className="w-5 h-5" /></>
                                 )}
                             </button>
                         </form>
 
-                        <div className="mt-8 pt-6 border-t border-slate-100 text-center space-y-1">
-                            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">Authorised Access Only</p>
-                            <p className="text-[11px] text-slate-400">© {new Date().getFullYear()} Kanan International. All rights reserved.</p>
+                        <div className="mt-10 text-center space-y-1.5 opacity-60 hover:opacity-100 transition-opacity">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Secure Access</p>
+                            <p className="text-[10px] font-medium text-slate-500">© {new Date().getFullYear()} Kanan International.</p>
                         </div>
                     </div>
                 </div>
