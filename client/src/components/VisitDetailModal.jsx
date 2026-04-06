@@ -348,9 +348,12 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
                             </Section>
 
                             <Section icon={GraduationCap} title="Student Information" accent="brand-sky">
+                                <Field label="Classification" value={visit.studentInfo?.classification} />
+                                <Field label="Lead Source" value={visit.studentInfo?.leadSource} />
                                 <Field label="CRM ID" value={visit.studentInfo?.crmId} />
                                 <Field label="Student Name" value={visit.studentInfo?.name} />
                                 <Field label="Email" value={visit.studentInfo?.email} />
+                                <Field label="Inquiry Types" value={arr(visit.studentInfo?.inquiryTypes)} full />
                             </Section>
 
                             <Section icon={Phone} title="Contact Details" accent="brand-green">
@@ -361,6 +364,7 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
 
                             <Section icon={MapPin} title="Location" accent="brand-orange">
                                 <Field label="Address" value={visit.location?.address} full />
+                                <Field label="Nearest Landmark" value={visit.location?.nearestLandmark} />
                                 <Field label="City" value={visit.location?.city} />
                                 <Field label="PIN Code" value={visit.location?.pinCode} />
                                 <Field label="State" value={visit.location?.state} />
@@ -374,6 +378,9 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
                                 <BoolField label="WhatsApp Group Created" value={visit.checklist?.waGroup} />
                                 <Field label="WA Group Name" value={visit.checklist?.waGroupName} />
                                 <BoolField label="MoM Done" value={visit.checklist?.momDone} />
+                                <BoolField label="Parents Met" value={visit.checklist?.parentsMet} />
+                                <BoolField label="Documents Collected" value={visit.checklist?.docsCollected} />
+                                <BoolField label="Application Logged" value={visit.checklist?.appLogged} />
                             </Section>
 
                             <Section icon={FileText} title="Final Outcome" accent="brand-green">
@@ -426,8 +433,8 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
                                     <Clock className="w-4 h-4 text-brand-orange" />
                                 </div>
                                 <div>
-                                    <h3 className="text-sm font-extrabold text-slate-700 uppercase tracking-wide">Visit Thread</h3>
-                                    <p className="text-[10px] text-slate-400">{totalMeetings === 1 ? 'Original visit only' : `${totalMeetings} visits total`}</p>
+                                    <h3 className="text-sm font-extrabold text-slate-700 uppercase tracking-wide">{isB2C ? 'Revisit History' : 'Visit Thread'}</h3>
+                                    <p className="text-[10px] text-slate-400">{totalMeetings === 1 ? 'Original visit only' : `${totalMeetings} entries total`}</p>
                                 </div>
                             </div>
                             {(isOwner || isAdmin) && visit.status !== 'draft' && (
@@ -436,7 +443,7 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
                                     className="flex items-center gap-1.5 text-xs font-bold text-brand-orange hover:text-brand-orange/80 transition-colors"
                                 >
                                     {showFollowUpForm ? <ChevronUp className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
-                                    {showFollowUpForm ? 'Cancel' : 'Log Follow-up'}
+                                    {showFollowUpForm ? 'Cancel' : (isB2C ? 'Log Revisit' : 'Log Follow-up')}
                                 </button>
                             )}
                         </div>
@@ -448,7 +455,7 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
                                     <div key={i} className="bg-orange-50/50 border border-orange-100 rounded-xl p-4">
                                         <div className="flex items-center justify-between mb-2">
                                             <span className="text-xs font-extrabold text-brand-orange flex items-center gap-1.5">
-                                                Visit {i + 2}
+                                                {isB2C ? 'Revisit' : 'Follow-up'} {i + 1}
                                             </span>
                                             <span className="text-[10px] text-slate-400 bg-white px-2 py-0.5 rounded-md border border-slate-100">
                                                 {fmt(m.date)}
@@ -479,7 +486,7 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
                         {/* Add follow-up form */}
                         {showFollowUpForm && (
                             <div className="bg-orange-50/60 border border-orange-200 rounded-2xl p-4 animate-slide-down">
-                                <h4 className="text-xs font-bold text-slate-700 mb-3">Log Visit {followUps.length + 2}</h4>
+                                <h4 className="text-xs font-bold text-slate-700 mb-3">{isB2C ? 'Log New Revisit' : `Log Visit ${followUps.length + 2}`}</h4>
                                 <div className="space-y-3">
                                     <div className="grid grid-cols-3 gap-3">
                                         <div>
@@ -521,7 +528,7 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
                                         className="btn-primary py-2 px-5 text-xs flex items-center gap-2"
                                     >
                                         {addingFollowUp ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                                        {addingFollowUp ? 'Adding...' : 'Add Follow-up Visit'}
+                                        {addingFollowUp ? 'Adding...' : (isB2C ? 'Log Revisit' : 'Add Follow-up Visit')}
                                     </button>
                                 </div>
                             </div>

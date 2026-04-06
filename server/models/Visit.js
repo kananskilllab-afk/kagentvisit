@@ -197,13 +197,27 @@ const visitSchema = new mongoose.Schema({
         visitDate:   { type: Date },
         officer:     { type: String },
         teamSize:    { type: String },
-        teamMembers: [{ type: String }]
+        teamMembers: [{ type: String }],
+        revisits: [{
+            date: { type: Date, default: Date.now },
+            officer: String,
+            remarks: String
+        }]
     },
 
     studentInfo: {
-        crmId: { type: String, index: true },
-        name:  { type: String },
-        email: { type: String }
+        crmId:          { type: String, index: true },
+        name:           { type: String },
+        email:          { type: String },
+        phoneNumber:    { type: String },
+        program:        { type: String },
+        intake:         { type: String },
+        qualification:  { type: String },
+        testScore:      { type: String },
+        interest:       [{ type: String }],
+        classification: { type: String, enum: ['Onshore', 'Offshore'] },
+        leadSource:     { type: String, enum: ['Band Data', 'Non-Band Data', 'Onshore Data', 'Reference Case'] },
+        inquiryTypes:   [{ type: String }]
     },
 
     contactDetails: {
@@ -213,10 +227,11 @@ const visitSchema = new mongoose.Schema({
     },
 
     location: {
-        address: { type: String },
-        city:    { type: String, index: true },
-        pinCode: { type: String },
-        state:   { type: String },
+        address:         { type: String },
+        nearestLandmark: { type: String },
+        city:            { type: String, index: true },
+        pinCode:         { type: String },
+        state:           { type: String },
         coordinates: {
             lat: { type: Number },
             lng: { type: Number }
@@ -228,14 +243,22 @@ const visitSchema = new mongoose.Schema({
     },
 
     checklist: {
-        waGroup: { type: Boolean, default: false },
-        waGroupName: { type: String },
-        momDone: { type: Boolean, default: false }
+        waGroup:      { type: Boolean, default: false },
+        waGroupName:  { type: String },
+        momDone:      { type: Boolean, default: false },
+        parentsMet:   { type: Boolean, default: false },
+        docsCollected:{ type: Boolean, default: false },
+        appLogged:    { type: Boolean, default: false }
     },
 
     outcome: {
         status:  { type: String },
         remarks: { type: String },
+        remarksLog: [{
+            text: String,
+            date: { type: Date, default: Date.now },
+            author: String
+        }],
         photo:   { type: String }
     },
 

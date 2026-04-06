@@ -146,35 +146,63 @@ const genericFields = [
 ];
 
 const b2cFields = [
-    // Visit Details
+    // Step 1: Visit Details
     { id: 'visitInfo.visitDate', group: 'Visit Details', label: 'Visit Date', type: 'date', required: true },
     { id: 'visitInfo.teamSize', group: 'Visit Details', label: 'Total Team Members', type: 'dropdown', required: true, options: ['1', '2', '3', '4', '5'] },
     { id: 'visitInfo.officer', group: 'Visit Details', label: 'Counsellor Name', type: 'text', required: true },
-    // Student Information
+
+    // New: Profile Classification
+    { id: 'studentInfo.classification', group: 'Student Information', label: 'Classification', type: 'dropdown', required: true, options: ['Onshore', 'Offshore'] },
+    // New: Lead Source
+    { id: 'studentInfo.leadSource', group: 'Student Information', label: 'Lead Source', type: 'dropdown', required: true, options: ['Band Data', 'Non-Band Data', 'Onshore Data', 'Reference Case'] },
+
+    // Step 2: Student Information
     { id: 'studentInfo.crmId', group: 'Student Information', label: 'CRM ID', type: 'text', required: true },
     { id: 'studentInfo.name', group: 'Student Information', label: 'Student Name', type: 'text', required: true },
     { id: 'studentInfo.email', group: 'Student Information', label: 'Email ID', type: 'text', required: true },
-    // Contact Details
+    { id: 'studentInfo.phoneNumber', group: 'Student Information', label: 'Student Mobile No.', type: 'text', required: true },
+    { id: 'studentInfo.qualification', group: 'Student Information', label: 'Current Qualification', type: 'dropdown', required: true, options: ['10th', '12th', 'Bachelors', 'Masters', 'Diploma', 'Other'] },
+    { id: 'studentInfo.program', group: 'Student Information', label: 'Program Interested', type: 'dropdown', required: true, options: ['UG', 'PG', 'Diploma', 'Certificate', 'Other'] },
+    { id: 'studentInfo.intake', group: 'Student Information', label: 'Intake Interested', type: 'dropdown', required: true, options: ['Jan/Feb', 'May/June', 'Sept/Oct', 'Other'] },
+    { id: 'studentInfo.testScore', group: 'Student Information', label: 'English Test Score (IELTS/PTE)', type: 'text', required: false },
+    { id: 'studentInfo.interest', group: 'Student Information', label: 'Countries of Interest', type: 'multi-select', required: true, options: ['Canada', 'USA', 'UK', 'Australia', 'Other'] },
+    
+    // New: Inquiry Types (This will be handled in frontend by showing relevant list based on classification)
+    { id: 'studentInfo.inquiryTypes', group: 'Student Information', label: 'Inquiry Types', type: 'multi-select', required: false, options: [
+        'PR Process', 'Kanan Coaching', 'Canada Visitor Visa', 'Study Permit Extension', 'PGWP', 'Super Visa', 'USA Visitor Visa', 'ECA – WES', 'Spousal PR', 'All Immigration Services',
+        'Country Counselling', 'My Career Mentor'
+    ] },
+
+    // Step 3: Contact Details
     { id: 'contactDetails.indiaNo', group: 'Contact Details', label: 'India No.', type: 'text', required: true },
-    { id: 'contactDetails.canadaNo', group: 'Contact Details', label: 'Canada No.', type: 'text', required: true },
+    { id: 'contactDetails.canadaNo', group: 'Contact Details', label: 'Canada No. (if any)', type: 'text', required: false },
     { id: 'contactDetails.parentsNo', group: 'Contact Details', label: 'Parents No.', type: 'text', required: true },
-    // Location Details
+
+    // Step 4: Location Details
     { id: 'location.pinCode', group: 'Location Details', label: 'PIN Code', type: 'text', required: true },
     { id: 'location.address', group: 'Location Details', label: 'Address', type: 'textarea', required: true },
+    { id: 'location.nearestLandmark', group: 'Location Details', label: 'Nearest Landmark', type: 'text', required: false },
     { id: 'location.city', group: 'Location Details', label: 'City', type: 'text', required: true },
     { id: 'location.state', group: 'Location Details', label: 'State', type: 'text', required: true },
-    // Academic Details
+
+    // Step 5: Academic Details
     { id: 'academic.college', group: 'Academic Details', label: 'College', type: 'text', required: true },
-    // Checklist
+
+    // Step 6: Checklist
     { id: 'checklist.waGroup', group: 'Checklist', label: 'WA Group Created (Y/N)', type: 'toggle', required: true },
+    { id: 'checklist.parentsMet', group: 'Checklist', label: 'Parents Met?', type: 'toggle', required: false },
+    { id: 'checklist.docsCollected', group: 'Checklist', label: 'Documents Collected?', type: 'toggle', required: false },
+    { id: 'checklist.appLogged', group: 'Checklist', label: 'Application Successfully Logged?', type: 'toggle', required: false },
     { id: 'checklist.momDone', group: 'Checklist', label: 'MOM Done (Y/N)', type: 'toggle', required: true },
-    // Final Outcome
+
+    // Step 7: Final Outcome
     {
         id: 'outcome.status', group: 'Final Outcome', label: 'Visit Outcome / Status', type: 'dropdown', required: true, options: [
             'Pending', 'Completed', 'Cancelled', 'HOUSE LOCKED', 'ADDRESS NOT FOUND', 'VISIT DONE',
             'REVISIT REQUIRED', 'ENROLLED', 'NOT INTRESTED', 'OUT OF VADODARAA', 'IN PROGRESS',
             'WRONG ADDRESS DETAILS', 'NOT RESPONDING', 'HO INVITE', 'FOLLOW UP REQUIRED',
-            'SHIFTED OTHER CITY', 'NOT FOUND'
+            'SHIFTED OTHER CITY', 'NOT FOUND',
+            'Process Done', 'Already PR in Canada', 'Married with PR Holder', 'Country Change', 'Already French Start In Canada'
         ]
     },
     { id: 'outcome.remarks', group: 'Final Outcome', label: 'Remarks / Notes', type: 'textarea', required: true }

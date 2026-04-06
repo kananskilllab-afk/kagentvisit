@@ -248,9 +248,11 @@ const NewVisit = () => {
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, [isDirty]);
 
-    const formData = watch();
-    const teamSize = parseInt(watch('visitInfo.teamSize') || '1');
+    const classificationValue = watch('studentInfo.classification');
+    const prevClassificationRef = React.useRef(classificationValue);
     const pinCodeValue = watch('location.pinCode');
+    const teamSize = parseInt(watch('visitInfo.teamSize') || '1');
+    const formData = watch();
 
     // Auto-fill City and State based on PIN Code
     useEffect(() => {
@@ -285,24 +287,26 @@ const NewVisit = () => {
         fetchAddress();
     }, [pinCodeValue, setValue]);
 
+    // Reset inquiry types if classification changes
+    useEffect(() => {
+        if (classificationValue && prevClassificationRef.current !== classificationValue) {
+            setValue('studentInfo.inquiryTypes', []);
+        }
+        prevClassificationRef.current = classificationValue;
+    }, [classificationValue, setValue]);
+
     const waGroupValue = watch('checklist.waGroup');
     const studentNameValue = watch('studentInfo.name');
-    const visitDateValue = watch('visitInfo.visitDate');
+    const crmIdValue = watch('studentInfo.crmId');
 
-    // Auto-generate WhatsApp Group Name
+    // Auto-generate WhatsApp Group Name: CRMIDNAME@Kanan.Co
     useEffect(() => {
-        if (waGroupValue && studentNameValue && visitDateValue) {
+        if (waGroupValue && studentNameValue && crmIdValue) {
             try {
-                const date = new Date(visitDateValue);
-                if (isNaN(date.getTime())) return;
+                const cleanName = studentNameValue.replace(/\s+/g, '');
+                const groupName = `${crmIdValue}${cleanName}@Kanan.Co`;
 
-                const d = date.getDate();
-                const m = date.getMonth() + 1;
-                const y = date.getFullYear();
-                const cleanName = studentNameValue.replace(/\s+/g, '').toLowerCase();
-                const groupName = `${d}${m}${y}-${cleanName}`;
-
-                setValue('checklist.waGroupName', groupName);
+                setValue('checklist.waGroupName', groupName, { shouldValidate: true });
                 if (!disabledFields['checklist.waGroupName']) {
                     setDisabledFields(prev => ({ ...prev, 'checklist.waGroupName': true }));
                 }
@@ -312,7 +316,7 @@ const NewVisit = () => {
         } else if (!waGroupValue) {
             setValue('checklist.waGroupName', '');
         }
-    }, [waGroupValue, studentNameValue, visitDateValue, setValue]);
+    }, [waGroupValue, studentNameValue, crmIdValue, setValue]);
 
     useEffect(() => {
         const loadForm = async () => {
@@ -785,10 +789,26 @@ const NewVisit = () => {
                         {config.fields
                             .filter(f => f.group === groups[currentStep])
                             .map(field => {
+                                // Dynamic options for inquiryTypes based on Classification
+                                let processedField = { ...field };
+                                if (field.id === 'studentInfo.inquiryTypes') {
+                                    const classification = watch('studentInfo.classification');
+                                    if (classification === 'Onshore') {
+                                        processedField.options = [
+                                            'PR Process', 'Kanan Coaching', 'Canada Visitor Visa', 'Study Permit Extension', 
+                                            'PGWP', 'Super Visa', 'USA Visitor Visa', 'ECA – WES', 'Spousal PR', 'All Immigration Services'
+                                        ];
+                                    } else if (classification === 'Offshore') {
+                                        processedField.options = ['Kanan Coaching', 'Country Counselling', 'My Career Mentor'];
+                                    } else {
+                                        processedField.options = [];
+                                    }
+                                }
+
                                 const mainField = (
-                                    <React.Fragment key={`main_${field.id}`}>
+                                    <React.Fragment key={`main_${processedField.id}`}>
                                         <DynamicField
-                                            field={field}
+                                            field={processedField}
                                             register={register}
                                             control={control}
                                             errors={errors}
