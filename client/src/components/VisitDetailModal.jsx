@@ -51,7 +51,7 @@ const Section = ({ icon: Icon, title, children, accent = 'brand-blue' }) => {
 };
 
 const Field = ({ label, value, full }) => {
-    if (value === null || value === undefined || value === '' || value === 0 || value === false) return null;
+    if (value === null || value === undefined || value === '' || value === false) return null;
     return (
         <div className={full ? 'sm:col-span-2' : ''}>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{label}</p>

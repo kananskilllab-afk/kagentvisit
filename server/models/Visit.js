@@ -93,8 +93,8 @@ const visitSchema = new mongoose.Schema({
         mobileNumber:     { type: String },
         emailId:          { type: String },
         totalStaff:       { type: Number },
-        coachingTeamSize: { type: Number, default: 0 },
-        countryTeamSize:  { type: Number, default: 0 },
+        coachingTeamSize: { type: Number },
+        countryTeamSize:  { type: Number },
         countriesPromoted: [{ type: String }],
         otherCountriesPromoted: { type: String },
         coachingPromoted:  [{ type: String }],
@@ -106,13 +106,13 @@ const visitSchema = new mongoose.Schema({
     // Step 4 – Marketing & Ops
     marketingOps: {
         marketingActivities: { type: String },
-        avgDailyWalkins: { type: Number, default: 0 },
+        avgDailyWalkins: { type: Number },
         walkinRatio:     { type: String },
         useBrochures:    { type: Boolean, default: false },
-        totalVisaYear:   { type: Number, default: 0 },
-        totalCoachingYear: { type: Number, default: 0 },
+        totalVisaYear:   { type: Number },
+        totalCoachingYear: { type: Number },
         officeMediaLink: { type: String },
-        totalBranches:   { type: Number, default: 1 }
+        totalBranches:   { type: Number }
     },
 
     // Step 5 – Kanan Status
@@ -125,10 +125,10 @@ const visitSchema = new mongoose.Schema({
 
     // Step 6 – Enquiry Stats
     enquiryStats: {
-        avgAdmissions: { type: Number, default: 0 },
-        avgCoaching:   { type: Number, default: 0 },
-        avgCanada:     { type: Number, default: 0 },
-        avgIELTS:      { type: Number, default: 0 }
+        avgAdmissions: { type: Number },
+        avgCoaching:   { type: Number },
+        avgCanada:     { type: Number },
+        avgIELTS:      { type: Number }
     },
 
     // Step 7 – Partnership
@@ -141,9 +141,9 @@ const visitSchema = new mongoose.Schema({
 
     // Step 8 – Student Counts
     studentCounts: {
-        canada: { type: Number, default: 0 },
-        usa:    { type: Number, default: 0 },
-        uk:     { type: Number, default: 0 }
+        canada: { type: Number },
+        usa:    { type: Number },
+        uk:     { type: Number }
     },
 
     // Step 9 – Kanan Tools
@@ -165,8 +165,8 @@ const visitSchema = new mongoose.Schema({
         techWillingness: { type: Number }
     },
     budget: {
-        marketing2026: { type: Number, default: 0 },
-        coaching2026:  { type: Number, default: 0 }
+        marketing2026: { type: Number },
+        coaching2026:  { type: Number }
     },
     competency: {
         pricingRating: { type: Number }

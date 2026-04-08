@@ -70,7 +70,7 @@ const DynamicField = ({ field, register, control, errors, watch, setValue, Contr
                             {...register(name, { valueAsNumber: true })}
                             disabled={disabled}
                             className={baseClass}
-                            placeholder={field.placeholder || '0'}
+                            placeholder={field.placeholder || ''}
                         />
                     );
                 case 'date':
