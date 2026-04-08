@@ -96,6 +96,8 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
     const [adminAuditEval, setAdminAuditEval] = useState(visit?.adminAuditEval || null);
     const [generatingAI, setGeneratingAI] = useState(false);
     const [generatingAudit, setGeneratingAudit] = useState(false);
+    const [aiError, setAiError] = useState(null);
+    const [auditError, setAuditError] = useState(null);
 
     // Follow-up meeting form state
     const [followUps, setFollowUps] = useState(visit?.followUpMeetings || []);
@@ -118,11 +120,15 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
     const handleGenerateInsights = async () => {
         if (!visit._id) return;
         setGeneratingAI(true);
+        setAiError(null);
         try {
             const res = await api.post(`/visits/${visit._id}/ai/insights`);
-            if (res.data?.success) setAiInsights(res.data.data);
+            if (res.data?.success) {
+                setAiInsights(res.data.data);
+                if (onVisitUpdated) onVisitUpdated({ ...visit, aiInsights: res.data.data });
+            }
         } catch (err) {
-            alert("Failed: " + (err.response?.data?.message || err.message));
+            setAiError(err.response?.data?.message || 'AI service temporarily unavailable. Please try again.');
         } finally {
             setGeneratingAI(false);
         }
@@ -131,11 +137,15 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
     const handleGenerateAudit = async () => {
         if (!visit._id) return;
         setGeneratingAudit(true);
+        setAuditError(null);
         try {
             const res = await api.post(`/visits/${visit._id}/ai/audit`);
-            if (res.data?.success) setAdminAuditEval(res.data.data);
+            if (res.data?.success) {
+                setAdminAuditEval(res.data.data);
+                if (onVisitUpdated) onVisitUpdated({ ...visit, adminAuditEval: res.data.data });
+            }
         } catch (err) {
-            alert("Failed: " + (err.response?.data?.message || err.message));
+            setAuditError(err.response?.data?.message || 'AI service temporarily unavailable. Please try again.');
         } finally {
             setGeneratingAudit(false);
         }
@@ -593,6 +603,11 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
                                 </div>
                             ) : (
                                 <div className="p-6 text-center bg-slate-50/50">
+                                    {aiError && (
+                                        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                            <p className="text-xs text-red-600 font-medium">{aiError}</p>
+                                        </div>
+                                    )}
                                     <p className="text-xs text-slate-400">Click "Generate Insights" to get an AI-powered summary, meeting minutes, and suggestions{totalMeetings > 1 ? ' across all visits in this thread' : ''}.</p>
                                 </div>
                             )}
@@ -692,6 +707,11 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
                                     </div>
                                 ) : (
                                     <div className="p-6 text-center bg-red-50/30">
+                                        {auditError && (
+                                            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                                <p className="text-xs text-red-600 font-medium">{auditError}</p>
+                                            </div>
+                                        )}
                                         <p className="text-xs text-slate-400">Click "Run Audit" for an honest evaluation of this visit's quality and completeness.</p>
                                     </div>
                                 )}

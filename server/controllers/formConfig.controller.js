@@ -5,8 +5,9 @@ exports.getFormConfig = async (req, res) => {
         const { formType } = req.query;
         const query = { isActive: true };
         if (formType) query.formType = formType;
-        
+
         const config = await FormConfig.findOne(query).sort({ createdAt: -1 });
+        res.set('Cache-Control', 'no-store');
         res.json({ success: true, data: config });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

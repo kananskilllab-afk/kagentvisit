@@ -380,6 +380,26 @@ const NewVisit = () => {
         if (user) loadForm();
     }, [user, id, urlFormType, reset]);
 
+    // Re-fetch form config when tab regains focus (new visits only) so superadmin changes appear immediately
+    useEffect(() => {
+        if (id || !user) return; // skip for edit mode
+        const handleVisibility = async () => {
+            if (document.visibilityState !== 'visible') return;
+            try {
+                const formType = (user.department === 'B2C' || user.role === 'home_visit') ? 'home_visit' : 'generic';
+                const cRes = await api.get(`/form-config?formType=${formType}`);
+                if (cRes.data?.success && cRes.data.data) {
+                    setConfig(prev => {
+                        if (prev?._id === cRes.data.data._id) return prev; // no change
+                        return cRes.data.data;
+                    });
+                }
+            } catch { /* silent */ }
+        };
+        document.addEventListener('visibilitychange', handleVisibility);
+        return () => document.removeEventListener('visibilitychange', handleVisibility);
+    }, [id, user, urlFormType]);
+
     // saveDraft — defined before auto-save effects so refs are never stale
     const saveDraftRef = useRef(null);
 

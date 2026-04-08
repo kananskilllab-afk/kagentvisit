@@ -53,6 +53,11 @@ const VisitsList = () => {
 
     useEffect(() => { fetchVisits(); }, [urlFormType]);
 
+    const handleVisitUpdated = (updatedVisit) => {
+        setVisits(prev => prev.map(v => v._id === updatedVisit._id ? { ...v, ...updatedVisit } : v));
+        setSelectedVisit(prev => prev?._id === updatedVisit._id ? { ...prev, ...updatedVisit } : prev);
+    };
+
     const handleApproveUnlock = async (visitId) => {
         setIsSubmitting(true);
         try {
@@ -367,6 +372,7 @@ const VisitsList = () => {
                         setSelectedVisit(null);
                         navigate(`/edit-visit/${selectedVisit._id}`);
                     }}
+                    onVisitUpdated={handleVisitUpdated}
                 />
             )}
 

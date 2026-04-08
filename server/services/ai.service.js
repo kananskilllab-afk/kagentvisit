@@ -3,6 +3,11 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 // Initialize Gemini Client
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 
+// Models to try in order — if the primary fails, fall back to the next
+const MODEL_CHAIN = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 2000;
+
 /**
  * Clean and parse JSON from Gemini's response
  * Sometimes the model wraps JSON in markdown blocks like ```json ... ```
@@ -19,33 +24,110 @@ const parseGeminiJSON = (text) => {
 };
 
 /**
+ * Sleep helper
+ */
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Call Gemini with retry + model fallback
+ * Retries on 503 (high demand) and 429 (rate limit) errors
+ */
+const callGeminiWithRetry = async (prompt) => {
+    let lastError = null;
+
+    for (const modelName of MODEL_CHAIN) {
+        const model = genAI.getGenerativeModel({ model: modelName });
+
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+            try {
+                const result = await model.generateContent(prompt);
+                return result.response.text();
+            } catch (error) {
+                lastError = error;
+                const status = error.status || error.httpStatusCode || 0;
+                const isRetryable = status === 503 || status === 429;
+
+                console.warn(`Gemini ${modelName} attempt ${attempt}/${MAX_RETRIES} failed (${status}): ${error.message}`);
+
+                if (isRetryable && attempt < MAX_RETRIES) {
+                    const delay = BASE_DELAY_MS * Math.pow(2, attempt - 1);
+                    await sleep(delay);
+                    continue;
+                }
+                // Non-retryable error or exhausted retries for this model — try next model
+                break;
+            }
+        }
+    }
+
+    // All models + retries exhausted
+    console.error('All Gemini models failed:', lastError);
+    const status = lastError?.status || lastError?.httpStatusCode || 0;
+    if (status === 429) {
+        throw new Error('AI quota exceeded. Please wait a minute and try again.');
+    } else if (status === 503) {
+        throw new Error('AI service is temporarily overloaded. Please try again in a moment.');
+    }
+    throw new Error('Failed to get AI response. Please try again later.');
+};
+
+/**
  * Generate User-facing Insights (Senior Agent AI)
  */
 const generateVisitInsights = async (visitData) => {
     if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is missing');
-    
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
-    
-    const prompt = `You are a friendly, experienced senior field mentor in the education consultancy industry. An agent has submitted a visit report (and possibly follow-up visits). Analyze the FULL thread — original visit + all followUpMeetings combined.
+
+    const prompt = `You are a senior field mentor generating a precise, data-rich Minutes of Meeting (MOM) for a B2B agency visit in the education consultancy sector. Analyze the FULL visit thread — original visit + all followUpMeetings combined.
 
 VISIT DATA:
 ${JSON.stringify(visitData, null, 2)}
 
-Return 3 things:
+FIELD REFERENCE (so you know what each key means):
+- meta.companyName: Agency/company name
+- meta.bdmName / meta.rmName: BDM and RM who conducted the visit
+- meta.meetingStart / meetingEnd: Visit date and time
+- agencyProfile: Address, PIN, website, establishment year, business model, office area, infra rating, computer lab, Google reviews
+- promoterTeam: Promoter name & designation, total staff, coaching team size, country team size, countries promoted, coaching courses, VAS offered
+- marketingOps: Marketing activities, avg daily walk-ins, walk-in ratio, brochure usage, total visa/coaching yearly, total branches
+- kananSpecific.prepcomAcademy: "Prepcom", "Appcom", "Both", or "None" — determines if the agent is ACTIVE with Kanan
+- kananSpecific.onboardingDate: Date they became a Kanan partner (if applicable)
+- kananSpecific.isAppcom / appcomOnboardingDate: APPCOM status and onboarding date
+- enquiryStats: Monthly avg enquiries for admissions, coaching, Canada, IELTS
+- partnership.workingCountries: Countries they work with through Kanan
+- partnership.feedback: Their direct feedback about Kanan's services
+- studentCounts: Number of students in Canada/USA/UK
+- kananTools: Academy Portal usage & courses, Books usage & courses, Classroom Content usage, trainer & counsellor ratings
+- opsTech.techPlatforms: Technology/platforms they use
+- opsTech.techWillingness: Willingness to adopt new tech (1-5)
+- budget.marketing2026 / coaching2026: 2026 budget plans in INR
+- competency.pricingRating: Pricing competitiveness rating
+- support.biggestChallenge: Their biggest operational challenge
+- support.painPoints: Specific pain points raised by the agent (CRITICAL — use exact content)
+- support.solutions: Solutions provided during the visit (CRITICAL — use exact content)
+- support.interestedServices: Kanan services they expressed interest in
+- support.need*: Training / Marketing / Tech / Partner / VAS support needs (true/false flags)
+- postVisit.actionPoints: Committed action items after the visit (CRITICAL — use exact content)
+- postVisit.remarks: Agent's own remarks and observations (CRITICAL — use exact content)
+- followUpMeetings: Array of follow-up visits with date, notes, and key outcomes
 
-1. "summary" — 2-3 sentence executive summary. Mention the company/student name, what happened, and current status. Be accurate, no fluff.
+INSTRUCTIONS:
 
-2. "bulletPoints" — Short one-liner bullet points (max 8). Each bullet = one fact or metric. No paragraphs, no filler, no repeating what's obvious. Good examples:
-   - "Staff: 12 total, 4 coaching, 3 country team"
-   - "Uses Kanan Portal & Books; no Classroom Content"
-   - "Walk-ins: 8/day, Visa: 120/yr, Coaching: 80/yr"
-   - "Budget 2026: ₹3L marketing, ₹1.5L coaching"
-   - "Pain point: Needs counsellor training"
-   Skip any bullet where data is missing. Combine related facts into one bullet where possible.
+1. "summary" — Write 2-3 tight sentences. THE VERY FIRST SENTENCE must state clearly whether the agency is ACTIVE with Kanan or not, based on kananSpecific.prepcomAcademy (Prepcom/Appcom/Both = active; None or missing = not active or prospect). Then mention: who visited whom, when, and the overall outcome or relationship status. Pull actual data — company name, BDM/RM names, visit date, Kanan status. No vague filler.
 
-3. "suggestions" — Friendly, motivating senior advice in 2-3 sentences. If the visit went well, genuinely acknowledge it — say "great job" or "well done". Then give 1-2 specific, actionable next steps. Never be discouraging. Think of it as a senior patting the agent on the back and guiding them forward.
+2. "bulletPoints" — Minimum 8, maximum 14 precise one-liners. MANDATORY sections to cover (skip a line only if the data is genuinely absent):
+   - Team & Agency: staff count, coaching team, country team, establishment year, branches
+   - Business: business model, walk-ins/day, visa and coaching yearly numbers, countries promoted
+   - Kanan Tools: which tools they use (Portal/Books/Classroom), courses, trainer and counsellor ratings
+   - Budget & Tech: 2026 marketing and coaching budget, tech platforms, tech willingness rating
+   - Enquiry Stats: monthly admissions, coaching, Canada, IELTS averages
+   - Partnership: countries working with Kanan, student counts, onshore referral
+   - Pain Points: Quote the actual pain points from support.painPoints verbatim or closely paraphrased
+   - Solutions Given: Quote the actual solutions from support.solutions verbatim or closely paraphrased
+   - Action Points: List each committed action from postVisit.actionPoints
+   - Feedback/Remarks: Key takeaway from postVisit.remarks and partnership.feedback
+   Format: "Category: detail" — be specific with numbers, names, and dates when available.
 
-Keep everything concise. No walls of text.
+3. "suggestions" — 2-3 sentences of warm, motivating senior guidance. Reference the ACTUAL action points and pain points from this visit — do not give generic advice. Acknowledge what went well. Give 1-2 specific next steps tied to what was discussed. Think: senior reviewing the field report and coaching the agent forward.
 
 Return ONLY this JSON, no markdown wrapping:
 {
@@ -55,12 +137,11 @@ Return ONLY this JSON, no markdown wrapping:
 }`;
 
     try {
-        const result = await model.generateContent(prompt);
-        const responseText = result.response.text();
+        const responseText = await callGeminiWithRetry(prompt);
         return parseGeminiJSON(responseText);
     } catch (error) {
         console.error('generateVisitInsights error:', error);
-        throw new Error('Failed to generate insights via AI.');
+        throw error;
     }
 };
 
@@ -69,8 +150,6 @@ Return ONLY this JSON, no markdown wrapping:
  */
 const evaluateAdminAudit = async (visitData) => {
     if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is missing');
-
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
     const prompt = `You are a highly experienced audit director who reviews field visit reports in the education consultancy sector. You are honest, fair, and thorough. Analyze the FULL visit thread — original visit + all followUpMeetings combined.
 
@@ -100,22 +179,21 @@ Return ONLY this JSON, no markdown wrapping:
 }`;
 
     try {
-        const result = await model.generateContent(prompt);
-        const responseText = result.response.text();
+        const responseText = await callGeminiWithRetry(prompt);
         const parsed = parseGeminiJSON(responseText);
-        
+
         // Ensure constraints
         if (!['successful', 'needs_improvement', 'failed'].includes(parsed.status)) {
-            parsed.status = 'needs_improvement'; 
+            parsed.status = 'needs_improvement';
         }
         if (typeof parsed.score !== 'number' || parsed.score < 1 || parsed.score > 10) parsed.score = 5;
         if (!Array.isArray(parsed.strengths)) parsed.strengths = [];
         if (!Array.isArray(parsed.weaknesses)) parsed.weaknesses = [];
-        
+
         return parsed;
     } catch (error) {
         console.error('evaluateAdminAudit error:', error);
-        throw new Error('Failed to evaluate audit via AI.');
+        throw error;
     }
 };
 

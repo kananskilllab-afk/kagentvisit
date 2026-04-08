@@ -233,6 +233,19 @@ const seedData = async () => {
                 fields: genericFields
             });
             console.log('B2B Form configuration seeded.');
+        } else {
+            // Patch: ensure onboarding date fields are never required in the active B2B config
+            const NEVER_REQUIRED = ['kananSpecific.onboardingDate', 'kananSpecific.appcomOnboardingDate'];
+            const needsPatch = activeB2B.fields.some(
+                f => NEVER_REQUIRED.includes(f.id) && f.required === true
+            );
+            if (needsPatch) {
+                activeB2B.fields = activeB2B.fields.map(f =>
+                    NEVER_REQUIRED.includes(f.id) ? { ...f.toObject(), required: false } : f
+                );
+                await activeB2B.save();
+                console.log('Patched onboarding date fields to required: false in active B2B config.');
+            }
         }
 
         if (!hasB2C || hasB2C.fields.length < 17) {

@@ -14,3 +14,4 @@ yarn-error.log*
 .eslintcache
 server/uploads/
 server/verify_db.js
+.vercel
