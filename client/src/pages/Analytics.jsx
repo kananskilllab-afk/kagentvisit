@@ -163,6 +163,7 @@ const Analytics = () => {
 
     // BDM Report state
     const [bdmReport, setBdmReport] = useState([]);
+    const [allBdmNames, setAllBdmNames] = useState([]);
     const [selectedBdm, setSelectedBdm] = useState(null);
     const [bdmVisits, setBdmVisits] = useState([]);
     const [isFetchingBdm, setIsFetchingBdm] = useState(false);
@@ -177,7 +178,9 @@ const Analytics = () => {
 
     const activeFilterCount = Object.values(filters).filter(Boolean).length;
     const handleFilterChange = (name, value) => setFilters(prev => ({ ...prev, [name]: value }));
-    const resetFilters = () => setFilters({ pinCode: '', bdmName: '', rmName: '', officerName: '', status: '', city: '', startDate: '', endDate: '', reportType: '' });
+    // Preserve the department-based reportType for admins when clearing filters.
+    const defaultReportType = user.role === 'admin' && user.department ? user.department : '';
+    const resetFilters = () => setFilters({ pinCode: '', bdmName: '', rmName: '', officerName: '', status: '', city: '', startDate: '', endDate: '', reportType: defaultReportType });
 
     const showToast = (msg, type = 'success') => {
         setToast({ msg, type });
@@ -187,6 +190,15 @@ const Analytics = () => {
     useEffect(() => {
         api.get('/pincodes').then(res => setPincodes(res.data.data || [])).catch(() => {});
     }, []);
+
+    // Fetch all BDM names once for the filter dropdown (unfiltered)
+    useEffect(() => {
+        if (user.role === 'superadmin' || user.department === 'B2B') {
+            api.get('/analytics/bdm-report')
+                .then(res => setAllBdmNames((res.data.data || []).map(b => b._id).filter(Boolean)))
+                .catch(() => {});
+        }
+    }, [user.role, user.department]);
 
     // Fetch all visits for the map (admin sees all)
     useEffect(() => {
@@ -198,8 +210,12 @@ const Analytics = () => {
     const fetchPendingVisits = useCallback(async () => {
         try {
             const base = new URLSearchParams();
-            if (filters.startDate) base.append('startDate', filters.startDate);
-            if (filters.endDate)   base.append('endDate',   filters.endDate);
+            if (filters.startDate)  base.append('startDate', filters.startDate);
+            if (filters.endDate)    base.append('endDate',   filters.endDate);
+            if (filters.bdmName)    base.append('bdmName',   filters.bdmName);
+            if (filters.rmName)     base.append('rmName',    filters.rmName);
+            if (filters.pinCode)    base.append('pinCode',   filters.pinCode);
+            if (filters.city)       base.append('city',      filters.city);
             if (filters.reportType === 'B2B') base.append('formType', 'generic');
             if (filters.reportType === 'B2C') base.append('formType', 'home_visit');
             const bqs = base.toString() ? `&${base.toString()}` : '';
@@ -226,7 +242,7 @@ const Analytics = () => {
         } catch (err) {
             console.error('Failed to fetch pending visits', err);
         }
-    }, [filters.startDate, filters.endDate, filters.reportType]);
+    }, [filters.startDate, filters.endDate, filters.reportType, filters.bdmName, filters.rmName, filters.pinCode, filters.city]);
 
     useEffect(() => { fetchPendingVisits(); }, [fetchPendingVisits]);
 
@@ -486,8 +502,18 @@ const Analytics = () => {
                             <>
                                 <div>
                                     <label className="label"><Users className="w-3 h-3 inline mr-1" />BDM Name</label>
-                                    <input type="text" placeholder="Search BDM..." className="input-field h-9 text-sm"
-                                        value={filters.bdmName} onChange={(e) => handleFilterChange('bdmName', e.target.value)} />
+                                    {allBdmNames.length > 0 ? (
+                                        <select className="input-field h-9 text-sm" value={filters.bdmName}
+                                            onChange={(e) => handleFilterChange('bdmName', e.target.value)}>
+                                            <option value="">All BDMs</option>
+                                            {allBdmNames.map(name => (
+                                                <option key={name} value={name}>{name}</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <input type="text" placeholder="Search BDM..." className="input-field h-9 text-sm"
+                                            value={filters.bdmName} onChange={(e) => handleFilterChange('bdmName', e.target.value)} />
+                                    )}
                                 </div>
                                 <div>
                                     <label className="label"><Briefcase className="w-3 h-3 inline mr-1" />RM Name</label>
