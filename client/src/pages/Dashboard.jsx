@@ -2,10 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
+import UpcomingVisitsWidget from '../components/UpcomingVisitsWidget';
 import {
     FileText, Clock, CheckCircle2, AlertCircle,
     TrendingUp, MapPin, Calendar, ArrowRight, PlusCircle,
-    Users, XCircle, Lock, Unlock
+    Users, XCircle, Lock, Unlock, Receipt, IndianRupee, Banknote
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid,
@@ -78,25 +79,38 @@ const Dashboard = () => {
     const [loading, setLoading] = useState(true);
 
     const [unlockRequests, setUnlockRequests] = useState([]);
+    const [expenseSummary, setExpenseSummary] = useState(null);
 
     useEffect(() => {
         (async () => {
             try {
                 const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
-                const requests = [
-                    api.get('/analytics/summary'),
-                    api.get('/visits?limit=6')
-                ];
+                const isAccountsRole = user?.role === 'accounts';
 
-                if (isAdmin) {
-                    requests.push(api.get('/visits?unlockRequestSent=true'));
+                const requests = [];
+
+                // Accounts role doesn't need visit data
+                if (!isAccountsRole) {
+                    requests.push(api.get('/analytics/summary'));
+                    requests.push(api.get('/visits?limit=6'));
+                    if (isAdmin) {
+                        requests.push(api.get('/visits?unlockRequestSent=true'));
+                    }
                 }
 
-                const [sRes, vRes, uRes] = await Promise.all(requests);
-                
-                setStats(sRes.data.data);
-                setVisits(vRes.data.data || []);
-                if (uRes) setUnlockRequests(uRes.data.data || []);
+                const results = await Promise.all(requests);
+
+                if (!isAccountsRole) {
+                    setStats(results[0]?.data?.data);
+                    setVisits(results[1]?.data?.data || []);
+                    if (isAdmin && results[2]) setUnlockRequests(results[2]?.data?.data || []);
+                }
+
+                // Fetch expense summary for everyone
+                try {
+                    const expRes = await api.get('/expenses/claims/summary');
+                    setExpenseSummary(expRes.data.data);
+                } catch { /* ignore if expense module not ready */ }
             } catch (err) {
                 console.error('Dashboard fetch error', err);
             } finally {
@@ -129,10 +143,23 @@ const Dashboard = () => {
     );
 
     const isUser = user.role === 'user' || user.role === 'home_visit';
+    const isAccountsRole = user.role === 'accounts';
     const trendData = (stats?.trends || []).map(t => ({ month: t._id, count: t.count }));
     const attentionNeeded = visits.filter(v => v.status === 'action_required');
 
-    const kpis = [
+    // Expense stats
+    const expClaimStats = expenseSummary?.claimStats || [];
+    const pendingExpClaims = expClaimStats.filter(s => ['submitted', 'under_review'].includes(s._id)).reduce((sum, s) => sum + s.count, 0);
+    const totalExpAmount = expClaimStats.reduce((sum, s) => sum + (s.total || 0), 0);
+    const approvedExpCount = expClaimStats.find(s => s._id === 'approved')?.count || 0;
+
+    // Accounts role gets expense-only KPIs
+    const kpis = isAccountsRole ? [
+        { title: 'Pending Claims', value: pendingExpClaims, icon: Clock, color: '#EF7F1A' },
+        { title: 'Approved', value: approvedExpCount, icon: CheckCircle2, color: '#009846' },
+        { title: 'Total Claims', value: expClaimStats.reduce((sum, s) => sum + s.count, 0), icon: Receipt, color: '#284695' },
+        { title: 'Total Value', value: `${Math.round(totalExpAmount / 1000)}K`, icon: IndianRupee, color: '#7C3AED' },
+    ] : [
         {
             title:   isUser ? 'My Total Visits' : 'Total Visits',
             value:   stats?.stats?.totalVisits ?? 0,
@@ -182,12 +209,59 @@ const Dashboard = () => {
                         New Visit Report
                     </button>
                 )}
+                {isAccountsRole && (
+                    <button
+                        onClick={() => navigate('/expenses/claims')}
+                        className="btn-primary shrink-0"
+                    >
+                        <Receipt className="w-4 h-4" />
+                        View Claims
+                    </button>
+                )}
             </div>
 
             {/* KPI Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                 {kpis.map(k => <KPICard key={k.title} {...k} />)}
             </div>
+
+            {/* Accounts: Recent Claims Section */}
+            {isAccountsRole && expenseSummary?.recentClaims?.length > 0 && (
+                <div className="card flex flex-col">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                            <Receipt className="w-5 h-5 text-brand-blue" />
+                            Recent Claims
+                        </h3>
+                        <button onClick={() => navigate('/expenses/claims')} className="text-xs font-semibold text-brand-sky hover:underline flex items-center gap-1">
+                            View all <ArrowRight className="w-3 h-3" />
+                        </button>
+                    </div>
+                    <div className="space-y-2">
+                        {expenseSummary.recentClaims.map(claim => (
+                            <div
+                                key={claim._id}
+                                onClick={() => navigate(`/expenses/claims/${claim._id}`)}
+                                className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-100 hover:border-brand-sky/30 hover:bg-blue-50/30 cursor-pointer transition-all"
+                            >
+                                <div className="min-w-0">
+                                    <p className="text-sm font-bold text-slate-800 truncate">{claim.title}</p>
+                                    <p className="text-xs text-slate-400">{claim.submittedBy?.name} &middot; {claim.claimNumber}</p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                    <p className="text-sm font-extrabold text-slate-700">{claim.totalAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</p>
+                                    <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                                        claim.status === 'submitted' ? 'bg-orange-50 text-orange-600' :
+                                        claim.status === 'approved' ? 'bg-green-50 text-green-600' :
+                                        claim.status === 'rejected' ? 'bg-red-50 text-red-600' :
+                                        'bg-slate-50 text-slate-500'
+                                    }`}>{claim.status?.replace('_', ' ')}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Admin: Unlock Requests Section */}
             {(user?.role === 'admin' || user?.role === 'superadmin') && unlockRequests.length > 0 && (
@@ -277,8 +351,8 @@ const Dashboard = () => {
                 </div>
             )}
 
-            {/* Charts + Recent */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Charts + Recent (not for accounts role) */}
+            {!isAccountsRole && <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
                 {/* Trend Chart */}
                 <div className="lg:col-span-2 glass p-6 sm:p-8 rounded-[2rem]">
@@ -357,10 +431,13 @@ const Dashboard = () => {
                         </button>
                     )}
                 </div>
-            </div>
+            </div>}
+
+            {/* Upcoming Visits Widget */}
+            {!isAccountsRole && <UpcomingVisitsWidget />}
 
             {/* Status Distribution Bar */}
-            {stats?.statusDist && stats.statusDist.length > 0 && (
+            {!isAccountsRole && stats?.statusDist && stats.statusDist.length > 0 && (
                 <div className="glass p-6 sm:p-8 rounded-[2rem]">
                     <h3 className="font-extrabold text-lg text-slate-800 mb-8">Status Overview</h3>
                     <div className="h-[240px]">

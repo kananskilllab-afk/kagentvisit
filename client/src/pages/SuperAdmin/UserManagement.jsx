@@ -11,7 +11,9 @@ import {
     UserX,
     Edit2,
     X,
-    Loader2
+    Loader2,
+    Link2,
+    Check
 } from 'lucide-react';
 
 const ROLE_BADGE = {
@@ -19,6 +21,7 @@ const ROLE_BADGE = {
     admin:      'bg-brand-blue/10 text-brand-blue border-brand-blue/20',
     home_visit: 'bg-brand-orange/10 text-brand-orange border-brand-orange/20',
     user:       'bg-brand-sky/10 text-brand-sky border-brand-sky/20',
+    accounts:   'bg-brand-gold/10 text-brand-gold border-brand-gold/20',
 };
 
 const DEPT_BADGE = {
@@ -34,6 +37,10 @@ const UserManagement = () => {
     const [editingUser, setEditingUser] = useState(null);
     const [userToDelete, setUserToDelete] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [assignModal, setAssignModal] = useState(null); // admin user object
+    const [assignedIds, setAssignedIds] = useState([]);
+    const [assignSearch, setAssignSearch] = useState('');
+    const [assignSaving, setAssignSaving] = useState(false);
 
     useEffect(() => { fetchUsers(); }, []);
 
@@ -91,6 +98,32 @@ const UserManagement = () => {
             alert(err.response?.data?.message || 'Failed to delete user');
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const openAssignModal = (adminUser) => {
+        setAssignModal(adminUser);
+        setAssignedIds(adminUser.assignedEmployees?.map(e => typeof e === 'object' ? e._id : e) || []);
+        setAssignSearch('');
+    };
+
+    const toggleAssign = (userId) => {
+        setAssignedIds(prev =>
+            prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
+        );
+    };
+
+    const saveAssignments = async () => {
+        if (!assignModal) return;
+        setAssignSaving(true);
+        try {
+            await api.put(`/users/${assignModal._id}`, { assignedEmployees: assignedIds });
+            fetchUsers();
+            setAssignModal(null);
+        } catch (err) {
+            alert(err.response?.data?.message || 'Failed to save assignments');
+        } finally {
+            setAssignSaving(false);
         }
     };
 
@@ -228,6 +261,15 @@ const UserManagement = () => {
                                                     >
                                                         <Edit2 className="w-3.5 h-3.5" />
                                                     </button>
+                                                    {user.role === 'admin' && (
+                                                        <button
+                                                            onClick={() => openAssignModal(user)}
+                                                            className="p-1.5 rounded-lg border border-brand-purple/20 text-brand-purple hover:bg-brand-purple/5 transition-all"
+                                                            title="Assign Employees"
+                                                        >
+                                                            <Link2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
                                                     <button
                                                         onClick={() => toggleUserStatus(user)}
                                                         className={`p-1.5 rounded-lg border transition-all ${
@@ -345,6 +387,7 @@ const UserManagement = () => {
                                 <select name="role" required className="input-field" defaultValue={editingUser?.role === 'home_visit' ? 'user' : (editingUser?.role || 'user')}>
                                     <option value="user">User</option>
                                     <option value="admin">Admin</option>
+                                    <option value="accounts">Accounts</option>
                                     <option value="superadmin">SuperAdmin</option>
                                 </select>
                             </div>
@@ -401,6 +444,95 @@ const UserManagement = () => {
                                 className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-bold hover:bg-red-700 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
                             >
                                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Delete User'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Assign Employees Modal */}
+            {assignModal && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
+                    <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl animate-fade-in max-h-[85vh] flex flex-col">
+                        <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+                            <div>
+                                <h3 className="text-lg font-bold text-slate-800">Assign Employees</h3>
+                                <p className="text-xs text-slate-400 mt-0.5">
+                                    Select employees to assign to <strong>{assignModal.name}</strong>
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setAssignModal(null)}
+                                className="p-2 hover:bg-slate-100 rounded-xl transition-all"
+                            >
+                                <X className="w-5 h-5 text-slate-500" />
+                            </button>
+                        </div>
+                        <div className="p-4 border-b border-slate-50 shrink-0">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search employees..."
+                                    className="input-field pl-10 h-10"
+                                    value={assignSearch}
+                                    onChange={(e) => setAssignSearch(e.target.value)}
+                                />
+                            </div>
+                            <p className="text-xs text-slate-400 mt-2 font-bold">
+                                {assignedIds.length} employee{assignedIds.length !== 1 ? 's' : ''} assigned
+                            </p>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-1">
+                            {users
+                                .filter(u =>
+                                    u._id !== assignModal._id &&
+                                    ['user', 'home_visit'].includes(u.role) &&
+                                    u.isActive &&
+                                    (!assignSearch || u.name?.toLowerCase().includes(assignSearch.toLowerCase()) || u.employeeId?.toLowerCase().includes(assignSearch.toLowerCase()))
+                                )
+                                .map(emp => {
+                                    const isAssigned = assignedIds.includes(emp._id);
+                                    return (
+                                        <button
+                                            key={emp._id}
+                                            type="button"
+                                            onClick={() => toggleAssign(emp._id)}
+                                            className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${
+                                                isAssigned
+                                                    ? 'border-brand-purple bg-brand-purple/5'
+                                                    : 'border-slate-100 hover:border-slate-200'
+                                            }`}
+                                        >
+                                            <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 ${
+                                                isAssigned ? 'border-brand-purple bg-brand-purple text-white' : 'border-slate-300'
+                                            }`}>
+                                                {isAssigned && <Check className="w-3 h-3" />}
+                                            </div>
+                                            <div className="w-8 h-8 rounded-full bg-brand-blue/10 text-brand-blue flex items-center justify-center font-bold text-xs shrink-0">
+                                                {emp.name?.charAt(0)?.toUpperCase() || 'U'}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-bold text-slate-700 truncate">{emp.name}</p>
+                                                <p className="text-xs text-slate-400">{emp.employeeId} &middot; {emp.department || 'B2B'}</p>
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                        </div>
+                        <div className="p-4 border-t border-slate-100 flex gap-3 shrink-0">
+                            <button onClick={() => setAssignModal(null)} className="flex-1 btn-outline py-2.5">
+                                Cancel
+                            </button>
+                            <button
+                                onClick={saveAssignments}
+                                disabled={assignSaving}
+                                className="flex-1 btn-primary py-2.5 flex items-center justify-center gap-2"
+                            >
+                                {assignSaving
+                                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                                    : <><Link2 className="w-4 h-4" /> Save Assignments</>
+                                }
                             </button>
                         </div>
                     </div>

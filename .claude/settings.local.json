@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Bash(npx eslint:*)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(node:*)",
+      "Bash(curl -s \"https://generativelanguage.googleapis.com/v1beta/models?key=AIzaSyBk7_8jSnDh6Hs_HfV8LrbxiIor93kU3qw\")",
+      "Bash(gh run:*)",
+      "Bash(vercel ls:*)",
+      "Bash(vercel --scope kananskilllab-1306s-projects ls)",
+      "Bash(vercel link:*)",
+      "Bash(ls *.json)",
+      "Bash(gh api:*)",
+      "Bash(npm install *)"
     ]
   }
 }

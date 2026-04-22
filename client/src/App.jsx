@@ -10,6 +10,13 @@ import UserManagement from './pages/SuperAdmin/UserManagement';
 import FormBuilder from './pages/FormBuilder';
 import Profile from './pages/Profile';
 import ManageAgent from './pages/ManageAgent';
+import ExpenseList from './pages/Expenses/ExpenseList';
+import AddExpense from './pages/Expenses/AddExpense';
+import ClaimsList from './pages/Expenses/ClaimsList';
+import NewClaim from './pages/Expenses/NewClaim';
+import ClaimDetail from './pages/Expenses/ClaimDetail';
+import ExpenseAnalytics from './pages/Expenses/ExpenseAnalytics';
+import Calendar from './pages/Calendar';
 
 const ProtectedRoute = ({ children, roles }) => {
     const { user } = useAuth();
@@ -56,6 +63,45 @@ function App() {
                     <Route path="agents" element={
                         <ProtectedRoute roles={['admin', 'superadmin']}>
                             <ManageAgent />
+                        </ProtectedRoute>
+                    } />
+
+                    {/* Calendar */}
+                    <Route path="calendar" element={
+                        <ProtectedRoute roles={['user', 'admin', 'superadmin', 'home_visit']}>
+                            <Calendar />
+                        </ProtectedRoute>
+                    } />
+
+                    {/* Expense Management */}
+                    <Route path="expenses" element={
+                        <ProtectedRoute roles={['user', 'admin', 'superadmin', 'accounts', 'home_visit']}>
+                            <ExpenseList />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="expenses/add" element={
+                        <ProtectedRoute roles={['user', 'admin', 'superadmin', 'accounts', 'home_visit']}>
+                            <AddExpense />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="expenses/claims" element={
+                        <ProtectedRoute roles={['user', 'admin', 'superadmin', 'accounts', 'home_visit']}>
+                            <ClaimsList />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="expenses/claims/new" element={
+                        <ProtectedRoute roles={['user', 'admin', 'superadmin', 'home_visit']}>
+                            <NewClaim />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="expenses/claims/:id" element={
+                        <ProtectedRoute roles={['user', 'admin', 'superadmin', 'accounts', 'home_visit']}>
+                            <ClaimDetail />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="expenses/analytics" element={
+                        <ProtectedRoute roles={['admin', 'superadmin', 'accounts']}>
+                            <ExpenseAnalytics />
                         </ProtectedRoute>
                     } />
                 </Route>

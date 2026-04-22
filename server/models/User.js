@@ -28,7 +28,7 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['user', 'admin', 'superadmin', 'home_visit'],
+        enum: ['user', 'admin', 'superadmin', 'home_visit', 'accounts'],
         default: 'user'
     },
     department: {
@@ -42,9 +42,22 @@ const userSchema = new mongoose.Schema({
         default: true
     },
     lastLogin: { type: Date },
+    // Employees assigned to this admin (only relevant for admin role)
+    assignedEmployees: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    }],
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
+    },
+    // Google Calendar OAuth tokens
+    googleCalendar: {
+        connected:    { type: Boolean, default: false },
+        accessToken:  { type: String },
+        refreshToken: { type: String },
+        expiryDate:   { type: Number },
+        email:        { type: String }
     }
 }, {
     timestamps: true

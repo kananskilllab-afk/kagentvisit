@@ -197,7 +197,99 @@ Return ONLY this JSON, no markdown wrapping:
     }
 };
 
+/**
+ * Audit Expense Claim against Company Travel Policy
+ */
+const auditExpenseClaim = async (claimData) => {
+    if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is missing');
+
+    const prompt = `You are a strict but fair corporate expense auditor. You must audit the following expense claim against the company's official travel policy. Be thorough — flag every violation and warning, but also acknowledge compliant items.
+
+COMPANY TRAVEL POLICY:
+======================
+
+1. TRAVEL MODE POLICY (to/from Vadodara):
+   - All train travel MUST be in 3rd AC Class (for Rajdhani, Tejas, Shatabdi), 2nd Class (for Express, Superfast) or Volvo Buses.
+   - No upgrades unless pre-approved by management.
+   - Tickets must be booked 21 days in advance via Vicky Ray (HOD Ticketing).
+
+2. INTRA-CITY TRAVEL POLICY:
+   - Must use public transport (Metro, BRTS, City Bus) first.
+   - If unavailable, cabs ONLY through Ola, Uber, or other apps (for records).
+   - Daily intra-city caps:
+     * Tier-1 Cities (Mumbai, Delhi, Bangalore, Chennai, Kolkata, Hyderabad, Pune): INR 1,000/day
+     * Tier-2 Cities (Ahmedabad, Jaipur, Lucknow, Chandigarh, etc.): INR 600/day
+     * Tier-3 Cities (all others): INR 400/day
+
+3. ACCOMMODATION POLICY:
+   - All hotel bookings done by Vicky Ray (HOD Ticketing).
+   - Only complimentary breakfast included — NO lunch/dinner on hotel bill.
+   - Must be booked 21 days in advance.
+
+4. DAILY FOOD ALLOWANCE:
+   - INR 600 per day for Lunch + Dinner combined.
+   - Breakfast is covered by hotel (complimentary).
+
+5. PROHIBITED ITEMS:
+   - Alcohol or any intoxicants are STRICTLY PROHIBITED.
+   - Claims containing alcohol will be flagged as critical violations.
+
+EXPENSE CLAIM DATA:
+${JSON.stringify(claimData, null, 2)}
+
+AUDIT INSTRUCTIONS:
+- Check EACH expense item against the relevant policy.
+- For travel expenses: verify mode, class, and booking method.
+- For intra-city expenses: check daily caps based on city tier. Group expenses by date and compare daily totals against tier limits.
+- For food expenses: check daily total against INR 600 cap. Flag if any single day exceeds.
+- For hotel expenses: verify it was booked properly (flag if employee booked directly).
+- Look for any alcohol or prohibited items in descriptions/vendor names.
+- Calculate an overall compliance score (0-100).
+
+Return ONLY this JSON, no markdown wrapping:
+{
+    "complianceScore": <number 0-100>,
+    "overallStatus": "compliant" | "warning" | "violation",
+    "flags": [
+        {
+            "expenseId": "<the _id of the flagged expense, or null for general flags>",
+            "type": "travel_class" | "intra_city_cap" | "food_allowance" | "prohibited_item" | "booking_compliance" | "accommodation" | "missing_receipt" | "other",
+            "severity": "info" | "warning" | "critical",
+            "message": "<clear description of the issue>",
+            "policyRef": "<which policy section this relates to, e.g. 'Section 2: Intra-city Travel'>"
+        }
+    ],
+    "recommendations": "<2-3 sentences of actionable recommendations for the approver>",
+    "summary": "<2-3 sentence overall audit summary>"
+}
+
+Scoring guide:
+- 90-100 "compliant": All items within policy, minor or no issues.
+- 60-89 "warning": Some items exceed limits or missing details, but no critical violations.
+- 0-59 "violation": Critical policy violations found (prohibited items, major overages, etc.).`;
+
+    try {
+        const responseText = await callGeminiWithRetry(prompt);
+        const parsed = parseGeminiJSON(responseText);
+
+        // Ensure constraints
+        if (!['compliant', 'warning', 'violation'].includes(parsed.overallStatus)) {
+            parsed.overallStatus = 'warning';
+        }
+        if (typeof parsed.complianceScore !== 'number' || parsed.complianceScore < 0 || parsed.complianceScore > 100) {
+            parsed.complianceScore = 50;
+        }
+        if (!Array.isArray(parsed.flags)) parsed.flags = [];
+
+        return parsed;
+    } catch (error) {
+        console.error('auditExpenseClaim error:', error);
+        throw error;
+    }
+};
+
 module.exports = {
     generateVisitInsights,
-    evaluateAdminAudit
+    evaluateAdminAudit,
+    auditExpenseClaim
 };

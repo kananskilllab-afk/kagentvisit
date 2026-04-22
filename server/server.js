@@ -313,6 +313,10 @@ const pincodeRoutes = require('./routes/pincode.routes');
 const uploadRoutes = require('./routes/upload.routes');
 const agentRoutes = require('./routes/agents.routes');
 const aiRoutes = require('./routes/ai.routes');
+const expenseRoutes = require('./routes/expenses.routes');
+const notificationRoutes = require('./routes/notifications.routes');
+const calendarRoutes = require('./routes/calendar.routes');
+const googleCalendarRoutes = require('./routes/googleCalendar.routes');
 
 // Use Routes
 app.use('/api/auth', authRoutes);
@@ -326,6 +330,10 @@ app.use('/api/pincodes', pincodeRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/agents', agentRoutes);
 app.use('/api/visits/:id/ai', aiRoutes);
+app.use('/api/expenses', expenseRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/calendar', calendarRoutes);
+app.use('/api/google-calendar', googleCalendarRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
