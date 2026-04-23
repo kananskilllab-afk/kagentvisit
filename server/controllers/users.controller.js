@@ -53,7 +53,7 @@ exports.updateUser = async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        const updatableFields = ['name', 'email', 'employeeId', 'role', 'isActive', 'passwordHash', 'region', 'department', 'assignedEmployees'];
+        const updatableFields = ['name', 'email', 'employeeId', 'role', 'isActive', 'passwordHash', 'region', 'department', 'assignedEmployees', 'formAccess'];
         
         updatableFields.forEach(field => {
             if (req.body[field] !== undefined) {

@@ -17,11 +17,17 @@ import NewClaim from './pages/Expenses/NewClaim';
 import ClaimDetail from './pages/Expenses/ClaimDetail';
 import ExpenseAnalytics from './pages/Expenses/ExpenseAnalytics';
 import Calendar from './pages/Calendar';
+import PostFieldDay from './pages/PostFieldDay';
+import DailyReport from './pages/DailyReport';
+import PostDemoFeedback from './pages/PostDemoFeedback';
 
-const ProtectedRoute = ({ children, roles }) => {
+const ProtectedRoute = ({ children, roles, formAccess }) => {
     const { user } = useAuth();
     if (!user) return <Navigate to="/login" replace />;
     if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />;
+    if (formAccess && !['admin', 'superadmin'].includes(user.role) && !user.formAccess?.includes(formAccess)) {
+        return <Navigate to="/" replace />;
+    }
     return children;
 };
 
@@ -63,6 +69,22 @@ function App() {
                     <Route path="agents" element={
                         <ProtectedRoute roles={['admin', 'superadmin']}>
                             <ManageAgent />
+                        </ProtectedRoute>
+                    } />
+
+                    <Route path="post-field-day" element={
+                        <ProtectedRoute formAccess="post_field_day">
+                            <PostFieldDay />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="daily-report" element={
+                        <ProtectedRoute formAccess="daily_report">
+                            <DailyReport />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="post-demo-feedback" element={
+                        <ProtectedRoute formAccess="post_demo_feedback">
+                            <PostDemoFeedback />
                         </ProtectedRoute>
                     } />
 

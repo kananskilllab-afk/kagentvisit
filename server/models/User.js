@@ -28,7 +28,7 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['user', 'admin', 'superadmin', 'home_visit', 'accounts'],
+        enum: ['user', 'admin', 'superadmin', 'home_visit', 'accounts', 'regional_bdm'],
         default: 'user'
     },
     department: {
@@ -37,6 +37,10 @@ const userSchema = new mongoose.Schema({
         default: 'B2B'
     },
     region: { type: String, trim: true },
+    formAccess: [{
+        type: String,
+        enum: ['b2b_visit', 'b2c_visit', 'post_field_day', 'daily_report', 'post_demo_feedback']
+    }],
     isActive: {
         type: Boolean,
         default: true

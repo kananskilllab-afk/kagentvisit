@@ -48,7 +48,7 @@ const connectDB = async () => {
 // Define form field configurations
 const genericFields = [
     // Step 1 – Visit Meta
-    { id: 'meta.companyName', group: 'Visit Meta', label: 'Agent/Company Name', type: 'text', required: true },
+    { id: 'meta.companyName', group: 'Visit Meta', label: 'Agent/Company Name', type: 'autocomplete-agent', required: true },
     { id: 'meta.email', group: 'Visit Meta', label: 'Email Address', type: 'text', required: false },
     { id: 'meta.bdmName', group: 'Visit Meta', label: 'BDM Name', type: 'text', required: true },
     { id: 'meta.rmName', group: 'Visit Meta', label: 'RM Name', type: 'text', required: true },
@@ -81,12 +81,12 @@ const genericFields = [
     { id: 'promoterTeam.totalStaff', group: 'Promoter & Team', label: 'Total Staff Size', type: 'number', required: true },
     { id: 'promoterTeam.coachingTeamSize', group: 'Promoter & Team', label: 'Coaching Team Size', type: 'number', required: false },
     { id: 'promoterTeam.countryTeamSize', group: 'Promoter & Team', label: 'Country Team Size', type: 'number', required: false },
-    { id: 'promoterTeam.countriesPromoted', group: 'Promoter & Team', label: 'Countries Promoted', type: 'multi-select', required: true, options: ['Canada', 'USA', 'UK', 'Australia', 'New Zealand', 'Europe', 'Other'] },
-    { id: 'promoterTeam.coachingPromoted', group: 'Promoter & Team', label: 'Coaching Courses Promoted', type: 'multi-select', required: false, options: ['IELTS', 'PTE', 'TOEFL', 'GRE', 'GMAT', 'SAT', 'Duolingo', 'Other'] },
-    { id: 'promoterTeam.vas', group: 'Promoter & Team', label: 'Value Added Services (VAS)', type: 'multi-select', required: false, options: ['Forex', 'Insurance', 'Accommodation', 'SIM Cards', 'Education Loan', 'Other'] },
+    { id: 'promoterTeam.countriesPromoted', group: 'Promoter & Team', label: 'Countries Promoted', type: 'multi-select', required: true, options: ['Canada', 'USA', 'UK', 'Australia', 'New Zealand', 'Europe', 'Dubai', 'Ireland', 'N/A', 'Other'] },
+    { id: 'promoterTeam.coachingPromoted', group: 'Promoter & Team', label: 'Coaching Courses Promoted', type: 'multi-select', required: false, options: ['IELTS', 'PTE', 'TOEFL', 'GRE', 'GMAT', 'SAT', 'Duolingo', 'N/A', 'Other'] },
+    { id: 'promoterTeam.vas', group: 'Promoter & Team', label: 'Value Added Services (VAS)', type: 'multi-select', required: false, options: ['Forex', 'Insurance', 'Accommodation', 'SIM Cards', 'Education Loan', 'N/A', 'Other'] },
 
     // Step 5 – Marketing & Operations
-    { id: 'marketingOps.marketingActivities', group: 'Marketing & Ops', label: 'What type of marketing activities they perform?', type: 'textarea', required: false },
+    { id: 'marketingOps.marketingActivities', group: 'Marketing & Ops', label: 'What type of marketing activities they perform?', type: 'richtext', required: false },
     { id: 'marketingOps.avgDailyWalkins', group: 'Marketing & Ops', label: 'Avg. Daily Walk-ins', type: 'number', required: true },
     { id: 'marketingOps.walkinRatio', group: 'Marketing & Ops', label: 'Walk-in to Registration Ratio', type: 'text', required: false },
     { id: 'marketingOps.useBrochures', group: 'Marketing & Ops', label: 'Using Brochures for Counselling?', type: 'toggle', required: false },
@@ -95,54 +95,93 @@ const genericFields = [
     { id: 'marketingOps.officeMediaLink', group: 'Marketing & Ops', label: 'Office Photos/Video link', type: 'text', required: false },
     { id: 'marketingOps.totalBranches', group: 'Marketing & Ops', label: 'Total Number of Branches', type: 'number', required: true },
 
-    // Step 6 – Kanan Status & Enrollment
-    { id: 'kananSpecific.prepcomAcademy', group: 'Kanan Status', label: 'Is it a PREPCOM or an Academy Partner?', type: 'dropdown', required: false, options: ['PREPCOM', 'Academy Partner', 'Both', 'None'] },
-    { id: 'kananSpecific.onboardingDate', group: 'Kanan Status', label: 'Date of Onboarding (If Partner)', type: 'date', required: false },
-    { id: 'kananSpecific.isAppcom', group: 'Kanan Status', label: 'Is this an APPCOM?', type: 'toggle', required: false },
-    { id: 'kananSpecific.appcomOnboardingDate', group: 'Kanan Status', label: 'Date of Onboarding (If APPCOM)', type: 'date', required: false },
-    { id: 'enquiryStats.avgAdmissions', group: 'Kanan Status', label: 'Monthly Enquiries (3m avg) [Admissions]', type: 'number', required: false },
-    { id: 'enquiryStats.avgCoaching', group: 'Kanan Status', label: 'Monthly Enquiries (3m avg) [Coaching]', type: 'number', required: false },
-    { id: 'enquiryStats.avgCanada', group: 'Kanan Status', label: 'Monthly Enquiries (3m avg) [Canada]', type: 'number', required: false },
-    { id: 'enquiryStats.avgIELTS', group: 'Kanan Status', label: 'Monthly Enquiries (3m avg) [IELTS]', type: 'number', required: false },
+    // Step 6 – Kanan Status & Tools
+    { id: 'kananSpecific.prepcomAcademy', group: 'Kanan Status & Tools', label: 'Is it a PREPCOM or an Academy Partner?', type: 'dropdown', required: false, options: ['Appcom', 'Prepcom', 'Both', 'None'] },
+    { id: 'kananSpecific.onboardingDate', group: 'Kanan Status & Tools', label: 'Date of Onboarding (If Partner)', type: 'date', required: false },
+    { id: 'kananSpecific.appcomOnboardingDate', group: 'Kanan Status & Tools', label: 'Date of Onboarding (If APPCOM)', type: 'date', required: false },
+    { id: 'enquiryStats.avgAdmissions', group: 'Kanan Status & Tools', label: 'Monthly Enquiries (3m avg) [Admissions]', type: 'number', required: false },
+    { id: 'enquiryStats.avgCoaching', group: 'Kanan Status & Tools', label: 'Monthly Enquiries (3m avg) [Coaching]', type: 'number', required: false },
+    { id: 'enquiryStats.avgCanada', group: 'Kanan Status & Tools', label: 'Monthly Enquiries (3m avg) [Canada]', type: 'number', required: false },
+    { id: 'enquiryStats.avgIELTS', group: 'Kanan Status & Tools', label: 'Monthly Enquiries (3m avg) [IELTS]', type: 'number', required: false },
+
+    // Kanan Tools (Merged into Step 6)
+    { id: 'kananTools.useAcademyPortal', group: 'Kanan Status & Tools', label: 'Is using Kanan Academy Portal?', type: 'toggle', required: false },
+    { id: 'kananTools.portalCourses', group: 'Kanan Status & Tools', label: 'Courses for which Portal used (If Yes)', type: 'multi-select', required: false, options: ['IELTS', 'PTE', 'SAT', 'GRE', 'French', 'My Career Mentor', 'German', 'Duolingo', 'TOEFL', 'N/A', 'Other'] },
+    { id: 'kananTools.useBooks', group: 'Kanan Status & Tools', label: 'Is using Kanan Books?', type: 'toggle', required: false },
+    { id: 'kananTools.bookCourses', group: 'Kanan Status & Tools', label: 'Courses for which Books used (If Yes)', type: 'multi-select', required: false, options: ['IELTS', 'PTE', 'SAT', 'GRE', 'French', 'My Career Mentor', 'German', 'Duolingo', 'TOEFL', 'N/A', 'Other'] },
+    { id: 'kananTools.useClassroomContent', group: 'Kanan Status & Tools', label: 'Is using Kanan Classroom Content?', type: 'toggle', required: false },
+    { id: 'kananTools.trainerRating', group: 'Kanan Status & Tools', label: 'Trainer Knowledge Rating about Kanan Products', type: 'star-rating', required: false },
+    { id: 'kananTools.counsellorRating', group: 'Kanan Status & Tools', label: 'Counsellor Knowledge Rating about Countries\' process', type: 'star-rating', required: false },
 
     // Step 7 – Partnership & Student Counts
-    { id: 'partnership.workingCountries', group: 'Partnership', label: 'Working with Kanan for which Countries?', type: 'multi-select', required: false, options: ['Canada', 'USA', 'UK', 'Australia', 'Other'] },
+    { id: 'partnership.workingCountries', group: 'Partnership', label: 'Working with Kanan for which Countries?', type: 'multi-select', required: false, options: ['Canada', 'USA', 'UK', 'Australia', 'Not Interested', 'Other'] },
     { id: 'partnership.onshoreReferral', group: 'Partnership', label: 'Has substantial students onshore for the referral model?', type: 'toggle', required: false },
     { id: 'studentCounts.canada', group: 'Partnership', label: 'Number of Students in Canada (from 2020)', type: 'number', required: false },
     { id: 'studentCounts.usa', group: 'Partnership', label: 'Number of Students in USA (from 2020)', type: 'number', required: false },
     { id: 'studentCounts.uk', group: 'Partnership', label: 'Number of Students in UK (from 2020)', type: 'number', required: false },
-    { id: 'partnership.feedback', group: 'Partnership', label: 'Feedback about Kanan Countries/Services', type: 'textarea', required: false },
+    { id: 'partnership.feedback', group: 'Partnership', label: 'Feedback about Kanan Countries/Services', type: 'richtext', required: false },
 
-    // Step 8 – Kanan Tools & Academy
-    { id: 'kananTools.useAcademyPortal', group: 'Kanan Tools', label: 'Is using Kanan Academy Portal?', type: 'toggle', required: false },
-    { id: 'kananTools.portalCourses', group: 'Kanan Tools', label: 'Courses for which Portal used (If Yes)', type: 'multi-select', required: false, options: ['IELTS', 'PTE', 'Digital Marketing', 'Other'] },
-    { id: 'kananTools.useBooks', group: 'Kanan Tools', label: 'Is using Kanan Books?', type: 'toggle', required: false },
-    { id: 'kananTools.bookCourses', group: 'Kanan Tools', label: 'Courses for which Books used (If Yes)', type: 'multi-select', required: false, options: ['IELTS', 'PTE', 'Other'] },
-    { id: 'kananTools.useClassroomContent', group: 'Kanan Tools', label: 'Is using Kanan Classroom Content?', type: 'toggle', required: false },
-    { id: 'kananTools.trainerRating', group: 'Kanan Tools', label: 'Trainer Knowledge Rating about Kanan Products', type: 'star-rating', required: false },
-    { id: 'kananTools.counsellorRating', group: 'Kanan Tools', label: 'Counsellor Knowledge Rating about Countries\' process', type: 'star-rating', required: false },
-
-    // Step 9 – Technology & Budget
-    { id: 'opsTech.techPlatforms', group: 'Tech & Budget', label: 'Which Technologies/Platforms currently used?', type: 'textarea', required: false },
+    // Step 8 – Technology & Budget
+    { id: 'opsTech.techPlatforms', group: 'Tech & Budget', label: 'Which Technologies/Platforms currently used?', type: 'richtext', required: false },
     { id: 'opsTech.techWillingness', group: 'Tech & Budget', label: 'Willingness to adopt new Technologies?', type: 'star-rating', required: false },
     { id: 'budget.marketing2026', group: 'Tech & Budget', label: 'Tentative Marketing Budget for 2026', type: 'number', required: false },
     { id: 'budget.coaching2026', group: 'Tech & Budget', label: 'Likely budget for Coaching Products 2026', type: 'number', required: false },
     { id: 'competency.pricingRating', group: 'Tech & Budget', label: 'Pricing Competitiveness (1-5 Scale)', type: 'star-rating', required: false },
 
-    // Step 10 – Challenges & Support
-    { id: 'support.biggestChallenge', group: 'Support Needs', label: 'Biggest challenge in current operations?', type: 'textarea', required: false },
+    // Step 9 – Challenges & Support
+    { id: 'support.biggestChallenge', group: 'Support Needs', label: 'Biggest challenge in current operations?', type: 'richtext', required: false },
     { id: 'support.interestedServices', group: 'Support Needs', label: 'SERVICES INTERESTED WITH KANAN.CO', type: 'multi-select', required: false, options: ['Study Abroad', 'Coaching', 'VAS', 'B2B Portal', 'Other'] },
     { id: 'support.needTraining', group: 'Support Needs', label: 'Need Support: Counsellor Training', type: 'toggle', required: false },
     { id: 'support.needMarketing', group: 'Support Needs', label: 'Need Support: Marketing & Lead Gen', type: 'toggle', required: false },
     { id: 'support.needTech', group: 'Support Needs', label: 'Need Support: Technology Adoption', type: 'toggle', required: false },
     { id: 'support.needPartners', group: 'Support Needs', label: 'Need Support: Institutional Partners', type: 'toggle', required: false },
     { id: 'support.needVAS', group: 'Support Needs', label: 'Need Support: Improving VAS offerings', type: 'toggle', required: false },
-    { id: 'support.painPoints', group: 'Support Needs', label: 'Agent Pain Points', type: 'textarea', required: true },
-    { id: 'support.solutions', group: 'Support Needs', label: 'Solutions Provided', type: 'textarea', required: true },
+    { id: 'support.painPoints', group: 'Support Needs', label: 'Agent Pain Points', type: 'richtext', required: true },
+    { id: 'support.solutions', group: 'Support Needs', label: 'Solutions Provided', type: 'richtext', required: true },
+
+    // Step 10 – Post In-Person Visit
+    { id: 'postInPerson.spocName', group: 'Post In-Person Visit', label: 'Name of SPOC/s', type: 'text', required: false },
+    { id: 'postInPerson.ownerName', group: 'Post In-Person Visit', label: 'Owner Name', type: 'text', required: false },
+    { id: 'postInPerson.whatsappNumber', group: 'Post In-Person Visit', label: 'Whatsapp Number', type: 'text', required: false },
+    { id: 'postInPerson.numPromoters', group: 'Post In-Person Visit', label: 'Number of Promoters', type: 'number', required: false },
+    { id: 'postInPerson.promoterInvolvement', group: 'Post In-Person Visit', label: 'Promoters Involvement in Business', type: 'dropdown', required: false, options: ['Extremely involved (daily)', 'Involved (weekly)', 'Somewhat involved (twice weekly)', 'Not very involved (less than weekly)'] },
+    { id: 'postInPerson.partnershipType', group: 'Post In-Person Visit', label: 'Type of Partnership', type: 'dropdown', required: false, options: ['Existing prepcom', 'Existing appcom', 'Existing prepcom+appcom', 'New partner'] },
+    { id: 'postInPerson.decisionMakerAvailable', group: 'Post In-Person Visit', label: 'Decision Maker Available', type: 'dropdown', required: false, options: ['Yes', 'No', 'Other'] },
+    { id: 'postInPerson.meetingPlanned', group: 'Post In-Person Visit', label: 'Meeting Planned', type: 'dropdown', required: false, options: ['Yes', 'No', 'Other'] },
+    { id: 'postInPerson.meetingDuration', group: 'Post In-Person Visit', label: 'Duration of Meeting (minutes)', type: 'number', required: false },
+    { id: 'postInPerson.otherPeopleDesignation', group: 'Post In-Person Visit', label: 'Other People Present - Designation', type: 'text', required: false },
+    { id: 'postInPerson.closureProbability', group: 'Post In-Person Visit', label: 'Probability of Closure', type: 'dropdown', required: false, options: ['0-25%', '25-50%', '50-75%', '75-100%'] },
+    { id: 'postInPerson.interestedInAdmissions', group: 'Post In-Person Visit', label: 'Interested in Admissions', type: 'dropdown', required: false, options: ['Yes', 'No'] },
+    { id: 'postInPerson.officeSize', group: 'Post In-Person Visit', label: 'Office Size', type: 'text', required: false },
+    { id: 'postInPerson.teamDistribution', group: 'Post In-Person Visit', label: 'Team Distribution', type: 'text', required: false },
+    { id: 'postInPerson.admissionPotential', group: 'Post In-Person Visit', label: 'Potential of Admission Business', type: 'dropdown', required: false, options: ['0-5 files/quarter', '5-30 files/quarter', '30-60 files/quarter', '60+ files/quarter'] },
+    { id: 'postInPerson.academyCoursesTaught', group: 'Post In-Person Visit', label: 'Academy Courses Taught', type: 'multi-select', required: false, options: ['IELTS', 'PTE', 'French', 'German', 'SAT', 'GRE', 'GMAT', 'Other'] },
+    { id: 'postInPerson.prepInquiryHandling', group: 'Post In-Person Visit', label: 'Handling of Prep Inquiries', type: 'text', required: false },
+    { id: 'postInPerson.teachingFormat', group: 'Post In-Person Visit', label: 'Teaching Format', type: 'dropdown', required: false, options: ['Online', 'Offline', 'Do not teach', 'Other'] },
+    { id: 'postInPerson.premises', group: 'Post In-Person Visit', label: 'Premises', type: 'dropdown', required: false, options: ['Owned', 'Rented', 'Both', 'Other'] },
+    { id: 'postInPerson.primaryBusinessStudyAbroad', group: 'Post In-Person Visit', label: 'Primary Business is Study Abroad', type: 'dropdown', required: false, options: ['Yes', 'No', 'Other'] },
+    { id: 'postInPerson.countriesPriorityRanking', group: 'Post In-Person Visit', label: 'Countries Promoted (Priority Ranking)', type: 'richtext', required: false },
+    { id: 'postInPerson.last3YearsVolume', group: 'Post In-Person Visit', label: 'Last 3 Years Volume (by Country)', type: 'richtext', required: false },
+    { id: 'postInPerson.offeringsDiscussed', group: 'Post In-Person Visit', label: 'Offerings Discussed', type: 'richtext', required: false },
+    { id: 'postInPerson.finalInterest', group: 'Post In-Person Visit', label: 'Finally Interested In', type: 'richtext', required: false },
+    { id: 'postInPerson.marketingStrategyRanking', group: 'Post In-Person Visit', label: 'Marketing Strategy (Priority Ranking)', type: 'richtext', required: false },
+    { id: 'postInPerson.marketingStrategyExplanation', group: 'Post In-Person Visit', label: 'Marketing Strategy Explanation', type: 'text', required: false },
+    { id: 'postInPerson.digitalMarketingBudget', group: 'Post In-Person Visit', label: 'Annual Digital Marketing Budget', type: 'number', required: false },
+    { id: 'postInPerson.offlineMarketingBudget', group: 'Post In-Person Visit', label: 'Annual Offline Marketing Budget', type: 'number', required: false },
+    { id: 'postInPerson.avgCostPerLead', group: 'Post In-Person Visit', label: 'Average Cost per Lead', type: 'number', required: false },
+    { id: 'postInPerson.conversionRatio', group: 'Post In-Person Visit', label: 'Average Conversion Ratio (per 100 leads)', type: 'text', required: false },
+    { id: 'postInPerson.leadMonitoringPractices', group: 'Post In-Person Visit', label: 'Lead Monitoring Practices', type: 'text', required: false },
+    { id: 'postInPerson.marketingMaterialsQuality', group: 'Post In-Person Visit', label: 'Quality of Marketing Materials', type: 'text', required: false },
+    { id: 'postInPerson.websiteDigitalManagement', group: 'Post In-Person Visit', label: 'Website / Digital Management', type: 'text', required: false },
+    { id: 'postInPerson.biggestIssueFaced', group: 'Post In-Person Visit', label: 'Biggest Issue Faced', type: 'text', required: false },
+    { id: 'postInPerson.otherIssuesFaced', group: 'Post In-Person Visit', label: 'Other Issues Faced', type: 'multi-select', required: false, options: ['Low lead volume', 'Low lead quality', 'High cost', 'Visa refusal', 'Technical knowledge gaps', 'Staff attrition', 'Coaching issues', 'Low revenue', 'Other'] },
+    { id: 'postInPerson.top5Issues', group: 'Post In-Person Visit', label: 'Top 5 Issues Faced', type: 'richtext', required: false },
+    { id: 'postInPerson.nextStepsMOM', group: 'Post In-Person Visit', label: 'Next Steps + MOM', type: 'richtext', required: false },
+    { id: 'postInPerson.nextFollowUpDate', group: 'Post In-Person Visit', label: 'Next Follow Up Date', type: 'date', required: false },
 
     // Step 11 – Final Summary
-    { id: 'postVisit.actionPoints', group: 'Final Summary', label: 'Action Points', type: 'textarea', required: true },
-    { id: 'postVisit.remarks', group: 'Final Summary', label: 'Your Remarks', type: 'textarea', required: false }
+    { id: 'postVisit.actionPoints', group: 'Final Summary', label: 'Action Points', type: 'richtext', required: true },
+    { id: 'postVisit.remarks', group: 'Final Summary', label: 'Your Remarks', type: 'richtext', required: false }
 ];
 
 const b2cFields = [
@@ -317,6 +356,9 @@ const expenseRoutes = require('./routes/expenses.routes');
 const notificationRoutes = require('./routes/notifications.routes');
 const calendarRoutes = require('./routes/calendar.routes');
 const googleCalendarRoutes = require('./routes/googleCalendar.routes');
+const postFieldDayRoutes = require('./routes/postFieldDay.routes');
+const dailyReportRoutes = require('./routes/dailyReport.routes');
+const postDemoFeedbackRoutes = require('./routes/postDemoFeedback.routes');
 
 // Use Routes
 app.use('/api/auth', authRoutes);
@@ -334,6 +376,9 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/google-calendar', googleCalendarRoutes);
+app.use('/api/post-field-day', postFieldDayRoutes);
+app.use('/api/daily-report', dailyReportRoutes);
+app.use('/api/post-demo-feedback', postDemoFeedbackRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
