@@ -54,6 +54,10 @@ const Layout = () => {
 
     const menuItems = [
         { label: 'Dashboard',    icon: LayoutDashboard, path: '/',         roles: ['user','admin','superadmin','home_visit','accounts'] },
+        { label: 'Calendar',      icon: CalendarDays,   path: '/calendar',         roles: ['user','admin','superadmin','home_visit'] },
+        { label: 'Expenses',      icon: Receipt,        path: '/expenses',             roles: ['user','admin','superadmin','home_visit','accounts'] },
+        { label: 'Claims',        icon: FileText,       path: '/expenses/claims',      roles: ['user','admin','superadmin','home_visit','accounts'] },
+        { label: 'Expense Analytics', icon: BarChart3,  path: '/expenses/analytics',   roles: ['admin','superadmin','accounts'] },
         ...(isAdmin ? [
             ...(user.role === 'superadmin' || user.department === 'B2B' ? [
                 { label: 'B2B Visits',    icon: List, path: '/visits?formType=generic',     roles: ['admin','superadmin'] },
@@ -66,10 +70,6 @@ const Layout = () => {
             { label: 'New Visit',     icon: PlusCircle, path: '/new-visit', roles: ['user','home_visit'] },
             { label: 'Visit History', icon: List,       path: '/visits',    roles: ['user','home_visit'] },
         ]),
-        { label: 'Calendar',      icon: CalendarDays,   path: '/calendar',         roles: ['user','admin','superadmin','home_visit'] },
-        { label: 'Expenses',      icon: Receipt,        path: '/expenses',             roles: ['user','admin','superadmin','home_visit','accounts'] },
-        { label: 'Claims',        icon: FileText,       path: '/expenses/claims',      roles: ['user','admin','superadmin','home_visit','accounts'] },
-        { label: 'Expense Analytics', icon: BarChart3,  path: '/expenses/analytics',   roles: ['admin','superadmin','accounts'] },
         { label: 'Analytics',     icon: BarChart3,      path: '/analytics',    roles: ['admin','superadmin'] },
         { label: 'Users',         icon: Users,          path: '/users',        roles: ['superadmin'] },
         { label: 'Form Builder',  icon: Settings,       path: '/form-builder', roles: ['superadmin'] },

@@ -18,7 +18,13 @@ const auditLogSchema = new mongoose.Schema({
     },
     targetModel: {
         type: String,
-        enum: ['Visit', 'User', 'FormConfig', 'PinCode', null],
+        enum: [
+            'Visit', 'User', 'FormConfig', 'PinCode',
+            'VisitPlan', 'VisitSchedule', 'VisitPlanBalance',
+            'Expense', 'ExpenseClaim', 'ExpenseTemplate',
+            'Policy', 'Upload', 'Agent',
+            null
+        ],
         default: null
     },
     ipAddress: { type: String },

@@ -5,10 +5,32 @@ const mongoose = require('mongoose');
 // Helper to validate ObjectId
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-// @desc    Get all agents
+// @desc    Get all agents (supports ?search=, ?active=true)
 exports.getAgents = async (req, res) => {
     try {
-        const agents = await Agent.find().select('-__v').sort({ name: 1 });
+        const { search, active } = req.query;
+        const filter = {};
+
+        if (active === 'true') filter.isActive = true;
+        else if (active === 'false') filter.isActive = false;
+
+        if (search && search.trim()) {
+            filter.name = { $regex: search.trim(), $options: 'i' };
+        }
+
+        const agents = await Agent.find(filter).select('-__v').sort({ name: 1 });
+
+        // When searching, bubble exact prefix matches to the top
+        if (search && search.trim()) {
+            const q = search.trim().toLowerCase();
+            agents.sort((a, b) => {
+                const aStarts = a.name.toLowerCase().startsWith(q) ? 0 : 1;
+                const bStarts = b.name.toLowerCase().startsWith(q) ? 0 : 1;
+                if (aStarts !== bStarts) return aStarts - bStarts;
+                return a.name.localeCompare(b.name);
+            });
+        }
+
         res.json({ success: true, data: agents });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

@@ -113,10 +113,33 @@ const expenseClaimSchema = new mongoose.Schema({
         auditedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
     },
 
-    // Visit reference (optional)
+    // Visit reference (optional legacy)
     visitRef: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Visit'
+    },
+    // NEW: plan + claim type + policy snapshot
+    claimType: {
+        type: String,
+        enum: ['advance', 'reimbursement'],
+        required: true,
+        default: 'reimbursement',
+        index: true
+    },
+    visitPlanRef: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'VisitPlan',
+        index: true
+    },
+    policyKindApplied: {
+        type: String,
+        enum: ['standard', 'leadership']
+    },
+    policyVersionSnapshot: { type: String },
+    fxRates: {
+        type: Map,
+        of: Number,
+        default: {}
     }
 }, {
     timestamps: true
@@ -125,6 +148,7 @@ const expenseClaimSchema = new mongoose.Schema({
 expenseClaimSchema.index({ submittedBy: 1, createdAt: -1 });
 expenseClaimSchema.index({ status: 1 });
 expenseClaimSchema.index({ claimNumber: 1 });
+expenseClaimSchema.index({ visitPlanRef: 1, claimType: 1 });
 
 // Auto-generate claim number before saving
 expenseClaimSchema.pre('save', async function () {

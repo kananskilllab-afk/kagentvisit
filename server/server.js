@@ -210,7 +210,8 @@ const b2cFields = [
 
 // Seeding logic (only once per instance)
 let isSeeded = false;
-const FormConfig = require('./models/FormConfig'); // Ensure FormConfig is imported
+const FormConfig = require('./models/FormConfig');
+const { seedPolicies, seedExpenseTemplates } = require('./services/policySeed');
 const seedData = async () => {
     if (isSeeded) return;
     try {
@@ -262,6 +263,10 @@ const seedData = async () => {
             });
             console.log('B2C Form configuration seeded.');
         }
+        // Seed policies and expense templates
+        await seedPolicies();
+        await seedExpenseTemplates();
+
         isSeeded = true;
     } catch (err) {
         console.error('Seeding Error:', err.message);
@@ -317,6 +322,10 @@ const expenseRoutes = require('./routes/expenses.routes');
 const notificationRoutes = require('./routes/notifications.routes');
 const calendarRoutes = require('./routes/calendar.routes');
 const googleCalendarRoutes = require('./routes/googleCalendar.routes');
+const visitPlanRoutes = require('./routes/visitPlans.routes');
+const expenseTemplateRoutes = require('./routes/expenseTemplates.routes');
+const policyRoutes = require('./routes/policies.routes');
+const uploadsRoutes = require('./routes/uploads.routes');
 
 // Use Routes
 app.use('/api/auth', authRoutes);
@@ -334,6 +343,10 @@ app.use('/api/expenses', expenseRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/calendar', calendarRoutes);
 app.use('/api/google-calendar', googleCalendarRoutes);
+app.use('/api/visit-plans', visitPlanRoutes);
+app.use('/api/expense-templates', expenseTemplateRoutes);
+app.use('/api/policies', policyRoutes);
+app.use('/api/uploads', uploadsRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {

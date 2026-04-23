@@ -7,6 +7,7 @@ import {
     ArrowLeft, Loader2, MapPin, Calendar, IndianRupee, Upload,
     AlertTriangle, Info, ShieldCheck
 } from 'lucide-react';
+import ImageUpload from '../../components/shared/ImageUpload';
 
 const CATEGORIES = [
     { value: 'flight',              label: 'Flight',             icon: Plane },
@@ -86,11 +87,14 @@ const AddExpense = () => {
         travelTo: { city: '', state: '' },
         vendor: '',
         paymentMethod: 'cash',
-        receiptUrl: '',
+        receiptUrl: '',      // primary receipt (first upload)
+        uploadRefs: [],      // all uploaded URLs
         cityTier: 'na',
         travelClass: '',
         bookingMode: 'other'
     });
+    // uploadedUrls drives the ImageUpload component (source of truth for previews)
+    const [uploadedUrls, setUploadedUrls] = useState([]);
 
     const handleChange = (field, value) => {
         setForm(prev => ({ ...prev, [field]: value }));
@@ -100,23 +104,13 @@ const AddExpense = () => {
         setForm(prev => ({ ...prev, [parent]: { ...prev[parent], [field]: value } }));
     };
 
-    const handleReceiptUpload = async (e) => {
-        const file = e.target.files[0];
-        if (!file) return;
-
-        const formData = new FormData();
-        formData.append('photo', file);
-
-        try {
-            const res = await api.post('/upload', formData, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-            if (res.data.url) {
-                handleChange('receiptUrl', res.data.url);
-            }
-        } catch (err) {
-            alert('Failed to upload receipt');
-        }
+    const handleUploadsChange = (uploads) => {
+        setUploadedUrls(uploads);
+        setForm(prev => ({
+            ...prev,
+            receiptUrl: uploads[0]?.url || '',
+            uploadRefs: uploads.map(u => u.uploadId).filter(Boolean),
+        }));
     };
 
     const handleSubmit = async (e) => {
@@ -471,17 +465,14 @@ const AddExpense = () => {
                         />
                     </div>
                     <div>
-                        <label className="label">Upload Receipt</label>
-                        <div className="flex items-center gap-3">
-                            <label className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 border-dashed border-slate-200 text-sm font-bold text-slate-500 hover:border-brand-blue hover:text-brand-blue cursor-pointer transition-all">
-                                <Upload className="w-4 h-4" />
-                                {form.receiptUrl ? 'Change Receipt' : 'Choose File'}
-                                <input type="file" className="hidden" accept="image/*,.pdf" onChange={handleReceiptUpload} />
-                            </label>
-                            {form.receiptUrl && (
-                                <span className="text-xs text-brand-green font-bold">Uploaded</span>
-                            )}
-                        </div>
+                        <label className="label">Upload Receipts / Bills</label>
+                        <ImageUpload
+                            urls={uploadedUrls}
+                            onChange={handleUploadsChange}
+                            maxFiles={5}
+                            label="Upload receipts, bills or tickets"
+                            context="expense_receipt"
+                        />
                     </div>
                 </div>
 

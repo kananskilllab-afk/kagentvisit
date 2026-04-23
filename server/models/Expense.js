@@ -73,10 +73,31 @@ const expenseSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Visit' // Optional link to a B2B visit
     },
+    visitPlanRef: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'VisitPlan',
+        index: true
+    },
+    visitScheduleRef: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'VisitSchedule'
+    },
+    templateRef: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'ExpenseTemplate',
+        default: null
+    },
     claimRef: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'ExpenseClaim' // Set when added to a claim
     },
+    // Marks this expense as over the advance balance (routed to reimbursement)
+    overBudget: { type: Boolean, default: false },
+    // Additional upload refs for multi-document expenses (receipt + boarding pass, etc.)
+    uploadRefs: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Upload'
+    }],
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
@@ -89,5 +110,6 @@ const expenseSchema = new mongoose.Schema({
 expenseSchema.index({ createdBy: 1, expenseDate: -1 });
 expenseSchema.index({ claimRef: 1 });
 expenseSchema.index({ category: 1 });
+expenseSchema.index({ visitPlanRef: 1 });
 
 module.exports = mongoose.model('Expense', expenseSchema);

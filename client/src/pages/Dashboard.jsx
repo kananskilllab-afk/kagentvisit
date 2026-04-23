@@ -6,11 +6,12 @@ import UpcomingVisitsWidget from '../components/UpcomingVisitsWidget';
 import {
     FileText, Clock, CheckCircle2, AlertCircle,
     TrendingUp, MapPin, Calendar, ArrowRight, PlusCircle,
-    Users, XCircle, Lock, Unlock, Receipt, IndianRupee, Banknote
+    Users, XCircle, Lock, Unlock, Receipt, IndianRupee, Wallet,
+    Briefcase, Activity, CheckCircle, ArrowUpRight
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid,
-    Tooltip, ResponsiveContainer, BarChart, Bar
+    Tooltip, ResponsiveContainer, BarChart, Bar, Cell
 } from 'recharts';
 
 const STATUS_CFG = {
@@ -21,8 +22,25 @@ const STATUS_CFG = {
     draft:           { label: 'Draft',              bg: 'bg-slate-50',  ring: 'ring-slate-200',        text: 'text-slate-500',    dot: 'bg-slate-400'    },
 };
 
-const StatusDot = ({ status }) => {
-    const cfg = STATUS_CFG[status] || STATUS_CFG.draft;
+const EXPENSE_STATUS_CFG = {
+    submitted:           { label: 'Submitted',       bg: 'bg-orange-50',  text: 'text-orange-600' },
+    under_review:        { label: 'Under Review',    bg: 'bg-blue-50',    text: 'text-blue-600' },
+    needs_justification: { label: 'Needs Justification', bg: 'bg-red-50', text: 'text-red-600' },
+    approved:            { label: 'Approved',        bg: 'bg-green-50',   text: 'text-green-600' },
+    paid:                { label: 'Paid',            bg: 'bg-emerald-50', text: 'text-emerald-700' },
+    rejected:            { label: 'Rejected',        bg: 'bg-slate-100',  text: 'text-slate-600' },
+    draft:               { label: 'Draft',           bg: 'bg-slate-50',   text: 'text-slate-500' }
+};
+
+const StatusDot = ({ status, isExpense }) => {
+    const cfg = isExpense ? (EXPENSE_STATUS_CFG[status] || EXPENSE_STATUS_CFG.draft) : (STATUS_CFG[status] || STATUS_CFG.draft);
+    if (isExpense) {
+        return (
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${cfg.bg} ${cfg.text}`}>
+                {cfg.label}
+            </span>
+        );
+    }
     return (
         <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide ${cfg.bg} ${cfg.text} ring-1 ${cfg.ring}`}>
             <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
@@ -31,28 +49,31 @@ const StatusDot = ({ status }) => {
     );
 };
 
-const KPICard = ({ title, value, icon: Icon, color, bgColor, trend }) => (
-    <div className="card-hover group relative overflow-visible bg-white/60 backdrop-blur-3xl border border-white p-6 rounded-[2rem] shadow-glass isolate">
-        {/* Subtle glowing ambient light behind the card */}
+const KPICard = ({ title, value, subtitle, icon: Icon, color, trend, trendIcon: TrendIcon }) => (
+    <div className="card-hover group relative overflow-visible bg-white/70 backdrop-blur-3xl border border-white p-6 rounded-[1.5rem] shadow-glass isolate flex flex-col justify-between">
         <div
-            className="absolute -top-10 -right-10 w-32 h-32 rounded-full blur-[40px] opacity-20 pointer-events-none transition-all group-hover:scale-150 group-hover:opacity-40 -z-10"
+            className="absolute -top-10 -right-10 w-32 h-32 rounded-full blur-[40px] opacity-10 pointer-events-none transition-all group-hover:scale-150 group-hover:opacity-30 -z-10"
             style={{ backgroundColor: color }}
         />
         <div className="flex items-start justify-between">
-            <div className="space-y-1">
+            <div className="space-y-1 z-10">
                 <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{title}</p>
-                <p className="text-4xl font-extrabold tracking-tight text-slate-800">
-                    {value ?? '—'}
-                </p>
+                <div className="flex items-baseline gap-2">
+                    <p className="text-3xl font-extrabold tracking-tight text-slate-800">
+                        {value ?? '—'}
+                    </p>
+                    {subtitle && <span className="text-sm font-semibold text-slate-400">{subtitle}</span>}
+                </div>
             </div>
-            <div className="p-3.5 rounded-2xl group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300 bg-white shadow-sm ring-1 ring-slate-100" style={{ color }}>
-                <Icon className="w-6 h-6" />
+            <div className="p-3.5 rounded-2xl group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 bg-white shadow-sm ring-1 ring-slate-100 z-10" style={{ color }}>
+                <Icon className="w-5 h-5" />
             </div>
         </div>
-        {trend !== undefined && (
-            <p className="mt-4 text-[11px] font-medium text-slate-400 flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
-                {trend}
-            </p>
+        {trend && (
+            <div className="mt-4 flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+                {TrendIcon && <TrendIcon className="w-4 h-4" style={{ color }} />}
+                <p className="text-[11px] font-bold" style={{ color }}>{trend}</p>
+            </div>
         )}
     </div>
 );
@@ -60,11 +81,12 @@ const KPICard = ({ title, value, icon: Icon, color, bgColor, trend }) => (
 const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-white rounded-xl shadow-card-lg border border-slate-100 p-3 text-sm">
+        <div className="bg-white/90 backdrop-blur-md rounded-xl shadow-card-lg border border-slate-100 p-3 text-sm z-50">
             <p className="font-bold text-slate-800 mb-1">{label}</p>
             {payload.map((p, i) => (
-                <p key={i} className="text-slate-600">
-                    <span className="font-semibold" style={{ color: p.color }}>{p.value}</span> visits
+                <p key={i} className="text-slate-600 flex justify-between gap-4">
+                    <span>{p.name || 'Count'}:</span>
+                    <span className="font-bold" style={{ color: p.color || p.fill }}>{p.value}</span>
                 </p>
             ))}
         </div>
@@ -74,28 +96,33 @@ const CustomTooltip = ({ active, payload, label }) => {
 const Dashboard = () => {
     const { user } = useAuth();
     const navigate = useNavigate();
+    
+    // Data states
     const [stats, setStats] = useState(null);
     const [visits, setVisits] = useState([]);
-    const [loading, setLoading] = useState(true);
-
     const [unlockRequests, setUnlockRequests] = useState([]);
     const [expenseSummary, setExpenseSummary] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    const isAccountsRole = user?.role === 'accounts';
+    const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+    const isUser = user?.role === 'user' || user?.role === 'home_visit';
 
     useEffect(() => {
-        (async () => {
+        const fetchDashboardData = async () => {
             try {
-                const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
-                const isAccountsRole = user?.role === 'accounts';
-
                 const requests = [];
 
-                // Accounts role doesn't need visit data
                 if (!isAccountsRole) {
                     requests.push(api.get('/analytics/summary'));
                     requests.push(api.get('/visits?limit=6'));
                     if (isAdmin) {
                         requests.push(api.get('/visits?unlockRequestSent=true'));
+                    } else {
+                        requests.push(Promise.resolve(null));
                     }
+                } else {
+                    requests.push(Promise.resolve(null), Promise.resolve(null), Promise.resolve(null));
                 }
 
                 const results = await Promise.all(requests);
@@ -111,13 +138,16 @@ const Dashboard = () => {
                     const expRes = await api.get('/expenses/claims/summary');
                     setExpenseSummary(expRes.data.data);
                 } catch { /* ignore if expense module not ready */ }
+                
             } catch (err) {
                 console.error('Dashboard fetch error', err);
             } finally {
                 setLoading(false);
             }
-        })();
-    }, [user]);
+        };
+
+        fetchDashboardData();
+    }, [user, isAdmin, isAccountsRole]);
 
     const handleApproveUnlock = async (visitId) => {
         try {
@@ -130,330 +160,348 @@ const Dashboard = () => {
     };
 
     if (loading) return (
-        <div className="space-y-6 animate-pulse">
-            <div className="h-10 w-72 bg-slate-200 rounded-xl" />
+        <div className="space-y-6 animate-pulse p-4">
+            <div className="h-20 w-full bg-slate-200/50 rounded-3xl" />
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {[1,2,3,4].map(i => <div key={i} className="h-28 bg-slate-200 rounded-2xl" />)}
+                {[1,2,3,4].map(i => <div key={i} className="h-32 bg-slate-200/50 rounded-3xl" />)}
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 h-80 bg-slate-200 rounded-2xl" />
-                <div className="h-80 bg-slate-200 rounded-2xl" />
+                <div className="lg:col-span-2 h-80 bg-slate-200/50 rounded-3xl" />
+                <div className="h-80 bg-slate-200/50 rounded-3xl" />
             </div>
         </div>
     );
 
-    const isUser = user.role === 'user' || user.role === 'home_visit';
-    const isAccountsRole = user.role === 'accounts';
     const trendData = (stats?.trends || []).map(t => ({ month: t._id, count: t.count }));
     const attentionNeeded = visits.filter(v => v.status === 'action_required');
 
-    // Expense stats
+    // Expense computations
     const expClaimStats = expenseSummary?.claimStats || [];
     const pendingExpClaims = expClaimStats.filter(s => ['submitted', 'under_review'].includes(s._id)).reduce((sum, s) => sum + s.count, 0);
     const totalExpAmount = expClaimStats.reduce((sum, s) => sum + (s.total || 0), 0);
     const approvedExpCount = expClaimStats.find(s => s._id === 'approved')?.count || 0;
-
-    // Accounts role gets expense-only KPIs
-    const kpis = isAccountsRole ? [
-        { title: 'Pending Claims', value: pendingExpClaims, icon: Clock, color: '#EF7F1A' },
-        { title: 'Approved', value: approvedExpCount, icon: CheckCircle2, color: '#009846' },
-        { title: 'Total Claims', value: expClaimStats.reduce((sum, s) => sum + s.count, 0), icon: Receipt, color: '#284695' },
-        { title: 'Total Value', value: `${Math.round(totalExpAmount / 1000)}K`, icon: IndianRupee, color: '#7C3AED' },
-    ] : [
-        {
-            title:   isUser ? 'My Total Visits' : 'Total Visits',
-            value:   stats?.stats?.totalVisits ?? 0,
-            icon:    FileText,
-            color:   '#284695',
-            bgColor: '#EEF4FF',
-        },
-        {
-            title:   'Pending Review',
-            value:   stats?.stats?.pendingReview ?? 0,
-            icon:    Clock,
-            color:   '#EF7F1A',
-            bgColor: '#FFF4EA',
-        },
-        {
-            title:   'Action Required',
-            value:   stats?.stats?.actionRequired ?? 0,
-            icon:    AlertCircle,
-            color:   '#DC2626',
-            bgColor: '#FEF2F2',
-        },
-        isUser
-            ? { title: 'My Drafts', value: stats?.statusDist?.find(s => s._id === 'draft')?.count ?? 0, icon: XCircle,      color: '#64748B', bgColor: '#F8FAFC' }
-            : { title: 'Active Users', value: stats?.stats?.activeUsers ?? 0,                            icon: Users,       color: '#009846', bgColor: '#ECFDF5' },
-    ];
+    const formatCurrency = (val) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(val);
 
     return (
-        <div className="space-y-6 page-enter">
-
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="space-y-8 page-enter pb-12">
+            {/* Header Area */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white/60 backdrop-blur-xl p-6 sm:p-8 rounded-[2rem] shadow-glass border border-white">
                 <div>
-                    <h1 className="page-title">
-                        Hello, {user.name.split(' ')[0]} 👋
+                    <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
+                        Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-indigo-600">{user.name.split(' ')[0]}</span> 👋
                     </h1>
-                    <p className="page-subtitle flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5" />
+                    <p className="text-sm text-slate-500 mt-2 font-medium flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-brand-blue/70" />
                         {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                     </p>
                 </div>
-                {isUser && (
-                    <button
-                        onClick={() => navigate('/new-visit')}
-                        className="btn-primary shrink-0"
-                    >
-                        <PlusCircle className="w-4 h-4" />
-                        New Visit Report
-                    </button>
-                )}
-                {isAccountsRole && (
-                    <button
-                        onClick={() => navigate('/expenses/claims')}
-                        className="btn-primary shrink-0"
-                    >
-                        <Receipt className="w-4 h-4" />
-                        View Claims
-                    </button>
-                )}
-            </div>
-
-            {/* KPI Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                {kpis.map(k => <KPICard key={k.title} {...k} />)}
-            </div>
-
-            {/* Accounts: Recent Claims Section */}
-            {isAccountsRole && expenseSummary?.recentClaims?.length > 0 && (
-                <div className="card flex flex-col">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-bold text-slate-800 flex items-center gap-2">
-                            <Receipt className="w-5 h-5 text-brand-blue" />
-                            Recent Claims
-                        </h3>
-                        <button onClick={() => navigate('/expenses/claims')} className="text-xs font-semibold text-brand-sky hover:underline flex items-center gap-1">
-                            View all <ArrowRight className="w-3 h-3" />
-                        </button>
-                    </div>
-                    <div className="space-y-2">
-                        {expenseSummary.recentClaims.map(claim => (
-                            <div
-                                key={claim._id}
-                                onClick={() => navigate(`/expenses/claims/${claim._id}`)}
-                                className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-100 hover:border-brand-sky/30 hover:bg-blue-50/30 cursor-pointer transition-all"
-                            >
-                                <div className="min-w-0">
-                                    <p className="text-sm font-bold text-slate-800 truncate">{claim.title}</p>
-                                    <p className="text-xs text-slate-400">{claim.submittedBy?.name} &middot; {claim.claimNumber}</p>
-                                </div>
-                                <div className="text-right shrink-0">
-                                    <p className="text-sm font-extrabold text-slate-700">{claim.totalAmount?.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</p>
-                                    <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded-full ${
-                                        claim.status === 'submitted' ? 'bg-orange-50 text-orange-600' :
-                                        claim.status === 'approved' ? 'bg-green-50 text-green-600' :
-                                        claim.status === 'rejected' ? 'bg-red-50 text-red-600' :
-                                        'bg-slate-50 text-slate-500'
-                                    }`}>{claim.status?.replace('_', ' ')}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Admin: Unlock Requests Section */}
-            {(user?.role === 'admin' || user?.role === 'superadmin') && unlockRequests.length > 0 && (
-                <div className="card border-blue-100 bg-brand-blue/5 overflow-hidden">
-                    <div className="px-5 py-3 border-b border-blue-100 bg-brand-blue/10 flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-brand-blue font-black text-xs uppercase tracking-widest">
-                            <Lock className="w-4 h-4" />
-                            Pending Unlock Requests
-                        </div>
-                        <span className="text-[10px] font-bold text-brand-blue bg-white px-2 py-0.5 rounded-full border border-blue-100">
-                            {unlockRequests.length} Request{unlockRequests.length > 1 ? 's' : ''}
-                        </span>
-                    </div>
-                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {unlockRequests.map(visit => (
-                            <div 
-                                key={visit._id}
-                                className="p-4 bg-white rounded-2xl border border-blue-100 shadow-sm hover:shadow-md transition-all group"
-                            >
-                                <div className="flex justify-between items-start gap-3 mb-3">
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-black text-slate-800 truncate">
-                                            {visit.meta?.companyName || visit.studentInfo?.name || 'Untitled Report'}
-                                        </p>
-                                        <p className="text-[10px] font-bold text-slate-400 mt-0.5">
-                                            By: {visit.submittedBy?.name || 'Unknown'}
-                                        </p>
-                                    </div>
-                                    <div className="p-2 bg-red-50 rounded-lg text-red-500">
-                                        <Lock className="w-4 h-4" />
-                                    </div>
-                                </div>
-                                <button
-                                    onClick={() => handleApproveUnlock(visit._id)}
-                                    className="w-full py-2 bg-brand-blue text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-brand-blue-dark transition-all flex items-center justify-center gap-2 shadow-lg shadow-brand-blue/20"
-                                >
-                                    <Unlock className="w-3.5 h-3.5" />
-                                    Approve Unlock
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            )}
-
-            {/* Attention Needed Section (Surveyor Only) */}
-            {isUser && attentionNeeded.length > 0 && (
-                <div className="card border-red-100 bg-red-50/20 overflow-hidden">
-                    <div className="px-5 py-3 border-b border-red-100 bg-red-50/50 flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-red-600 font-black text-xs uppercase tracking-widest">
-                            <AlertCircle className="w-4 h-4" />
-                            Action Required by You
-                        </div>
-                        <span className="text-[10px] font-bold text-red-400 bg-white px-2 py-0.5 rounded-full border border-red-100">
-                            {attentionNeeded.length} Task{attentionNeeded.length > 1 ? 's' : ''}
-                        </span>
-                    </div>
-                    <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {attentionNeeded.map(visit => {
-                            const latestNote = visit.adminNotes?.[visit.adminNotes.length - 1];
-                            return (
-                                <div 
-                                    key={visit._id}
-                                    onClick={() => navigate(`/edit-visit/${visit._id}${latestNote?.stepIndex !== undefined ? `?step=${latestNote.stepIndex}` : ''}`)}
-                                    className="p-4 bg-white rounded-2xl border border-red-100 shadow-sm hover:shadow-md hover:border-red-200 transition-all cursor-pointer group"
-                                >
-                                    <div className="flex justify-between items-start gap-3 mb-2">
-                                        <div className="min-w-0">
-                                            <p className="text-sm font-black text-slate-800 truncate group-hover:text-red-600 transition-colors">
-                                                {visit.meta?.companyName || visit.studentInfo?.name || 'Untitled Report'}
-                                            </p>
-                                            {latestNote?.stepName && (
-                                                <p className="text-[10px] font-black text-red-500 uppercase tracking-tighter mt-0.5">
-                                                    Issue in {latestNote.stepName}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <ArrowRight className="w-4 h-4 text-red-300 group-hover:translate-x-1 transition-all" />
-                                    </div>
-                                    <p className="text-xs text-slate-500 font-medium line-clamp-2 italic bg-slate-50 p-2 rounded-lg border border-slate-100/50">
-                                        "{latestNote?.note || 'No specific instruction provided'}"
-                                    </p>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
-
-            {/* Charts + Recent (not for accounts role) */}
-            {!isAccountsRole && <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-                {/* Trend Chart */}
-                <div className="lg:col-span-2 glass p-6 sm:p-8 rounded-[2rem]">
-                    <div className="flex items-center justify-between mb-8">
-                        <div>
-                            <h3 className="font-extrabold text-lg text-slate-800 flex items-center gap-2">
-                                <TrendingUp className="w-5 h-5 text-brand-blue" />
-                                Visit Trends
-                            </h3>
-                            <p className="text-sm font-medium text-slate-400 mt-1">Last 6 months</p>
-                        </div>
-                    </div>
-                    <div className="h-[280px]">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                <defs>
-                                    <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%"  stopColor="#3B82F6" stopOpacity={0.25}/>
-                                        <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" opacity={0.6} />
-                                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 11, fontWeight: 500 }} dy={10} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 11, fontWeight: 500 }} />
-                                <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3B82F6', strokeWidth: 1, strokeDasharray: '4 4' }} />
-                                <Area type="monotone" dataKey="count" stroke="#3B82F6" strokeWidth={3.5} fill="url(#areaGrad)" 
-                                      activeDot={{ r: 6, fill: '#FFFFFF', stroke: '#3B82F6', strokeWidth: 2 }} className="drop-shadow-sm" />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                {/* Recent Visits */}
-                <div className="card flex flex-col">
-                    <div className="flex items-center justify-between mb-4">
-                        <h3 className="font-bold text-slate-800">Recent Submissions</h3>
-                        <button onClick={() => navigate('/visits')} className="text-xs font-semibold text-brand-sky hover:underline flex items-center gap-1">
-                            View all <ArrowRight className="w-3 h-3" />
-                        </button>
-                    </div>
-                    <div className="space-y-3 flex-1">
-                        {visits.length === 0 && (
-                            <div className="flex-1 flex flex-col items-center justify-center py-10 text-center">
-                                <FileText className="w-10 h-10 text-slate-200 mb-3" />
-                                <p className="text-sm text-slate-400">No visits yet</p>
-                            </div>
-                        )}
-                        {visits.map(visit => (
-                            <div
-                                key={visit._id}
-                                onClick={() => navigate(`/edit-visit/${visit._id}`)}
-                                className="flex items-start justify-between gap-3 p-3 rounded-xl border border-slate-100 hover:border-brand-sky/30 hover:bg-blue-50/30 cursor-pointer transition-all group"
-                            >
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-sm font-bold text-slate-800 truncate group-hover:text-brand-blue transition-colors">
-                                        {visit.meta?.companyName || visit.studentInfo?.name || 'Untitled Report'}
-                                    </p>
-                                    <p className="text-xs text-slate-400 flex items-center gap-1 mt-0.5 truncate">
-                                        <MapPin className="w-3 h-3 shrink-0" />
-                                        {(visit.location?.city || visit.location?.address || visit.agencyProfile?.address || 'No address')?.substring(0, 28)}
-                                    </p>
-                                </div>
-                                <div className="shrink-0 text-right space-y-1">
-                                    <StatusDot status={visit.status} />
-                                    <p className="text-[10px] text-slate-400">{new Date(visit.createdAt).toLocaleDateString()}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                    {!isUser && (
-                        <button
-                            onClick={() => navigate('/visits')}
-                            className="mt-4 w-full py-2.5 text-sm font-semibold text-brand-sky bg-brand-sky/5 rounded-xl hover:bg-brand-sky/10 transition-all border border-brand-sky/10"
-                        >
-                            View All History
+                <div className="flex flex-wrap gap-3">
+                    {isUser && (
+                        <button onClick={() => navigate('/new-visit')} className="btn-primary shadow-glow shrink-0">
+                            <PlusCircle className="w-4 h-4" /> New Visit
                         </button>
                     )}
+                    <button onClick={() => navigate('/expenses/claims')} className="btn-secondary shrink-0">
+                        <Receipt className="w-4 h-4 text-indigo-500" /> Manage Claims
+                    </button>
                 </div>
-            </div>}
+            </div>
 
-            {/* Upcoming Visits Widget */}
-            {!isAccountsRole && <UpcomingVisitsWidget />}
+            {/* --- ADMIN & SUPERADMIN VIEW --- */}
+            {isAdmin && (
+                <div className="space-y-8">
+                    {/* Unified KPI Section */}
+                    <div>
+                        <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 ml-2 flex items-center gap-2">
+                            <Activity className="w-4 h-4" /> Organization Overview
+                        </h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                            <KPICard title="Total Visits" value={stats?.stats?.totalVisits ?? 0} icon={Briefcase} color="#284695" />
+                            <KPICard title="Pending Visit Reviews" value={stats?.stats?.pendingReview ?? 0} icon={Clock} color="#EF7F1A" trend={`${stats?.stats?.actionRequired || 0} action required`} trendIcon={AlertCircle} />
+                            <KPICard title="Pending Expense Claims" value={pendingExpClaims} icon={Receipt} color="#8B5CF6" />
+                            <KPICard title="Total Expense Value" value={formatCurrency(totalExpAmount)} icon={IndianRupee} color="#10B981" subtitle="LTD" />
+                        </div>
+                    </div>
 
-            {/* Status Distribution Bar */}
+                    {/* Unlock Requests Alert */}
+                    {unlockRequests.length > 0 && (
+                        <div className="card border-blue-200 bg-gradient-to-r from-blue-50/50 to-white overflow-hidden p-0">
+                            <div className="px-5 py-3 border-b border-blue-100 bg-brand-blue/10 flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-brand-blue font-black text-xs uppercase tracking-widest">
+                                    <Lock className="w-4 h-4" />
+                                    Pending Unlock Requests
+                                </div>
+                                <span className="text-[10px] font-bold text-white bg-brand-blue px-2.5 py-1 rounded-full shadow-sm">
+                                    {unlockRequests.length} Request{unlockRequests.length > 1 ? 's' : ''}
+                                </span>
+                            </div>
+                            <div className="p-5 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {unlockRequests.map(visit => (
+                                    <div key={visit._id} className="p-4 bg-white rounded-2xl border border-blue-100 shadow-sm hover:shadow-md transition-all group">
+                                        <div className="flex justify-between items-start gap-3 mb-4">
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-black text-slate-800 truncate">{visit.meta?.companyName || visit.studentInfo?.name || 'Untitled Report'}</p>
+                                                <p className="text-[10px] font-bold text-slate-400 mt-1">By: {visit.submittedBy?.name || 'Unknown'}</p>
+                                            </div>
+                                            <div className="p-2 bg-red-50 rounded-xl text-red-500 group-hover:scale-110 transition-transform"><Lock className="w-4 h-4" /></div>
+                                        </div>
+                                        <button onClick={() => handleApproveUnlock(visit._id)} className="w-full py-2.5 bg-brand-blue text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+                                            <Unlock className="w-3.5 h-3.5" /> Approve Unlock
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Charts & Lists Row */}
+                    <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+                        {/* Visit Trends */}
+                        <div className="xl:col-span-2 glass p-6 sm:p-8 rounded-[2rem] flex flex-col">
+                            <div className="flex items-center justify-between mb-8">
+                                <div>
+                                    <h3 className="font-extrabold text-lg text-slate-800 flex items-center gap-2">
+                                        <TrendingUp className="w-5 h-5 text-brand-blue" /> Visit Trends
+                                    </h3>
+                                    <p className="text-sm font-medium text-slate-400 mt-1">Last 6 months progression</p>
+                                </div>
+                            </div>
+                            <div className="flex-1 min-h-[280px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={trendData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%"  stopColor="#3B82F6" stopOpacity={0.3}/>
+                                                <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" opacity={0.5} />
+                                        <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 11, fontWeight: 600 }} dy={10} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 11, fontWeight: 600 }} />
+                                        <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#3B82F6', strokeWidth: 1, strokeDasharray: '4 4' }} />
+                                        <Area type="monotone" dataKey="count" name="Visits" stroke="#3B82F6" strokeWidth={4} fill="url(#areaGrad)" activeDot={{ r: 6, fill: '#FFFFFF', stroke: '#3B82F6', strokeWidth: 2 }} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+
+                        {/* Recent Activity */}
+                        <div className="flex flex-col gap-6">
+                            {/* Recent Visits Mini-list */}
+                            <div className="card flex flex-col flex-1">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="font-bold text-slate-800 flex items-center gap-2"><MapPin className="w-4 h-4 text-brand-blue" /> Recent Visits</h3>
+                                    <button onClick={() => navigate('/visits')} className="text-xs font-semibold text-brand-sky hover:underline">View all</button>
+                                </div>
+                                <div className="space-y-2 flex-1">
+                                    {visits.slice(0,4).map(visit => (
+                                        <div key={visit._id} onClick={() => navigate(`/edit-visit/${visit._id}`)} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-brand-sky/30 hover:bg-blue-50/50 cursor-pointer transition-all">
+                                            <div className="min-w-0">
+                                                <p className="text-sm font-bold text-slate-800 truncate">{visit.meta?.companyName || visit.studentInfo?.name || 'Untitled Report'}</p>
+                                                <p className="text-[10px] text-slate-400 truncate">{visit.submittedBy?.name}</p>
+                                            </div>
+                                            <StatusDot status={visit.status} />
+                                        </div>
+                                    ))}
+                                    {visits.length === 0 && <p className="text-sm text-slate-400 text-center py-4">No visits found</p>}
+                                </div>
+                            </div>
+                            
+                            {/* Recent Claims Mini-list */}
+                            {expenseSummary?.recentClaims?.length > 0 && (
+                                <div className="card flex flex-col flex-1">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="font-bold text-slate-800 flex items-center gap-2"><Receipt className="w-4 h-4 text-indigo-500" /> Recent Claims</h3>
+                                        <button onClick={() => navigate('/expenses/claims')} className="text-xs font-semibold text-indigo-500 hover:underline">View all</button>
+                                    </div>
+                                    <div className="space-y-2 flex-1">
+                                        {expenseSummary.recentClaims.slice(0,3).map(claim => (
+                                            <div key={claim._id} onClick={() => navigate(`/expenses/claims/${claim._id}`)} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/50 cursor-pointer transition-all">
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-bold text-slate-800 truncate">{claim.title}</p>
+                                                    <p className="text-[10px] text-slate-400 truncate">{claim.submittedBy?.name}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="text-xs font-extrabold text-slate-700">{formatCurrency(claim.totalAmount)}</p>
+                                                    <StatusDot status={claim.status} isExpense />
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- USER VIEW --- */}
+            {isUser && (
+                <div className="space-y-8">
+                    {/* User KPIs */}
+                    <div>
+                        <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 ml-2 flex items-center gap-2">
+                            <Activity className="w-4 h-4" /> My Overview
+                        </h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                            <KPICard title="My Total Visits" value={stats?.stats?.totalVisits ?? 0} icon={Briefcase} color="#284695" />
+                            <KPICard title="Pending Review" value={stats?.stats?.pendingReview ?? 0} icon={Clock} color="#EF7F1A" />
+                            <KPICard title="Action Required" value={stats?.stats?.actionRequired ?? 0} icon={AlertCircle} color="#DC2626" />
+                            <KPICard title="My Drafts" value={stats?.stats?.draftVisits ?? 0} icon={FileText} color="#64748B" />
+                        </div>
+                    </div>
+
+                    {/* Action Required Banner */}
+                    {attentionNeeded.length > 0 && (
+                        <div className="card border-red-200 bg-gradient-to-r from-red-50 to-white overflow-hidden p-0">
+                            <div className="px-5 py-3 border-b border-red-100 bg-red-100/50 flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-red-600 font-black text-xs uppercase tracking-widest">
+                                    <AlertCircle className="w-4 h-4" /> Action Required by You
+                                </div>
+                                <span className="text-[10px] font-bold text-white bg-red-500 px-2.5 py-1 rounded-full shadow-sm">
+                                    {attentionNeeded.length} Task{attentionNeeded.length > 1 ? 's' : ''}
+                                </span>
+                            </div>
+                            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {attentionNeeded.map(visit => {
+                                    const latestNote = visit.adminNotes?.[visit.adminNotes.length - 1];
+                                    return (
+                                        <div key={visit._id} onClick={() => navigate(`/edit-visit/${visit._id}${latestNote?.stepIndex !== undefined ? `?step=${latestNote.stepIndex}` : ''}`)} className="p-4 bg-white rounded-2xl border border-red-100 shadow-sm hover:shadow-md hover:border-red-300 transition-all cursor-pointer group">
+                                            <div className="flex justify-between items-start gap-3 mb-3">
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-black text-slate-800 truncate group-hover:text-red-600 transition-colors">
+                                                        {visit.meta?.companyName || visit.studentInfo?.name || 'Untitled Report'}
+                                                    </p>
+                                                    {latestNote?.stepName && <p className="text-[10px] font-bold text-red-500 uppercase tracking-tighter mt-1">Issue in {latestNote.stepName}</p>}
+                                                </div>
+                                                <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center group-hover:bg-red-100 transition-colors">
+                                                    <ArrowRight className="w-4 h-4 text-red-500 group-hover:translate-x-0.5 transition-transform" />
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-slate-600 font-medium line-clamp-2 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                                                "{latestNote?.note || 'Review required'}"
+                                            </p>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Two Column Layout for User */}
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Upcoming Visits */}
+                        <div className="lg:col-span-2">
+                            <UpcomingVisitsWidget />
+                        </div>
+                        {/* Recent Visits list */}
+                        <div className="card flex flex-col">
+                            <div className="flex items-center justify-between mb-5">
+                                <h3 className="font-extrabold text-slate-800">Recent Submissions</h3>
+                                <button onClick={() => navigate('/visits')} className="text-xs font-bold text-brand-sky hover:underline">View all</button>
+                            </div>
+                            <div className="space-y-3 flex-1">
+                                {visits.length === 0 ? (
+                                    <div className="flex-1 flex flex-col items-center justify-center py-10 text-center">
+                                        <FileText className="w-10 h-10 text-slate-200 mb-3" />
+                                        <p className="text-sm text-slate-400 font-medium">No visits yet</p>
+                                    </div>
+                                ) : visits.map(visit => (
+                                    <div key={visit._id} onClick={() => navigate(`/edit-visit/${visit._id}`)} className="flex items-center justify-between p-3.5 rounded-2xl border border-slate-100 hover:border-brand-blue/30 hover:shadow-md cursor-pointer transition-all group">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-bold text-slate-800 truncate group-hover:text-brand-blue transition-colors">
+                                                {visit.meta?.companyName || visit.studentInfo?.name || 'Untitled Report'}
+                                            </p>
+                                            <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+                                                <Calendar className="w-3 h-3" /> {new Date(visit.createdAt).toLocaleDateString()}
+                                            </p>
+                                        </div>
+                                        <StatusDot status={visit.status} />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* --- ACCOUNTS VIEW --- */}
+            {isAccountsRole && (
+                <div className="space-y-8">
+                    <div>
+                        <h2 className="text-sm font-black text-slate-400 uppercase tracking-widest mb-4 ml-2 flex items-center gap-2">
+                            <Wallet className="w-4 h-4" /> Financial Overview
+                        </h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                            <KPICard title="Pending Claims" value={pendingExpClaims} icon={Clock} color="#EF7F1A" />
+                            <KPICard title="Approved" value={approvedExpCount} icon={CheckCircle2} color="#10B981" />
+                            <KPICard title="Total Claims" value={expClaimStats.reduce((sum, s) => sum + s.count, 0)} icon={Receipt} color="#284695" />
+                            <KPICard title="Total Value" value={formatCurrency(totalExpAmount)} icon={IndianRupee} color="#8B5CF6" />
+                        </div>
+                    </div>
+
+                    {expenseSummary?.recentClaims?.length > 0 && (
+                        <div className="card max-w-4xl">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="font-extrabold text-lg text-slate-800 flex items-center gap-2">
+                                    <Receipt className="w-5 h-5 text-indigo-500" /> Recent Expense Claims
+                                </h3>
+                                <button onClick={() => navigate('/expenses/claims')} className="btn-outline text-xs">
+                                    View All Claims
+                                </button>
+                            </div>
+                            <div className="space-y-3">
+                                {expenseSummary.recentClaims.map(claim => (
+                                    <div key={claim._id} onClick={() => navigate(`/expenses/claims/${claim._id}`)} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl border border-slate-100 hover:border-indigo-200 hover:shadow-md cursor-pointer transition-all bg-slate-50/50 hover:bg-white">
+                                        <div className="flex items-start gap-4">
+                                            <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
+                                                <Wallet className="w-5 h-5 text-indigo-600" />
+                                            </div>
+                                            <div>
+                                                <p className="text-base font-bold text-slate-800">{claim.title}</p>
+                                                <p className="text-xs text-slate-500 mt-1 font-medium flex items-center gap-2">
+                                                    <span>By {claim.submittedBy?.name}</span>
+                                                    <span>&bull;</span>
+                                                    <span>{claim.claimNumber}</span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2">
+                                            <p className="text-lg font-black text-slate-800">{formatCurrency(claim.totalAmount)}</p>
+                                            <StatusDot status={claim.status} isExpense />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Shared Charts for Admin & Users (Status Overview) */}
             {!isAccountsRole && stats?.statusDist && stats.statusDist.length > 0 && (
                 <div className="glass p-6 sm:p-8 rounded-[2rem]">
-                    <h3 className="font-extrabold text-lg text-slate-800 mb-8">Status Overview</h3>
-                    <div className="h-[240px]">
+                    <h3 className="font-extrabold text-lg text-slate-800 mb-8 flex items-center gap-2">
+                        <Activity className="w-5 h-5 text-brand-blue" /> Pipeline Status
+                    </h3>
+                    <div className="h-[260px]">
                         <ResponsiveContainer width="100%" height="100%">
                             <BarChart data={stats.statusDist.map(s => ({ name: STATUS_CFG[s._id]?.label || s._id, count: s.count }))} margin={{ left: -20 }}>
-                                <defs>
-                                    <linearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="0%" stopColor="#3B82F6" />
-                                        <stop offset="100%" stopColor="#8B5CF6" />
-                                    </linearGradient>
-                                </defs>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" opacity={0.6} />
-                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 11, fontWeight: 500 }} dy={10} />
-                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 11, fontWeight: 500 }} />
+                                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 11, fontWeight: 600 }} dy={10} />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fill: '#64748B', fontSize: 11, fontWeight: 600 }} />
                                 <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(59, 130, 246, 0.05)' }} />
-                                <Bar dataKey="count" fill="url(#barGrad)" radius={[8, 8, 0, 0]} barSize={42} />
+                                <Bar dataKey="count" radius={[8, 8, 0, 0]} barSize={48}>
+                                    {stats.statusDist.map((entry, index) => {
+                                        const cfg = STATUS_CFG[entry._id] || STATUS_CFG.draft;
+                                        // Simple color mapping based on status
+                                        const color = entry._id === 'action_required' ? '#EF4444' : 
+                                                      entry._id === 'submitted' ? '#F97316' : 
+                                                      entry._id === 'reviewed' ? '#3B82F6' :
+                                                      entry._id === 'closed' ? '#10B981' : '#94A3B8';
+                                        return <Cell key={`cell-${index}`} fill={color} />;
+                                    })}
+                                </Bar>
                             </BarChart>
                         </ResponsiveContainer>
                     </div>

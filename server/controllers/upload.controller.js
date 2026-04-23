@@ -2,6 +2,18 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const cloudinary = require('cloudinary').v2;
+const Upload = require('../models/Upload');
+const AuditLog = require('../models/AuditLog');
+
+const configuredCloudinary = () => {
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY) return null;
+    cloudinary.config({
+        cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+        api_key: process.env.CLOUDINARY_API_KEY,
+        api_secret: process.env.CLOUDINARY_API_SECRET
+    });
+    return cloudinary;
+};
 
 /**
  * @desc    Upload photo to Cloudinary first, or fallback to local storage
@@ -14,16 +26,12 @@ exports.uploadPhoto = async (req, res) => {
         }
 
         // 1. Try Cloudinary if keys are present
-        if (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY) {
-            cloudinary.config({
-                cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-                api_key: process.env.CLOUDINARY_API_KEY,
-                api_secret: process.env.CLOUDINARY_API_SECRET
-            });
+        const cld = configuredCloudinary();
+        if (cld) {
 
             // Upload from memory buffer
             const result = await new Promise((resolve, reject) => {
-                const uploadStream = cloudinary.uploader.upload_stream(
+                const uploadStream = cld.uploader.upload_stream(
                     { folder: 'avs_uploads' },
                     (error, result) => {
                         if (error) reject(error);
@@ -38,7 +46,11 @@ exports.uploadPhoto = async (req, res) => {
                 data: {
                     url: result.secure_url,
                     filename: result.public_id,
-                    provider: 'cloudinary'
+                    publicId: result.public_id,
+                    provider: 'cloudinary',
+                    mimeType: req.file.mimetype,
+                    sizeBytes: req.file.size,
+                    originalName: req.file.originalname
                 }
             });
         }
@@ -64,7 +76,11 @@ exports.uploadPhoto = async (req, res) => {
             data: {
                 url: fileUrl,
                 filename: filename,
-                provider: 'local'
+                publicId: null,
+                provider: 'local',
+                mimeType: req.file.mimetype,
+                sizeBytes: req.file.size,
+                originalName: req.file.originalname
             }
         });
     } catch (error) {
@@ -74,5 +90,119 @@ exports.uploadPhoto = async (req, res) => {
             message: 'Server error during photo upload',
             error: error.message
         });
+    }
+};
+
+// ─── Upload REGISTRATION (persist metadata after binary upload) ──────────
+// POST /api/uploads/register
+exports.registerUpload = async (req, res) => {
+    try {
+        const {
+            url, publicId, provider = 'cloudinary',
+            context, refModel, refId,
+            mimeType, sizeBytes, originalName, bookingDate, metadata
+        } = req.body;
+
+        if (!url || !context) {
+            return res.status(400).json({ success: false, message: 'url and context are required' });
+        }
+
+        const doc = await Upload.create({
+            url, publicId, provider,
+            context, refModel: refModel || null, refId: refId || null,
+            mimeType, sizeBytes, originalName, bookingDate,
+            metadata,
+            owner: req.user._id
+        });
+
+        AuditLog.create({
+            userId: req.user._id, action: 'REGISTER_UPLOAD',
+            targetId: doc._id, targetModel: 'Upload',
+            details: { context, refModel, refId }
+        }).catch(() => {});
+
+        res.status(201).json({ success: true, data: doc });
+    } catch (error) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+};
+
+// GET /api/uploads?refModel=&refId=&context=
+exports.listUploads = async (req, res) => {
+    try {
+        const q = {};
+        if (req.query.refModel) q.refModel = req.query.refModel;
+        if (req.query.refId) q.refId = req.query.refId;
+        if (req.query.context) q.context = req.query.context;
+        // Scope
+        const role = req.user.role;
+        if (role === 'user' || role === 'home_visit') {
+            q.owner = req.user._id;
+        }
+        const uploads = await Upload.find(q).sort({ createdAt: -1 }).lean();
+
+        // Audit view for privileged access to others' uploads
+        if (['admin', 'accounts', 'superadmin', 'hod'].includes(role) && uploads.length) {
+            AuditLog.create({
+                userId: req.user._id, action: 'VIEW_UPLOADS',
+                targetModel: 'Upload',
+                details: { query: req.query, count: uploads.length }
+            }).catch(() => {});
+        }
+
+        res.json({ success: true, data: uploads });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// PATCH /api/uploads/:id — rebind to a different ref (e.g., admin fixing wrong schedule)
+exports.updateUpload = async (req, res) => {
+    try {
+        const u = await Upload.findById(req.params.id);
+        if (!u) return res.status(404).json({ success: false, message: 'Upload not found' });
+
+        const privileged = ['admin', 'accounts', 'superadmin'].includes(req.user.role);
+        const owner = String(u.owner) === String(req.user._id);
+        if (!privileged && !owner) {
+            return res.status(403).json({ success: false, message: 'Not authorized' });
+        }
+
+        ['context', 'refModel', 'refId', 'bookingDate', 'metadata'].forEach(f => {
+            if (req.body[f] !== undefined) u[f] = req.body[f];
+        });
+        await u.save();
+        res.json({ success: true, data: u });
+    } catch (error) {
+        res.status(400).json({ success: false, message: error.message });
+    }
+};
+
+// DELETE /api/uploads/:id — removes Cloudinary binary too
+exports.deleteUpload = async (req, res) => {
+    try {
+        const u = await Upload.findById(req.params.id);
+        if (!u) return res.status(404).json({ success: false, message: 'Upload not found' });
+
+        const privileged = ['admin', 'accounts', 'superadmin'].includes(req.user.role);
+        const owner = String(u.owner) === String(req.user._id);
+        if (!privileged && !owner) {
+            return res.status(403).json({ success: false, message: 'Not authorized' });
+        }
+
+        if (u.provider === 'cloudinary' && u.publicId) {
+            const cld = configuredCloudinary();
+            if (cld) {
+                try { await cld.uploader.destroy(u.publicId); } catch (_) {}
+            }
+        }
+        await u.deleteOne();
+        AuditLog.create({
+            userId: req.user._id, action: 'DELETE_UPLOAD',
+            targetId: u._id, targetModel: 'Upload'
+        }).catch(() => {});
+        res.json({ success: true, message: 'Upload deleted' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
     }
 };

@@ -1,8 +1,19 @@
 const Expense = require('../models/Expense');
 const ExpenseClaim = require('../models/ExpenseClaim');
 const User = require('../models/User');
+const VisitPlan = require('../models/VisitPlan');
+const VisitPlanBalance = require('../models/VisitPlanBalance');
 const { notifyClaimSubmitted, notifyClaimStatusChange } = require('../services/notification.service');
 const { auditExpenseClaim } = require('../services/ai.service');
+const { evaluateClaim, policyKindForUser, getActivePolicy } = require('../services/policy.service');
+
+async function applyBalanceDelta(planId, delta) {
+    if (!planId || !delta) return;
+    const bal = await VisitPlanBalance.findOne({ visitPlanRef: planId });
+    if (!bal || bal.lockedAt) return;
+    bal.spentAmount = Math.max(0, (bal.spentAmount || 0) + delta);
+    await bal.save();
+}
 
 // ─── EXPENSE CRUD ────────────────────────────────────────────────
 
@@ -56,10 +67,26 @@ exports.getExpenses = async (req, res) => {
 // @desc    Create expense
 exports.createExpense = async (req, res) => {
     try {
+        // Auto-detect over-budget against an existing advance balance
+        let overBudget = !!req.body.overBudget;
+        if (req.body.visitPlanRef && !overBudget) {
+            const bal = await VisitPlanBalance.findOne({ visitPlanRef: req.body.visitPlanRef });
+            if (bal && !bal.lockedAt) {
+                const projected = (bal.spentAmount || 0) + (req.body.amount || 0);
+                if (projected > bal.grantedAmount) overBudget = true;
+            }
+        }
+
         const expense = await Expense.create({
             ...req.body,
+            overBudget,
             createdBy: req.user._id
         });
+
+        // Debit the balance immediately for non-over-budget actuals that aren't yet claimed
+        if (expense.visitPlanRef && !expense.overBudget) {
+            await applyBalanceDelta(expense.visitPlanRef, expense.amount);
+        }
 
         res.status(201).json({ success: true, data: expense });
     } catch (error) {
@@ -91,13 +118,35 @@ exports.updateExpense = async (req, res) => {
         const updatableFields = [
             'category', 'otherCategory', 'amount', 'currency', 'description',
             'expenseDate', 'travelFrom', 'travelTo', 'receiptUrl', 'vendor',
-            'paymentMethod', 'visitRef', 'cityTier', 'travelClass', 'bookingMode'
+            'paymentMethod', 'visitRef', 'cityTier', 'travelClass', 'bookingMode',
+            'visitPlanRef', 'visitScheduleRef', 'templateRef', 'uploadRefs', 'overBudget'
         ];
+
+        const prevAmount = expense.amount;
+        const prevOverBudget = expense.overBudget;
+        const prevPlan = expense.visitPlanRef;
+
         updatableFields.forEach(field => {
             if (req.body[field] !== undefined) expense[field] = req.body[field];
         });
 
         await expense.save();
+
+        // Balance reconciliation if plan/amount/overBudget changed
+        if (String(prevPlan || '') === String(expense.visitPlanRef || '')) {
+            if (expense.visitPlanRef && !expense.overBudget && !prevOverBudget) {
+                await applyBalanceDelta(expense.visitPlanRef, (expense.amount || 0) - (prevAmount || 0));
+            } else if (expense.visitPlanRef && prevOverBudget && !expense.overBudget) {
+                await applyBalanceDelta(expense.visitPlanRef, expense.amount);
+            } else if (expense.visitPlanRef && !prevOverBudget && expense.overBudget) {
+                await applyBalanceDelta(expense.visitPlanRef, -prevAmount);
+            }
+        } else {
+            // plan changed — refund old, debit new
+            if (prevPlan && !prevOverBudget) await applyBalanceDelta(prevPlan, -prevAmount);
+            if (expense.visitPlanRef && !expense.overBudget) await applyBalanceDelta(expense.visitPlanRef, expense.amount);
+        }
+
         res.json({ success: true, data: expense });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
@@ -129,6 +178,11 @@ exports.deleteExpense = async (req, res) => {
             }
         }
 
+        // Credit the balance back before deletion if it was debited
+        if (expense.visitPlanRef && !expense.overBudget) {
+            await applyBalanceDelta(expense.visitPlanRef, -expense.amount);
+        }
+
         await expense.deleteOne();
         res.json({ success: true, message: 'Expense deleted' });
     } catch (error) {
@@ -156,11 +210,14 @@ exports.getClaims = async (req, res) => {
         // Filters
         if (req.query.status) query.status = req.query.status;
         if (req.query.submittedBy) query.submittedBy = req.query.submittedBy;
+        if (req.query.visitPlanRef) query.visitPlanRef = req.query.visitPlanRef;
+        if (req.query.claimType) query.claimType = req.query.claimType;
 
         const claims = await ExpenseClaim.find(query)
-            .populate('submittedBy', 'name employeeId email')
+            .populate('submittedBy', 'name employeeId email role')
             .populate('reviewedBy', 'name employeeId')
             .populate('expenses')
+            .populate('visitPlanRef', 'title city plannedStartAt plannedEndAt status')
             .sort({ createdAt: -1 });
 
         res.json({ success: true, data: claims });
@@ -200,9 +257,81 @@ exports.getClaimById = async (req, res) => {
 // @desc    Create a new expense claim (draft)
 exports.createClaim = async (req, res) => {
     try {
-        const { title, description, travelPurpose, travelFrom, travelTo, travelStartDate, travelEndDate, claimLocation, expenseIds } = req.body;
+        const {
+            title, description, travelPurpose, travelFrom, travelTo,
+            travelStartDate, travelEndDate, claimLocation, expenseIds,
+            claimType, visitPlanRef
+        } = req.body;
 
-        // Validate that expenses belong to this user
+        // Enforce: every claim must have a claimType and a plan reference (advance OR reimbursement)
+        if (!claimType || !['advance', 'reimbursement'].includes(claimType)) {
+            return res.status(400).json({
+                success: false,
+                message: 'claimType is required and must be "advance" or "reimbursement"',
+                errorCode: 'CLAIM_TYPE_REQUIRED'
+            });
+        }
+        if (!visitPlanRef) {
+            return res.status(400).json({
+                success: false,
+                message: 'visitPlanRef is required — schedule a visit before claiming.',
+                errorCode: 'VISIT_REQUIRED'
+            });
+        }
+
+        const plan = await VisitPlan.findById(visitPlanRef);
+        if (!plan) return res.status(404).json({ success: false, message: 'Visit plan not found' });
+        if (String(plan.owner) !== String(req.user._id) && req.user.role !== 'superadmin') {
+            return res.status(403).json({ success: false, message: 'You do not own this plan' });
+        }
+
+        // Advance claims: plan must still be scheduled and start in the future
+        if (claimType === 'advance') {
+            if (plan.status !== 'scheduled') {
+                return res.status(400).json({
+                    success: false,
+                    message: `Advance claims require a scheduled plan (current: ${plan.status})`,
+                    errorCode: 'ADVANCE_PLAN_STATUS'
+                });
+            }
+            const existing = await ExpenseClaim.findOne({
+                visitPlanRef: plan._id,
+                claimType: 'advance',
+                status: { $nin: ['rejected'] }
+            });
+            if (existing) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'An advance claim already exists for this plan.',
+                    errorCode: 'ADVANCE_EXISTS'
+                });
+            }
+        }
+
+        // Reimbursement claims: open only during or within window after visit
+        if (claimType === 'reimbursement') {
+            const now = new Date();
+            const policy = await getActivePolicy(policyKindForUser(req.user));
+            const windowDays = policy?.globalRequirements?.reimbursementWindowDays ?? 7;
+            const deadline = new Date(plan.plannedEndAt);
+            deadline.setDate(deadline.getDate() + windowDays);
+            if (now < new Date(plan.plannedStartAt)) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Reimbursement is allowed only during or after the visit.',
+                    errorCode: 'REIMBURSEMENT_WINDOW_NOT_OPEN'
+                });
+            }
+            if (now > deadline) {
+                return res.status(403).json({
+                    success: false,
+                    message: `Reimbursement window closed on ${deadline.toISOString().slice(0,10)}.`,
+                    errorCode: 'REIMBURSEMENT_WINDOW_CLOSED'
+                });
+            }
+        }
+
+        // Validate that expenses belong to this user + plan
         let expenses = [];
         let totalAmount = 0;
         if (expenseIds && expenseIds.length > 0) {
@@ -222,27 +351,29 @@ exports.createClaim = async (req, res) => {
         const claim = await ExpenseClaim.create({
             title,
             description,
-            travelPurpose,
+            travelPurpose: travelPurpose || plan.purpose,
             travelFrom,
-            travelTo,
-            travelStartDate,
-            travelEndDate,
+            travelTo: travelTo || { city: plan.city, state: plan.state },
+            travelStartDate: travelStartDate || plan.plannedStartAt,
+            travelEndDate: travelEndDate || plan.plannedEndAt,
             claimLocation,
             expenses: expenses.map(e => e._id),
             totalAmount,
+            claimType,
+            visitPlanRef: plan._id,
+            policyKindApplied: policyKindForUser(req.user),
             submittedBy: req.user._id,
             statusHistory: [{
                 status: 'draft',
                 changedBy: req.user._id,
-                comment: 'Claim created'
+                comment: `${claimType} claim created`
             }]
         });
 
-        // Update expenses with claim reference
         if (expenses.length > 0) {
             await Expense.updateMany(
                 { _id: { $in: expenses.map(e => e._id) } },
-                { claimRef: claim._id }
+                { claimRef: claim._id, visitPlanRef: plan._id }
             );
         }
 
@@ -326,12 +457,47 @@ exports.submitClaim = async (req, res) => {
 
         // Recalculate total
         claim.totalAmount = claim.expenses.reduce((sum, e) => sum + e.amount, 0);
+
+        // ── Policy evaluation (notice-only — violations do NOT block submission) ──
+        const plan = claim.visitPlanRef
+            ? await VisitPlan.findById(claim.visitPlanRef).lean()
+            : null;
+        const evalPayload = {
+            claim: { ...claim.toObject(), submittedAt: new Date() },
+            expenses: claim.expenses,
+            plan,
+            user: req.user
+        };
+        const evalResult = await evaluateClaim(evalPayload);
+
+        // Snapshot policy on the claim regardless of violations
+        if (evalResult.appliedPolicy) {
+            claim.policyKindApplied = evalResult.appliedPolicy.policyKind;
+            claim.policyVersionSnapshot = evalResult.appliedPolicy.version;
+        }
+
+        // Store violations on the AI audit block for reviewer visibility
+        if (evalResult.violations.length || evalResult.warnings.length) {
+            claim.aiAudit = {
+                ...(claim.aiAudit?.toObject?.() || claim.aiAudit || {}),
+                overallStatus: evalResult.violations.length ? 'violation' : 'warning',
+                flags: evalResult.violations.map(v => ({
+                    type: v.code,
+                    severity: v.severity || 'warning',
+                    message: v.message,
+                    policyRef: v.policyRef || ''
+                })),
+                summary: evalResult.summary,
+                auditedAt: new Date()
+            };
+        }
+
         claim.status = 'submitted';
         claim.submittedAt = new Date();
         claim.statusHistory.push({
             status: 'submitted',
             changedBy: req.user._id,
-            comment: req.body.justificationNote || 'Claim submitted for review'
+            comment: req.body.justificationNote || `${claim.claimType} claim submitted for review`
         });
 
         if (req.body.justificationNote) {
@@ -345,7 +511,12 @@ exports.submitClaim = async (req, res) => {
             console.error('[Notification Error]', err.message)
         );
 
-        res.json({ success: true, data: claim });
+        res.json({
+            success: true,
+            data: claim,
+            policyNotices: evalResult.violations,
+            policyWarnings: evalResult.warnings
+        });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
     }
@@ -361,9 +532,24 @@ exports.updateClaimStatus = async (req, res) => {
             return res.status(400).json({ success: false, message: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
         }
 
-        const claim = await ExpenseClaim.findById(req.params.id);
+        const claim = await ExpenseClaim.findById(req.params.id).populate('expenses');
         if (!claim) {
             return res.status(404).json({ success: false, message: 'Claim not found' });
+        }
+
+        // Last-line policy guard on approval
+        if (status === 'approved') {
+            const plan = claim.visitPlanRef
+                ? await VisitPlan.findById(claim.visitPlanRef).lean()
+                : null;
+            const submitter = await User.findById(claim.submittedBy).lean();
+            const evalResult = await evaluateClaim({
+                claim: claim.toObject(),
+                expenses: claim.expenses,
+                plan,
+                user: submitter
+            });
+            // Violations are surfaced on the claim's aiAudit for reviewer awareness — not a hard block
         }
 
         claim.status = status;
@@ -378,6 +564,26 @@ exports.updateClaimStatus = async (req, res) => {
         });
 
         await claim.save();
+
+        // ── Advance approval → create / update VisitPlanBalance ──
+        if (status === 'approved' && claim.claimType === 'advance' && claim.visitPlanRef) {
+            const granted = (approvedAmount !== undefined ? approvedAmount : claim.totalAmount) || 0;
+            const existing = await VisitPlanBalance.findOne({ visitPlanRef: claim.visitPlanRef });
+            if (existing) {
+                existing.grantedAmount = granted;
+                existing.advanceClaimRef = claim._id;
+                existing.currency = claim.currency || 'INR';
+                await existing.save();
+            } else {
+                await VisitPlanBalance.create({
+                    visitPlanRef: claim.visitPlanRef,
+                    advanceClaimRef: claim._id,
+                    grantedAmount: granted,
+                    spentAmount: 0,
+                    currency: claim.currency || 'INR'
+                });
+            }
+        }
 
         // Notify the claim submitter
         notifyClaimStatusChange(claim, status, req.user, comment).catch(err =>
