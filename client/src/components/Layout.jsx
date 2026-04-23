@@ -5,7 +5,7 @@ import ErrorBoundary from './ErrorBoundary';
 import {
     LayoutDashboard, PlusCircle, Users, BarChart3,
     Settings, LogOut, Menu, X, User as UserIcon,
-    ChevronRight, List, Bell, Building2, Receipt, FileText, CalendarDays
+    ChevronRight, List, Bell, Building2, Receipt, FileText, CalendarDays, ClipboardList, BookOpen, MessageSquare
 } from 'lucide-react';
 
 const SidebarLink = ({ icon: Icon, label, path, active, onClick }) => (
@@ -24,13 +24,14 @@ const SidebarLink = ({ icon: Icon, label, path, active, onClick }) => (
 
 const RolePill = ({ role }) => {
     const styles = {
-        superadmin: 'bg-brand-purple/20 text-purple-300',
-        admin:      'bg-brand-sky/20 text-sky-300',
-        home_visit: 'bg-brand-orange/20 text-orange-300',
-        user:       'bg-brand-lime/20 text-lime-300',
-        accounts:   'bg-brand-gold/20 text-yellow-300',
+        superadmin:   'bg-brand-purple/20 text-purple-300',
+        admin:        'bg-brand-sky/20 text-sky-300',
+        home_visit:   'bg-brand-orange/20 text-orange-300',
+        user:         'bg-brand-lime/20 text-lime-300',
+        accounts:     'bg-brand-gold/20 text-yellow-300',
+        regional_bdm: 'bg-brand-green/20 text-green-300',
     };
-    const labels = { superadmin: 'Super Admin', admin: 'Admin', home_visit: 'Field Officer', user: 'User', accounts: 'Accounts' };
+    const labels = { superadmin: 'Super Admin', admin: 'Admin', home_visit: 'Field Officer', user: 'User', accounts: 'Accounts', regional_bdm: 'Regional BDM' };
     return (
         <span className={`text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${styles[role] || styles.user}`}>
             {labels[role] || role}
@@ -45,6 +46,7 @@ const Layout = () => {
 
     const isB2C      = user?.department === 'B2C' || user?.role === 'home_visit';
     const isAccounts = user?.role === 'accounts';
+    const hasFormAccess = (key) => user?.formAccess?.includes(key);
 
     const isActive = (path) => {
         const fullPath = location.pathname + location.search;
@@ -53,7 +55,7 @@ const Layout = () => {
     };
 
     const menuItems = [
-        { label: 'Dashboard',    icon: LayoutDashboard, path: '/',         roles: ['user','admin','superadmin','home_visit','accounts'] },
+        { label: 'Dashboard',    icon: LayoutDashboard, path: '/',         roles: ['user','admin','superadmin','home_visit','accounts','regional_bdm'] },
         { label: 'Calendar',      icon: CalendarDays,   path: '/calendar',         roles: ['user','admin','superadmin','home_visit'] },
         { label: 'Expenses',      icon: Receipt,        path: '/expenses',             roles: ['user','admin','superadmin','home_visit','accounts'] },
         { label: 'Claims',        icon: FileText,       path: '/expenses/claims',      roles: ['user','admin','superadmin','home_visit','accounts'] },
@@ -65,10 +67,24 @@ const Layout = () => {
             ...(user.role === 'superadmin' || isB2C ? [
                 { label: 'Home Visits',   icon: List, path: '/visits?formType=home_visit',  roles: ['admin','superadmin'] },
             ] : []),
-            { label: 'Manage Agent',  icon: Building2,      path: '/agents',       roles: ['admin', 'superadmin'] },
+            { label: 'Manage Agent',  icon: Building2,      path: '/agents',         roles: ['admin', 'superadmin'] },
+            { label: 'Post Field Day', icon: ClipboardList, path: '/post-field-day',  roles: ['admin', 'superadmin'] },
+            { label: 'Daily Report',       icon: BookOpen,       path: '/daily-report',       roles: ['admin', 'superadmin'] },
+            { label: 'Post-Demo Feedback', icon: MessageSquare,  path: '/post-demo-feedback', roles: ['admin', 'superadmin'] },
         ] : isAccounts ? [] : [
-            { label: 'New Visit',     icon: PlusCircle, path: '/new-visit', roles: ['user','home_visit'] },
-            { label: 'Visit History', icon: List,       path: '/visits',    roles: ['user','home_visit'] },
+            ...(!user?.formAccess?.length || hasFormAccess('b2b_visit') || hasFormAccess('b2c_visit') ? [
+                { label: 'New Visit',     icon: PlusCircle, path: '/new-visit', roles: ['user','home_visit','regional_bdm'] },
+                { label: 'Visit History', icon: List,       path: '/visits',    roles: ['user','home_visit','regional_bdm'] },
+            ] : []),
+            ...(hasFormAccess('post_field_day') ? [
+                { label: 'Post Field Day', icon: ClipboardList, path: '/post-field-day', roles: ['user','home_visit','accounts','regional_bdm'] },
+            ] : []),
+            ...(hasFormAccess('daily_report') ? [
+                { label: 'Daily Report', icon: BookOpen, path: '/daily-report', roles: ['user','home_visit','accounts','regional_bdm'] },
+            ] : []),
+            ...(hasFormAccess('post_demo_feedback') ? [
+                { label: 'Post-Demo Feedback', icon: MessageSquare, path: '/post-demo-feedback', roles: ['user','home_visit','accounts','regional_bdm'] },
+            ] : []),
         ]),
         { label: 'Analytics',     icon: BarChart3,      path: '/analytics',    roles: ['admin','superadmin'] },
         { label: 'Users',         icon: Users,          path: '/users',        roles: ['superadmin'] },

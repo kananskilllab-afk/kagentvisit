@@ -13,15 +13,25 @@ import {
     X,
     Loader2,
     Link2,
-    Check
+    Check,
+    ClipboardList
 } from 'lucide-react';
 
+const FORM_ACCESS_OPTIONS = [
+    { value: 'b2b_visit',     label: 'B2B Visit Form',  icon: '🏢' },
+    { value: 'b2c_visit',     label: 'B2C Visit Form',  icon: '🏠' },
+    { value: 'post_field_day',label: 'Post Field Day',  icon: '📋' },
+    { value: 'daily_report',      label: 'Daily Report',           icon: '📝' },
+    { value: 'post_demo_feedback', label: 'Post-Demo Feedback',    icon: '💬' },
+];
+
 const ROLE_BADGE = {
-    superadmin: 'bg-brand-purple/10 text-brand-purple border-brand-purple/20',
-    admin:      'bg-brand-blue/10 text-brand-blue border-brand-blue/20',
-    home_visit: 'bg-brand-orange/10 text-brand-orange border-brand-orange/20',
-    user:       'bg-brand-sky/10 text-brand-sky border-brand-sky/20',
-    accounts:   'bg-brand-gold/10 text-brand-gold border-brand-gold/20',
+    superadmin:   'bg-brand-purple/10 text-brand-purple border-brand-purple/20',
+    admin:        'bg-brand-blue/10 text-brand-blue border-brand-blue/20',
+    home_visit:   'bg-brand-orange/10 text-brand-orange border-brand-orange/20',
+    user:         'bg-brand-sky/10 text-brand-sky border-brand-sky/20',
+    accounts:     'bg-brand-gold/10 text-brand-gold border-brand-gold/20',
+    regional_bdm: 'bg-brand-green/10 text-brand-green border-brand-green/20',
 };
 
 const DEPT_BADGE = {
@@ -41,6 +51,7 @@ const UserManagement = () => {
     const [assignedIds, setAssignedIds] = useState([]);
     const [assignSearch, setAssignSearch] = useState('');
     const [assignSaving, setAssignSaving] = useState(false);
+    const [formAccess, setFormAccess] = useState([]);
 
     useEffect(() => { fetchUsers(); }, []);
 
@@ -63,6 +74,7 @@ const UserManagement = () => {
             const data = Object.fromEntries(formData.entries());
             if (editingUser && !data.passwordHash) delete data.passwordHash;
             if (data.role === 'user' && data.department === 'B2C') data.role = 'home_visit';
+            data.formAccess = formAccess;
             if (editingUser) {
                 await api.put(`/users/${editingUser._id}`, data);
             } else {
@@ -134,8 +146,14 @@ const UserManagement = () => {
         (u?.employeeId || '').toLowerCase().includes(uq)
     );
 
-    const openAdd = () => { setEditingUser(null); setShowAddModal(true); };
-    const openEdit = (user) => { setEditingUser(user); setShowAddModal(true); };
+    const toggleFormAccess = (value) => {
+        setFormAccess(prev =>
+            prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value]
+        );
+    };
+
+    const openAdd = () => { setEditingUser(null); setFormAccess([]); setShowAddModal(true); };
+    const openEdit = (user) => { setEditingUser(user); setFormAccess(user.formAccess || []); setShowAddModal(true); };
 
     return (
         <div className="space-y-5 page-enter">
@@ -220,6 +238,18 @@ const UserManagement = () => {
                                                             <Mail className="w-3 h-3" />
                                                             {user?.email}
                                                         </p>
+                                                        {user?.formAccess?.length > 0 && (
+                                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                                {user.formAccess.map(f => {
+                                                                    const opt = FORM_ACCESS_OPTIONS.find(o => o.value === f);
+                                                                    return opt ? (
+                                                                        <span key={f} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-brand-blue/8 text-brand-blue text-[9px] font-bold border border-brand-blue/15">
+                                                                            {opt.icon} {opt.label}
+                                                                        </span>
+                                                                    ) : null;
+                                                                })}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </td>
@@ -351,8 +381,8 @@ const UserManagement = () => {
             {/* Add/Edit User Modal */}
             {showAddModal && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
-                    <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl animate-fade-in">
-                        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+                    <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl animate-fade-in max-h-[92vh] sm:max-h-[90vh] flex flex-col">
+                        <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
                             <div>
                                 <h3 className="text-lg font-bold text-slate-800">{editingUser ? 'Edit User' : 'Add New User'}</h3>
                                 <p className="text-xs text-slate-400 mt-0.5">{editingUser ? 'Update account details' : 'Create a new team member account'}</p>
@@ -364,7 +394,8 @@ const UserManagement = () => {
                                 <X className="w-5 h-5 text-slate-500" />
                             </button>
                         </div>
-                        <form onSubmit={handleSaveUser} className="p-5 space-y-4">
+                        <form onSubmit={handleSaveUser} className="flex flex-col flex-1 overflow-hidden">
+                        <div className="p-5 space-y-4 overflow-y-auto flex-1">
                             <div>
                                 <label className="label">Full Name</label>
                                 <input name="name" required className="input-field" placeholder="John Doe" defaultValue={editingUser?.name || ''} />
@@ -391,6 +422,49 @@ const UserManagement = () => {
                                     <option value="superadmin">SuperAdmin</option>
                                 </select>
                             </div>
+
+                            {/* Form Access */}
+                            <div>
+                                <label className="label flex items-center gap-1.5">
+                                    <ClipboardList className="w-3.5 h-3.5 text-slate-400" />
+                                    Form Access
+                                </label>
+                                <p className="text-[11px] text-slate-400 mb-2">Select which forms this user can access</p>
+                                <div className="space-y-2">
+                                    {FORM_ACCESS_OPTIONS.map(opt => {
+                                        const checked = formAccess.includes(opt.value);
+                                        return (
+                                            <label
+                                                key={opt.value}
+                                                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition-all select-none ${
+                                                    checked
+                                                        ? 'border-brand-blue bg-brand-blue/5'
+                                                        : 'border-slate-200 hover:border-slate-300'
+                                                }`}
+                                            >
+                                                <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
+                                                    checked
+                                                        ? 'border-brand-blue bg-brand-blue text-white'
+                                                        : 'border-slate-300'
+                                                }`}>
+                                                    {checked && <Check className="w-3 h-3" />}
+                                                </div>
+                                                <input
+                                                    type="checkbox"
+                                                    className="sr-only"
+                                                    checked={checked}
+                                                    onChange={() => toggleFormAccess(opt.value)}
+                                                />
+                                                <span className="text-sm">{opt.icon}</span>
+                                                <span className={`text-sm font-semibold ${checked ? 'text-brand-blue' : 'text-slate-600'}`}>
+                                                    {opt.label}
+                                                </span>
+                                            </label>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
                             <div>
                                 <label className="label">Email Address</label>
                                 <input name="email" type="email" required className="input-field" placeholder="john@kanan.co" defaultValue={editingUser?.email || ''} />
@@ -399,7 +473,9 @@ const UserManagement = () => {
                                 <label className="label">{editingUser ? 'New Password (leave blank to keep current)' : 'Initial Password'}</label>
                                 <input name="passwordHash" type="password" required={!editingUser} className="input-field" placeholder="••••••••" />
                             </div>
-                            <div className="flex gap-3 pt-2">
+                        </div>
+                        {/* Sticky footer */}
+                        <div className="p-5 border-t border-slate-100 flex gap-3 shrink-0">
                                 <button
                                     type="button"
                                     onClick={() => { setShowAddModal(false); setEditingUser(null); }}
@@ -417,7 +493,7 @@ const UserManagement = () => {
                                         : editingUser ? 'Update Account' : 'Create Account'
                                     }
                                 </button>
-                            </div>
+                        </div>
                         </form>
                     </div>
                 </div>

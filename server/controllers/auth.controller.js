@@ -38,7 +38,8 @@ exports.login = async (req, res) => {
                     email: user.email,
                     role: user.role,
                     department: user.department,
-                    employeeId: user.employeeId
+                    employeeId: user.employeeId,
+                    formAccess: user.formAccess
                 }
             });
         } else {

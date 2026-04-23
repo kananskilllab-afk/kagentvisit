@@ -6,7 +6,7 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 
 const FormConfig = require('./models/FormConfig');
 
-// ── B2B Form Fields (9 Steps) ─────────────────────────────────────────────────
+// ── B2B Form Fields (11 Steps) ────────────────────────────────────────────────
 const b2bFields = [
     // Step 1 – Visit Meta
     { id: 'meta.companyName', group: 'Visit Meta', label: 'Agent/Company Name', type: 'autocomplete-agent', required: true },
@@ -100,7 +100,47 @@ const b2bFields = [
     { id: 'support.painPoints', group: 'Support Needs', label: 'Agent Pain Points', type: 'richtext', required: true },
     { id: 'support.solutions', group: 'Support Needs', label: 'Solutions Provided', type: 'richtext', required: true },
 
-    // Step 10 – Final Summary
+    // Step 10 – Post In-Person Visit
+    { id: 'postInPerson.spocName', group: 'Post In-Person Visit', label: 'Name of SPOC/s', type: 'text', required: false },
+    { id: 'postInPerson.ownerName', group: 'Post In-Person Visit', label: 'Owner Name', type: 'text', required: false },
+    { id: 'postInPerson.whatsappNumber', group: 'Post In-Person Visit', label: 'Whatsapp Number', type: 'text', required: false },
+    { id: 'postInPerson.numPromoters', group: 'Post In-Person Visit', label: 'Number of Promoters', type: 'number', required: false },
+    { id: 'postInPerson.promoterInvolvement', group: 'Post In-Person Visit', label: 'Promoters Involvement in Business', type: 'dropdown', required: false, options: ['Extremely involved (daily)', 'Involved (weekly)', 'Somewhat involved (twice weekly)', 'Not very involved (less than weekly)'] },
+    { id: 'postInPerson.partnershipType', group: 'Post In-Person Visit', label: 'Type of Partnership', type: 'dropdown', required: false, options: ['Existing prepcom', 'Existing appcom', 'Existing prepcom+appcom', 'New partner'] },
+    { id: 'postInPerson.decisionMakerAvailable', group: 'Post In-Person Visit', label: 'Decision Maker Available', type: 'dropdown', required: false, options: ['Yes', 'No', 'Other'] },
+    { id: 'postInPerson.meetingPlanned', group: 'Post In-Person Visit', label: 'Meeting Planned', type: 'dropdown', required: false, options: ['Yes', 'No', 'Other'] },
+    { id: 'postInPerson.meetingDuration', group: 'Post In-Person Visit', label: 'Duration of Meeting (minutes)', type: 'number', required: false },
+    { id: 'postInPerson.otherPeopleDesignation', group: 'Post In-Person Visit', label: 'Other People Present - Designation', type: 'text', required: false },
+    { id: 'postInPerson.closureProbability', group: 'Post In-Person Visit', label: 'Probability of Closure', type: 'dropdown', required: false, options: ['0-25%', '25-50%', '50-75%', '75-100%'] },
+    { id: 'postInPerson.interestedInAdmissions', group: 'Post In-Person Visit', label: 'Interested in Admissions', type: 'dropdown', required: false, options: ['Yes', 'No'] },
+    { id: 'postInPerson.officeSize', group: 'Post In-Person Visit', label: 'Office Size', type: 'text', required: false },
+    { id: 'postInPerson.teamDistribution', group: 'Post In-Person Visit', label: 'Team Distribution', type: 'text', required: false },
+    { id: 'postInPerson.admissionPotential', group: 'Post In-Person Visit', label: 'Potential of Admission Business', type: 'dropdown', required: false, options: ['0-5 files/quarter', '5-30 files/quarter', '30-60 files/quarter', '60+ files/quarter'] },
+    { id: 'postInPerson.academyCoursesTaught', group: 'Post In-Person Visit', label: 'Academy Courses Taught', type: 'multi-select', required: false, options: ['IELTS', 'PTE', 'French', 'German', 'SAT', 'GRE', 'GMAT', 'Other'] },
+    { id: 'postInPerson.prepInquiryHandling', group: 'Post In-Person Visit', label: 'Handling of Prep Inquiries', type: 'text', required: false },
+    { id: 'postInPerson.teachingFormat', group: 'Post In-Person Visit', label: 'Teaching Format', type: 'dropdown', required: false, options: ['Online', 'Offline', 'Do not teach', 'Other'] },
+    { id: 'postInPerson.premises', group: 'Post In-Person Visit', label: 'Premises', type: 'dropdown', required: false, options: ['Owned', 'Rented', 'Both', 'Other'] },
+    { id: 'postInPerson.primaryBusinessStudyAbroad', group: 'Post In-Person Visit', label: 'Primary Business is Study Abroad', type: 'dropdown', required: false, options: ['Yes', 'No', 'Other'] },
+    { id: 'postInPerson.countriesPriorityRanking', group: 'Post In-Person Visit', label: 'Countries Promoted (Priority Ranking)', type: 'richtext', required: false },
+    { id: 'postInPerson.last3YearsVolume', group: 'Post In-Person Visit', label: 'Last 3 Years Volume (by Country)', type: 'richtext', required: false },
+    { id: 'postInPerson.offeringsDiscussed', group: 'Post In-Person Visit', label: 'Offerings Discussed', type: 'richtext', required: false },
+    { id: 'postInPerson.finalInterest', group: 'Post In-Person Visit', label: 'Finally Interested In', type: 'richtext', required: false },
+    { id: 'postInPerson.marketingStrategyRanking', group: 'Post In-Person Visit', label: 'Marketing Strategy (Priority Ranking)', type: 'richtext', required: false },
+    { id: 'postInPerson.marketingStrategyExplanation', group: 'Post In-Person Visit', label: 'Marketing Strategy Explanation', type: 'text', required: false },
+    { id: 'postInPerson.digitalMarketingBudget', group: 'Post In-Person Visit', label: 'Annual Digital Marketing Budget', type: 'number', required: false },
+    { id: 'postInPerson.offlineMarketingBudget', group: 'Post In-Person Visit', label: 'Annual Offline Marketing Budget', type: 'number', required: false },
+    { id: 'postInPerson.avgCostPerLead', group: 'Post In-Person Visit', label: 'Average Cost per Lead', type: 'number', required: false },
+    { id: 'postInPerson.conversionRatio', group: 'Post In-Person Visit', label: 'Average Conversion Ratio (per 100 leads)', type: 'text', required: false },
+    { id: 'postInPerson.leadMonitoringPractices', group: 'Post In-Person Visit', label: 'Lead Monitoring Practices', type: 'text', required: false },
+    { id: 'postInPerson.marketingMaterialsQuality', group: 'Post In-Person Visit', label: 'Quality of Marketing Materials', type: 'text', required: false },
+    { id: 'postInPerson.websiteDigitalManagement', group: 'Post In-Person Visit', label: 'Website / Digital Management', type: 'text', required: false },
+    { id: 'postInPerson.biggestIssueFaced', group: 'Post In-Person Visit', label: 'Biggest Issue Faced', type: 'text', required: false },
+    { id: 'postInPerson.otherIssuesFaced', group: 'Post In-Person Visit', label: 'Other Issues Faced', type: 'multi-select', required: false, options: ['Low lead volume', 'Low lead quality', 'High cost', 'Visa refusal', 'Technical knowledge gaps', 'Staff attrition', 'Coaching issues', 'Low revenue', 'Other'] },
+    { id: 'postInPerson.top5Issues', group: 'Post In-Person Visit', label: 'Top 5 Issues Faced', type: 'richtext', required: false },
+    { id: 'postInPerson.nextStepsMOM', group: 'Post In-Person Visit', label: 'Next Steps + MOM', type: 'richtext', required: false },
+    { id: 'postInPerson.nextFollowUpDate', group: 'Post In-Person Visit', label: 'Next Follow Up Date', type: 'date', required: false },
+
+    // Step 11 – Final Summary
     { id: 'postVisit.actionPoints', group: 'Final Summary', label: 'Action Points', type: 'richtext', required: true },
     { id: 'postVisit.remarks', group: 'Final Summary', label: 'Your Remarks', type: 'richtext', required: false }
 ];

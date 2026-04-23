@@ -183,6 +183,48 @@ const visitSchema = new mongoose.Schema({
         solutions:          { type: mongoose.Schema.Types.Mixed }
     },
 
+    // Post In-Person Visit Assessment
+    postInPerson: {
+        spocName:                    { type: String },
+        ownerName:                   { type: String },
+        whatsappNumber:              { type: String },
+        numPromoters:                { type: Number },
+        promoterInvolvement:         { type: String },
+        partnershipType:             { type: String },
+        decisionMakerAvailable:      { type: String },
+        meetingPlanned:              { type: String },
+        meetingDuration:             { type: Number },
+        otherPeopleDesignation:      { type: String },
+        closureProbability:          { type: String },
+        interestedInAdmissions:      { type: String },
+        officeSize:                  { type: String },
+        teamDistribution:            { type: String },
+        admissionPotential:          { type: String },
+        academyCoursesTaught:        [{ type: String }],
+        prepInquiryHandling:         { type: String },
+        teachingFormat:              { type: String },
+        premises:                    { type: String },
+        primaryBusinessStudyAbroad:  { type: String },
+        countriesPriorityRanking:    { type: String },
+        last3YearsVolume:            { type: String },
+        offeringsDiscussed:          { type: String },
+        finalInterest:               { type: String },
+        marketingStrategyRanking:    { type: String },
+        marketingStrategyExplanation:{ type: String },
+        digitalMarketingBudget:      { type: Number },
+        offlineMarketingBudget:      { type: Number },
+        avgCostPerLead:              { type: Number },
+        conversionRatio:             { type: String },
+        leadMonitoringPractices:     { type: String },
+        marketingMaterialsQuality:   { type: String },
+        websiteDigitalManagement:    { type: String },
+        biggestIssueFaced:           { type: String },
+        otherIssuesFaced:            [{ type: String }],
+        top5Issues:                  { type: String },
+        nextStepsMOM:                { type: String },
+        nextFollowUpDate:            { type: Date }
+    },
+
     // Step 11 – Summary
     postVisit: {
         actionPoints: { type: String },
