@@ -49,7 +49,14 @@ const postFieldDaySchema = new mongoose.Schema({
     demosBooked: { type: Number, default: 0 },
 
     confidenceLevel: { type: Number, min: 1, max: 5 },
-    keyFocusTomorrow: { type: String, trim: true }
+    keyFocusTomorrow: { type: String, trim: true },
+
+    // Admin comments
+    comments: [{
+        text:      { type: String, required: true, trim: true },
+        addedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        createdAt: { type: Date, default: Date.now }
+    }]
 }, { timestamps: true });
 
 postFieldDaySchema.index({ submittedBy: 1, date: -1 });

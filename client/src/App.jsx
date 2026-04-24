@@ -22,6 +22,8 @@ import Calendar from './pages/Calendar';
 import PostFieldDay from './pages/PostFieldDay';
 import DailyReport from './pages/DailyReport';
 import PostDemoFeedback from './pages/PostDemoFeedback';
+import FormsAdmin from './pages/FormsAdmin';
+import FormsHub from './pages/FormsHub';
 
 const ProtectedRoute = ({ children, roles, formAccess }) => {
     const { user } = useAuth();
@@ -99,6 +101,12 @@ function App() {
                     <Route path="post-demo-feedback" element={
                         <ProtectedRoute formAccess="post_demo_feedback">
                             <PostDemoFeedback />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="forms" element={<FormsHub />} />
+                    <Route path="forms-admin" element={
+                        <ProtectedRoute roles={['admin', 'superadmin']}>
+                            <FormsAdmin />
                         </ProtectedRoute>
                     } />
 

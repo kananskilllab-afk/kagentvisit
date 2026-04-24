@@ -291,7 +291,7 @@ const UserManagement = () => {
                                                     >
                                                         <Edit2 className="w-3.5 h-3.5" />
                                                     </button>
-                                                    {user.role === 'admin' && (
+                                                    {['admin', 'superadmin', 'accounts'].includes(user.role) && (
                                                         <button
                                                             onClick={() => openAssignModal(user)}
                                                             className="p-1.5 rounded-lg border border-brand-purple/20 text-brand-purple hover:bg-brand-purple/5 transition-all"
@@ -364,6 +364,11 @@ const UserManagement = () => {
                                         <button onClick={() => openEdit(user)} className="flex-1 py-2 rounded-xl border border-brand-blue/20 text-brand-blue text-xs font-bold hover:bg-brand-blue/5">
                                             Edit
                                         </button>
+                                        {['admin', 'superadmin', 'accounts'].includes(user.role) && (
+                                            <button onClick={() => openAssignModal(user)} className="flex-1 py-2 rounded-xl border border-brand-purple/20 text-brand-purple text-xs font-bold hover:bg-brand-purple/5">
+                                                Assign
+                                            </button>
+                                        )}
                                         <button onClick={() => toggleUserStatus(user)} className={`flex-1 py-2 rounded-xl border text-xs font-bold ${user.isActive ? 'border-brand-orange/20 text-brand-orange' : 'border-brand-green/20 text-brand-green'}`}>
                                             {user.isActive ? 'Deactivate' : 'Activate'}
                                         </button>
@@ -563,7 +568,6 @@ const UserManagement = () => {
                             {users
                                 .filter(u =>
                                     u._id !== assignModal._id &&
-                                    ['user', 'home_visit'].includes(u.role) &&
                                     u.isActive &&
                                     (!assignSearch || u.name?.toLowerCase().includes(assignSearch.toLowerCase()) || u.employeeId?.toLowerCase().includes(assignSearch.toLowerCase()))
                                 )
@@ -592,6 +596,9 @@ const UserManagement = () => {
                                                 <p className="text-sm font-bold text-slate-700 truncate">{emp.name}</p>
                                                 <p className="text-xs text-slate-400">{emp.employeeId} &middot; {emp.department || 'B2B'}</p>
                                             </div>
+                                            <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full border shrink-0 ${ROLE_BADGE[emp.role] || ROLE_BADGE.user}`}>
+                                                {emp.role === 'home_visit' ? 'user' : emp.role}
+                                            </span>
                                         </button>
                                     );
                                 })}

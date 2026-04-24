@@ -68,7 +68,14 @@ const postDemoFeedbackSchema = new mongoose.Schema({
     meetingRecordingLink:  { type: String, trim: true },
     nextFollowUpDate:      { type: Date },
     expectedClosureDate:   { type: Date },
-    additionalNotes:       { type: String, trim: true }
+    additionalNotes:       { type: String, trim: true },
+
+    // Admin comments
+    comments: [{
+        text:      { type: String, required: true, trim: true },
+        addedBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        createdAt: { type: Date, default: Date.now }
+    }]
 
 }, { timestamps: true });
 

@@ -5,7 +5,7 @@ import ErrorBoundary from './ErrorBoundary';
 import {
     LayoutDashboard, PlusCircle, Users, BarChart3,
     Settings, LogOut, Menu, X, User as UserIcon,
-    ChevronRight, List, Bell, Building2, Receipt, FileText, CalendarDays, ClipboardList, BookOpen, MessageSquare
+    ChevronRight, List, Building2, Receipt, FileText, CalendarDays, ClipboardList
 } from 'lucide-react';
 
 const SidebarLink = ({ icon: Icon, label, path, active, onClick }) => (
@@ -39,6 +39,60 @@ const RolePill = ({ role }) => {
     );
 };
 
+// Defined OUTSIDE Layout so its reference is stable — prevents unmount/remount on route change
+const Sidebar = ({ menuItems, isActive, user, logout, onClose }) => (
+    <div className="flex flex-col h-full bg-white/80 backdrop-blur-xl border-r border-slate-200/50">
+        {/* Logo */}
+        <div className="px-6 py-8 shrink-0">
+            <div className="flex items-center justify-between">
+                <img src="/logo.png" alt="Kanan" className="h-10 w-auto object-contain" />
+                {onClose && (
+                    <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100/50 text-slate-400 hover:text-slate-600 transition-all">
+                        <X className="w-5 h-5" />
+                    </button>
+                )}
+            </div>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 px-4 py-2 space-y-1.5 overflow-y-auto no-scrollbar">
+            <p className="px-4 mb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Navigation</p>
+            {menuItems.map(item => (
+                <SidebarLink
+                    key={item.path}
+                    {...item}
+                    active={isActive(item.path)}
+                    onClick={onClose}
+                />
+            ))}
+        </nav>
+
+        {/* User Footer */}
+        <div className="p-4 m-4 rounded-3xl bg-slate-50/50 border border-slate-100/60 backdrop-blur-sm space-y-2 shrink-0">
+            <Link
+                to="/profile"
+                onClick={onClose}
+                className="flex items-center gap-3 p-2 rounded-2xl hover:bg-white transition-all group"
+            >
+                <div className="w-10 h-10 rounded-xl bg-brand-blue/10 flex items-center justify-center text-brand-blue font-bold text-sm shrink-0 ring-2 ring-brand-blue/5">
+                    {user?.name?.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-slate-800 truncate">{user?.name}</p>
+                    <RolePill role={user?.role} />
+                </div>
+            </Link>
+            <button
+                onClick={logout}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 hover:text-red-600 transition-all"
+            >
+                <LogOut className="w-4 h-4" />
+                Sign Out
+            </button>
+        </div>
+    </div>
+);
+
 const Layout = () => {
     const { user, logout, isAdmin, isSuperAdmin } = useAuth();
     const location = useLocation();
@@ -55,102 +109,44 @@ const Layout = () => {
     };
 
     const menuItems = [
-        { label: 'Dashboard',    icon: LayoutDashboard, path: '/',         roles: ['user','admin','superadmin','home_visit','accounts','regional_bdm'] },
-        { label: 'Calendar',      icon: CalendarDays,   path: '/calendar',         roles: ['user','admin','superadmin','home_visit'] },
-        { label: 'Expenses',      icon: Receipt,        path: '/expenses',             roles: ['user','admin','superadmin','home_visit','accounts'] },
-        { label: 'Claims',        icon: FileText,       path: '/expenses/claims',      roles: ['user','admin','superadmin','home_visit','accounts'] },
-        { label: 'Expense Analytics', icon: BarChart3,  path: '/expenses/analytics',   roles: ['admin','superadmin','accounts'] },
+        { label: 'Dashboard',        icon: LayoutDashboard, path: '/',                      roles: ['user','admin','superadmin','home_visit','accounts','regional_bdm'] },
+        { label: 'Calendar',          icon: CalendarDays,    path: '/calendar',              roles: ['user','admin','superadmin','home_visit'] },
+        { label: 'Expenses',          icon: Receipt,         path: '/expenses',              roles: ['user','admin','superadmin','home_visit','accounts'] },
+        { label: 'Claims',            icon: FileText,        path: '/expenses/claims',       roles: ['user','admin','superadmin','home_visit','accounts'] },
+        { label: 'Expense Analytics', icon: BarChart3,       path: '/expenses/analytics',    roles: ['admin','superadmin','accounts'] },
         ...(isAdmin ? [
             ...(user.role === 'superadmin' || user.department === 'B2B' ? [
-                { label: 'B2B Visits',    icon: List, path: '/visits?formType=generic',     roles: ['admin','superadmin'] },
+                { label: 'B2B Visits',  icon: List, path: '/visits?formType=generic',    roles: ['admin','superadmin'] },
             ] : []),
             ...(user.role === 'superadmin' || isB2C ? [
-                { label: 'Home Visits',   icon: List, path: '/visits?formType=home_visit',  roles: ['admin','superadmin'] },
+                { label: 'Home Visits', icon: List, path: '/visits?formType=home_visit', roles: ['admin','superadmin'] },
             ] : []),
-            { label: 'Manage Agent',  icon: Building2,      path: '/agents',         roles: ['admin', 'superadmin'] },
-            { label: 'Post Field Day', icon: ClipboardList, path: '/post-field-day',  roles: ['admin', 'superadmin'] },
-            { label: 'Daily Report',       icon: BookOpen,       path: '/daily-report',       roles: ['admin', 'superadmin'] },
-            { label: 'Post-Demo Feedback', icon: MessageSquare,  path: '/post-demo-feedback', roles: ['admin', 'superadmin'] },
+            { label: 'Manage Agent',  icon: Building2,   path: '/agents',      roles: ['admin','superadmin'] },
+            { label: 'Form Reports',  icon: ClipboardList, path: '/forms-admin', roles: ['admin','superadmin'] },
         ] : isAccounts ? [] : [
             ...(!user?.formAccess?.length || hasFormAccess('b2b_visit') || hasFormAccess('b2c_visit') ? [
                 { label: 'New Visit',     icon: PlusCircle, path: '/new-visit', roles: ['user','home_visit','regional_bdm'] },
                 { label: 'Visit History', icon: List,       path: '/visits',    roles: ['user','home_visit','regional_bdm'] },
             ] : []),
-            ...(hasFormAccess('post_field_day') ? [
-                { label: 'Post Field Day', icon: ClipboardList, path: '/post-field-day', roles: ['user','home_visit','accounts','regional_bdm'] },
-            ] : []),
-            ...(hasFormAccess('daily_report') ? [
-                { label: 'Daily Report', icon: BookOpen, path: '/daily-report', roles: ['user','home_visit','accounts','regional_bdm'] },
-            ] : []),
-            ...(hasFormAccess('post_demo_feedback') ? [
-                { label: 'Post-Demo Feedback', icon: MessageSquare, path: '/post-demo-feedback', roles: ['user','home_visit','accounts','regional_bdm'] },
-            ] : []),
         ]),
-        { label: 'Analytics',     icon: BarChart3,      path: '/analytics',    roles: ['admin','superadmin'] },
-        { label: 'Users',         icon: Users,          path: '/users',        roles: ['superadmin'] },
-        { label: 'Form Builder',  icon: Settings,       path: '/form-builder', roles: ['superadmin'] },
+        { label: 'Forms',     icon: ClipboardList, path: '/forms',       roles: ['user','admin','superadmin','home_visit','accounts','regional_bdm'] },
+        { label: 'Analytics', icon: BarChart3,     path: '/analytics',   roles: ['admin','superadmin'] },
+        { label: 'Users',     icon: Users,         path: '/users',       roles: ['superadmin'] },
+        { label: 'Form Builder', icon: Settings,   path: '/form-builder', roles: ['superadmin'] },
     ].filter(item => item.roles.includes(user?.role));
-
-    const Sidebar = ({ onClose }) => (
-        <div className="flex flex-col h-full bg-white/80 backdrop-blur-xl border-r border-slate-200/50">
-            {/* Logo */}
-            <div className="px-6 py-8">
-                <div className="flex items-center justify-between">
-                    <img src="/logo.png" alt="Kanan" className="h-10 w-auto object-contain" />
-                    {onClose && (
-                        <button onClick={onClose} className="p-2 rounded-xl hover:bg-slate-100/50 text-slate-400 hover:text-slate-600 transition-all">
-                            <X className="w-5 h-5" />
-                        </button>
-                    )}
-                </div>
-            </div>
-
-            {/* Nav */}
-            <nav className="flex-1 px-4 py-2 space-y-1.5 overflow-y-auto no-scrollbar">
-                <p className="px-4 mb-4 text-[10px] font-bold uppercase tracking-widest text-slate-400">Navigation</p>
-                {menuItems.map(item => (
-                    <SidebarLink
-                        key={item.path}
-                        {...item}
-                        active={isActive(item.path)}
-                        onClick={onClose}
-                    />
-                ))}
-            </nav>
-
-            {/* User Footer */}
-            <div className="p-4 m-4 rounded-3xl bg-slate-50/50 border border-slate-100/60 backdrop-blur-sm space-y-2">
-                <Link
-                    to="/profile"
-                    onClick={onClose}
-                    className="flex items-center gap-3 p-2 rounded-2xl hover:bg-white transition-all group"
-                >
-                    <div className="w-10 h-10 rounded-xl bg-brand-blue/10 flex items-center justify-center text-brand-blue font-bold text-sm shrink-0 ring-2 ring-brand-blue/5">
-                        {user?.name?.charAt(0).toUpperCase()}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-sm font-bold text-slate-800 truncate">{user?.name}</p>
-                        <RolePill role={user?.role} />
-                    </div>
-                </Link>
-                <button
-                    onClick={logout}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-bold text-red-500 hover:bg-red-50 hover:text-red-600 transition-all"
-                >
-                    <LogOut className="w-4 h-4" />
-                    Sign Out
-                </button>
-            </div>
-        </div>
-    );
 
     return (
         <div className="min-h-screen flex bg-transparent">
 
-            {/* Desktop Sidebar - Detached floating effect */}
+            {/* Desktop Sidebar */}
             <aside className="hidden lg:flex w-72 flex-col fixed left-0 top-0 h-screen z-30 p-4">
                 <div className="h-full w-full rounded-[2rem] shadow-glass overflow-hidden">
-                    <Sidebar />
+                    <Sidebar
+                        menuItems={menuItems}
+                        isActive={isActive}
+                        user={user}
+                        logout={logout}
+                    />
                 </div>
             </aside>
 
@@ -164,7 +160,13 @@ const Layout = () => {
 
             {/* Mobile drawer */}
             <aside className={`lg:hidden fixed left-0 top-0 h-screen w-72 z-50 shadow-sidebar transform transition-transform duration-300 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-                <Sidebar onClose={() => setMobileOpen(false)} />
+                <Sidebar
+                    menuItems={menuItems}
+                    isActive={isActive}
+                    user={user}
+                    logout={logout}
+                    onClose={() => setMobileOpen(false)}
+                />
             </aside>
 
             {/* Mobile Topbar */}
