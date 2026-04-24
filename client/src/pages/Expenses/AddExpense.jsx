@@ -8,6 +8,8 @@ import {
     AlertTriangle, Info, ShieldCheck
 } from 'lucide-react';
 import ImageUpload from '../../components/shared/ImageUpload';
+import CityAutocomplete from '../../components/shared/CityAutocomplete';
+import { getCityTier } from '../../utils/indianCities';
 
 const CATEGORIES = [
     { value: 'flight',              label: 'Flight',             icon: Plane },
@@ -414,34 +416,38 @@ const AddExpense = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="space-y-3">
                             <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">From</p>
-                            <input
-                                type="text"
-                                className="input-field"
-                                placeholder="City"
-                                value={form.travelFrom.city}
-                                onChange={(e) => handleNestedChange('travelFrom', 'city', e.target.value)}
+                            <CityAutocomplete
+                                city={form.travelFrom.city}
+                                state={form.travelFrom.state}
+                                placeholder="City (type to search)"
+                                onSelect={(city, state) => {
+                                    const tier = (city && showCityTier) ? getCityTier(city) : null;
+                                    setForm(prev => ({ ...prev, travelFrom: { city, state }, ...(tier ? { cityTier: tier } : {}) }));
+                                }}
                             />
                             <input
                                 type="text"
                                 className="input-field"
-                                placeholder="State"
+                                placeholder="State (auto-detected)"
                                 value={form.travelFrom.state}
                                 onChange={(e) => handleNestedChange('travelFrom', 'state', e.target.value)}
                             />
                         </div>
                         <div className="space-y-3">
                             <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">To</p>
-                            <input
-                                type="text"
-                                className="input-field"
-                                placeholder="City"
-                                value={form.travelTo.city}
-                                onChange={(e) => handleNestedChange('travelTo', 'city', e.target.value)}
+                            <CityAutocomplete
+                                city={form.travelTo.city}
+                                state={form.travelTo.state}
+                                placeholder="City (type to search)"
+                                onSelect={(city, state) => {
+                                    const tier = (city && showCityTier) ? getCityTier(city) : null;
+                                    setForm(prev => ({ ...prev, travelTo: { city, state }, ...(tier ? { cityTier: tier } : {}) }));
+                                }}
                             />
                             <input
                                 type="text"
                                 className="input-field"
-                                placeholder="State"
+                                placeholder="State (auto-detected)"
                                 value={form.travelTo.state}
                                 onChange={(e) => handleNestedChange('travelTo', 'state', e.target.value)}
                             />

@@ -7,7 +7,7 @@ import {
     Clock, CheckCircle2, XCircle, AlertTriangle, Eye,
     Receipt, Banknote, ArrowLeft, Filter, SlidersHorizontal,
     ChevronDown, ChevronUp, ShieldCheck, ShieldAlert, ShieldX,
-    BarChart3
+    BarChart3, User as UserIcon, ChevronRight
 } from 'lucide-react';
 
 const STATUS_CFG = {
@@ -56,6 +56,63 @@ const DATE_PRESETS = [
     { label: 'Last 3 Months', getValue: () => { const now = new Date(); const d = new Date(now); d.setMonth(d.getMonth() - 3); return { start: d.toISOString().split('T')[0], end: now.toISOString().split('T')[0] }; } },
 ];
 
+function getInitials(name = '') {
+    return name.split(' ').filter(Boolean).slice(0, 2).map(n => n[0]).join('').toUpperCase() || '?';
+}
+
+const statusColors = {
+    draft: 'bg-slate-100 text-slate-500',
+    submitted: 'bg-orange-100 text-orange-600',
+    under_review: 'bg-blue-100 text-blue-600',
+    approved: 'bg-green-100 text-green-600',
+    rejected: 'bg-red-100 text-red-600',
+    needs_justification: 'bg-amber-100 text-amber-600',
+    paid: 'bg-emerald-100 text-emerald-600',
+};
+
+const UserClaimCard = ({ group, isSelected, onClick }) => {
+    const pendingCount = group.claims.filter(c => ['submitted', 'under_review'].includes(c.status)).length;
+    const justifCount = group.claims.filter(c => c.status === 'needs_justification').length;
+
+    return (
+        <button
+            onClick={onClick}
+            className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
+                isSelected
+                    ? 'border-brand-blue bg-brand-blue/5 shadow-sm'
+                    : 'border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm'
+            }`}
+        >
+            <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-sm shrink-0 ${
+                    isSelected ? 'bg-brand-blue text-white' : 'bg-slate-100 text-slate-600'
+                }`}>
+                    {getInitials(group.user.name)}
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="font-bold text-slate-800 text-sm truncate">{group.user.name}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                        <p className="text-xs text-slate-400">{group.claims.length} claim{group.claims.length !== 1 ? 's' : ''}</p>
+                        {pendingCount > 0 && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-orange-50 text-orange-600">{pendingCount} pending</span>
+                        )}
+                        {justifCount > 0 && (
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-600">{justifCount} needs justif.</span>
+                        )}
+                    </div>
+                </div>
+                <div className="text-right shrink-0">
+                    <p className={`font-extrabold text-sm flex items-center gap-0.5 ${isSelected ? 'text-brand-blue' : 'text-slate-800'}`}>
+                        <IndianRupee className="w-3 h-3" />
+                        {group.totalAmount.toLocaleString('en-IN')}
+                    </p>
+                </div>
+                <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${isSelected ? 'rotate-90 text-brand-blue' : 'text-slate-300'}`} />
+            </div>
+        </button>
+    );
+};
+
 const ClaimsList = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -65,6 +122,7 @@ const ClaimsList = () => {
     const [filterStatus, setFilterStatus] = useState('');
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [employees, setEmployees] = useState([]);
+    const [selectedUserId, setSelectedUserId] = useState(null);
     const [filters, setFilters] = useState({
         startDate: '',
         endDate: '',
@@ -107,6 +165,7 @@ const ClaimsList = () => {
     const clearFilters = () => {
         setFilters({ startDate: '', endDate: '', employee: '' });
         setFilterStatus('');
+        setSelectedUserId(null);
     };
 
     const sq = search.toLowerCase();
@@ -114,10 +173,11 @@ const ClaimsList = () => {
         (c.title || '').toLowerCase().includes(sq) ||
         (c.claimNumber || '').toLowerCase().includes(sq) ||
         (c.submittedBy?.name || '').toLowerCase().includes(sq) ||
-        (c.travelPurpose || '').toLowerCase().includes(sq)
+        (c.travelPurpose || '').toLowerCase().includes(sq) ||
+        (c.travelFrom?.city || '').toLowerCase().includes(sq) ||
+        (c.travelTo?.city || '').toLowerCase().includes(sq)
     );
 
-    // Client-side date filter (since backend doesn't filter claims by date range in this version)
     if (filters.startDate) {
         filtered = filtered.filter(c => new Date(c.createdAt) >= new Date(filters.startDate));
     }
@@ -128,6 +188,31 @@ const ClaimsList = () => {
     }
 
     const activeFilterCount = [filterStatus, filters.startDate, filters.employee].filter(Boolean).length;
+
+    // Group by user
+    const groupedByUser = Object.values(
+        filtered.reduce((acc, claim) => {
+            const uId = claim.submittedBy?._id || 'unassigned';
+            if (!acc[uId]) {
+                acc[uId] = {
+                    user: claim.submittedBy || { name: 'Unknown User', _id: 'unassigned' },
+                    claims: [],
+                    totalAmount: 0
+                };
+            }
+            acc[uId].claims.push(claim);
+            acc[uId].totalAmount += (claim.totalAmount || 0);
+            return acc;
+        }, {})
+    );
+
+    const displayedClaims = isPrivileged
+        ? (selectedUserId
+            ? filtered.filter(c => (c.submittedBy?._id || 'unassigned') === selectedUserId)
+            : filtered)
+        : filtered;
+
+    const selectedGroup = selectedUserId ? groupedByUser.find(g => (g.user._id || 'unassigned') === selectedUserId) : null;
 
     // Stats
     const stats = {
@@ -193,7 +278,7 @@ const ClaimsList = () => {
                 </div>
             </div>
 
-            {/* AI Audit Stats (admin only) */}
+            {/* AI Audit Stats */}
             {isPrivileged && stats.audited > 0 && (
                 <div className="card p-4 flex items-center gap-6 flex-wrap">
                     <div className="flex items-center gap-2">
@@ -221,7 +306,7 @@ const ClaimsList = () => {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                             type="text"
-                            placeholder="Search by title, number, or name..."
+                            placeholder="Search by title, number, name, city..."
                             className="input-field pl-10 h-10"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
@@ -261,7 +346,6 @@ const ClaimsList = () => {
                     )}
                 </div>
 
-                {/* Advanced Filters */}
                 {isPrivileged && showAdvancedFilters && (
                     <div className="border-t border-slate-100 pt-4 space-y-4 animate-fade-in">
                         <div>
@@ -313,48 +397,56 @@ const ClaimsList = () => {
                     <p className="text-sm text-slate-400 mt-1">Create your first expense claim</p>
                 </div>
             ) : isPrivileged ? (
-                // Grouped View for Admins
-                <div className="space-y-6">
-                    {Object.values(
-                        filtered.reduce((acc, claim) => {
-                            const uId = claim.submittedBy?._id || 'unassigned';
-                            if (!acc[uId]) {
-                                acc[uId] = {
-                                    user: claim.submittedBy || { name: 'Unknown User' },
-                                    claims: [],
-                                    totalAmount: 0
-                                };
-                            }
-                            acc[uId].claims.push(claim);
-                            acc[uId].totalAmount += (claim.totalAmount || 0);
-                            return acc;
-                        }, {})
-                    ).map(group => (
-                        <div key={group.user._id || 'unassigned'} className="space-y-3">
-                            {/* Group Header */}
-                            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                                <h3 className="font-extrabold text-slate-800 text-lg flex items-center gap-2">
-                                    {group.user.name}
+                <div className="space-y-5">
+                    {/* User Cards */}
+                    <div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                            <UserIcon className="w-3 h-3" /> Team Members
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {groupedByUser.map(group => (
+                                <UserClaimCard
+                                    key={group.user._id || 'unassigned'}
+                                    group={group}
+                                    isSelected={(group.user._id || 'unassigned') === selectedUserId}
+                                    onClick={() => setSelectedUserId(prev =>
+                                        prev === (group.user._id || 'unassigned') ? null : (group.user._id || 'unassigned')
+                                    )}
+                                />
+                            ))}
+                        </div>
+                        {selectedUserId && (
+                            <button
+                                onClick={() => setSelectedUserId(null)}
+                                className="mt-2 text-xs font-bold text-brand-blue hover:underline flex items-center gap-1"
+                            >
+                                <X className="w-3 h-3" /> Show all employees
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Claims for selected user or all */}
+                    <div className="space-y-2">
+                        {selectedGroup && (
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                                <h3 className="font-extrabold text-slate-800 flex items-center gap-2">
+                                    {selectedGroup.user.name}
                                     <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold">
-                                        {group.claims.length} claim{group.claims.length !== 1 ? 's' : ''}
+                                        {selectedGroup.claims.length} claim{selectedGroup.claims.length !== 1 ? 's' : ''}
                                     </span>
                                 </h3>
-                                <p className="font-extrabold text-slate-800 flex items-center gap-0.5">
+                                <p className="font-extrabold text-brand-blue flex items-center gap-0.5">
                                     <IndianRupee className="w-4 h-4" />
-                                    {group.totalAmount.toLocaleString('en-IN')}
+                                    {selectedGroup.totalAmount.toLocaleString('en-IN')}
                                 </p>
                             </div>
-                            {/* Group Items */}
-                            <div className="space-y-2 pl-2 sm:pl-4 border-l-2 border-slate-100">
-                                {group.claims.map(claim => (
-                                    <ClaimCard key={claim._id} claim={claim} isPrivileged={isPrivileged} />
-                                ))}
-                            </div>
-                        </div>
-                    ))}
+                        )}
+                        {displayedClaims.map(claim => (
+                            <ClaimCard key={claim._id} claim={claim} isPrivileged={isPrivileged} />
+                        ))}
+                    </div>
                 </div>
             ) : (
-                // Flat View for Standard Users
                 <div className="space-y-2">
                     {filtered.map(claim => (
                         <ClaimCard key={claim._id} claim={claim} isPrivileged={isPrivileged} />
@@ -365,7 +457,6 @@ const ClaimsList = () => {
     );
 };
 
-// Extracted ClaimCard component for reuse
 const ClaimCard = ({ claim, isPrivileged }) => (
     <Link
         to={`/expenses/claims/${claim._id}`}
@@ -388,7 +479,10 @@ const ClaimCard = ({ claim, isPrivileged }) => (
                 </div>
                 <div className="flex items-center gap-3 mt-1 text-xs text-slate-400 flex-wrap">
                     {isPrivileged && claim.submittedBy && (
-                        <span className="font-medium">{claim.submittedBy.name}</span>
+                        <span className="font-medium flex items-center gap-1">
+                            <UserIcon className="w-3 h-3" />
+                            {claim.submittedBy.name}
+                        </span>
                     )}
                     {claim.travelFrom?.city && claim.travelTo?.city && (
                         <span>{claim.travelFrom.city} → {claim.travelTo.city}</span>

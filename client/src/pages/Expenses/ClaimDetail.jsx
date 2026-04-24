@@ -190,16 +190,39 @@ const ClaimDetail = () => {
                 </div>
             </div>
 
+            {/* Needs Justification notice for owner */}
+            {isOwner && claim.status === 'needs_justification' && (
+                <div className="card p-4 bg-amber-50 border border-amber-200 space-y-3">
+                    <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-xl bg-amber-100">
+                            <AlertTriangle className="w-5 h-5 text-amber-600" />
+                        </div>
+                        <div>
+                            <p className="font-bold text-amber-800">Justification Required</p>
+                            <p className="text-xs text-amber-700 mt-0.5">Your claim has been returned. Please review the reviewer's message below and resubmit with justification.</p>
+                        </div>
+                    </div>
+                    {claim.statusHistory?.slice().reverse().find(h => h.status === 'needs_justification')?.comment && (
+                        <div className="p-3 rounded-xl bg-white border border-amber-200">
+                            <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-1">Reviewer's Message</p>
+                            <p className="text-sm text-slate-700 leading-relaxed">
+                                {claim.statusHistory.slice().reverse().find(h => h.status === 'needs_justification').comment}
+                            </p>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-2">
                 {isOwner && ['draft', 'needs_justification'].includes(claim.status) && (
                     <>
                         {claim.status === 'needs_justification' && (
                             <div className="w-full mb-2">
-                                <label className="label">Justification Note</label>
+                                <label className="label">Your Justification *</label>
                                 <textarea
-                                    className="input-field min-h-[60px]"
-                                    placeholder="Provide justification for your expenses..."
+                                    className="input-field min-h-[80px]"
+                                    placeholder="Address each point raised by the reviewer. e.g. 'The hotel receipt is attached. The food expense was a team lunch for 4 people — receipts attached.'"
                                     value={justification}
                                     onChange={(e) => setJustification(e.target.value)}
                                 />
@@ -574,6 +597,14 @@ const ClaimDetail = () => {
                                     <option value="paid">Paid</option>
                                 </select>
                             </div>
+
+                            {statusForm.status === 'needs_justification' && (
+                                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-700 flex items-start gap-2">
+                                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                                    <p>The claimant will be notified and asked to provide justification before resubmitting.</p>
+                                </div>
+                            )}
+
                             {statusForm.status === 'approved' && (
                                 <div>
                                     <label className="label">Approved Amount (INR)</label>
@@ -587,13 +618,29 @@ const ClaimDetail = () => {
                                 </div>
                             )}
                             <div>
-                                <label className="label">Comment</label>
+                                <label className="label">
+                                    {statusForm.status === 'needs_justification'
+                                        ? 'Message to Employee — explain what needs justification *'
+                                        : statusForm.status === 'rejected'
+                                        ? 'Reason for Rejection'
+                                        : 'Comment (visible to claimant)'}
+                                </label>
                                 <textarea
-                                    className="input-field min-h-[80px]"
-                                    placeholder="Add a comment (visible to the claimant)..."
+                                    className={`input-field min-h-[80px] ${statusForm.status === 'needs_justification' ? 'border-amber-300 focus:border-amber-500' : ''}`}
+                                    placeholder={
+                                        statusForm.status === 'needs_justification'
+                                            ? 'e.g. "Please provide receipt for the hotel stay on Apr 18. The food expense exceeds the daily ₹600 limit — clarify if it was a client meeting."'
+                                            : statusForm.status === 'rejected'
+                                            ? 'Explain why this claim is being rejected...'
+                                            : 'Add a comment visible to the claimant...'
+                                    }
                                     value={statusForm.comment}
                                     onChange={(e) => setStatusForm(prev => ({ ...prev, comment: e.target.value }))}
+                                    required={statusForm.status === 'needs_justification'}
                                 />
+                                {statusForm.status === 'needs_justification' && !statusForm.comment && (
+                                    <p className="text-xs text-amber-600 font-bold mt-1">Required — the employee needs to know what to address.</p>
+                                )}
                             </div>
                             <div className="flex gap-3 pt-2">
                                 <button type="button" onClick={() => setShowStatusModal(false)} className="flex-1 btn-outline py-3">

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, ChevronRight, ChevronLeft, Plus, Trash2, Loader2, MapPin, Users, Calendar, Check, Search } from 'lucide-react';
+import CityAutocomplete from './shared/CityAutocomplete';
+import { getCityTier } from '../utils/indianCities';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
@@ -279,14 +281,20 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1">City *</label>
-                                    <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Mumbai"
-                                        value={details.city} onChange={e => setDetails(d => ({ ...d, city: e.target.value }))} />
+                                    <CityAutocomplete
+                                        city={details.city}
+                                        state={details.state}
+                                        placeholder="Type to search city"
+                                        onSelect={(city, state) => {
+                                            const tier = city ? getCityTier(city) : null;
+                                            setDetails(d => ({ ...d, city, state: state || d.state, ...(tier ? { cityTier: tier } : {}) }));
+                                        }}
+                                    />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">State (auto-detected)</label>
                                     <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        placeholder="Maharashtra"
+                                        placeholder="Auto-filled on city select"
                                         value={details.state} onChange={e => setDetails(d => ({ ...d, state: e.target.value }))} />
                                 </div>
                             </div>

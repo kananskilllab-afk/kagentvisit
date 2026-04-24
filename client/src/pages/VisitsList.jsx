@@ -1,7 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
-import { FileText, Search, MapPin, Calendar, Building2, Trash2, Edit, PlusCircle, Filter, X, Lock, Bell, Eye } from 'lucide-react';
+import {
+    FileText, Search, MapPin, Calendar, Building2, Trash2, Edit, PlusCircle,
+    Filter, X, Lock, Bell, Eye, SlidersHorizontal, ChevronDown, ChevronUp,
+    User as UserIcon
+} from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import VisitDetailModal from '../components/VisitDetailModal';
 
@@ -12,6 +16,13 @@ const STATUS_CFG = {
     closed:          { label: 'Closed',            bg: 'bg-green-50',  text: 'text-brand-green',  dot: 'bg-brand-green',  ring: 'ring-brand-green/20'  },
     draft:           { label: 'Draft',             bg: 'bg-slate-50',  text: 'text-slate-500',    dot: 'bg-slate-400',    ring: 'ring-slate-200'       },
 };
+
+const DATE_PRESETS = [
+    { label: 'Today', getValue: () => { const d = new Date().toISOString().split('T')[0]; return { start: d, end: d }; } },
+    { label: 'This Week', getValue: () => { const now = new Date(); const d = new Date(now); d.setDate(d.getDate() - d.getDay()); return { start: d.toISOString().split('T')[0], end: now.toISOString().split('T')[0] }; } },
+    { label: 'This Month', getValue: () => { const now = new Date(); return { start: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`, end: now.toISOString().split('T')[0] }; } },
+    { label: 'Last 3 Months', getValue: () => { const now = new Date(); const d = new Date(now); d.setMonth(d.getMonth() - 3); return { start: d.toISOString().split('T')[0], end: now.toISOString().split('T')[0] }; } },
+];
 
 const StatusBadge = ({ status }) => {
     const cfg = STATUS_CFG[status] || STATUS_CFG.draft;
@@ -29,6 +40,8 @@ const VisitsList = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
+    const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+    const [employees, setEmployees] = useState([]);
     const [visitToDelete, setVisitToDelete] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [selectedVisit, setSelectedVisit] = useState(null);
@@ -36,22 +49,61 @@ const VisitsList = () => {
     const [searchParams] = useSearchParams();
     const urlFormType = searchParams.get('formType');
 
-    const isHomeVisit = urlFormType === 'home_visit' || user?.department === 'B2C' || user?.role === 'home_visit';
+    const [filters, setFilters] = useState({
+        startDate: '',
+        endDate: '',
+        city: '',
+        companyName: '',
+        submittedBy: '',
+    });
 
-    const fetchVisits = async () => {
+    const isHomeVisit = urlFormType === 'home_visit' || user?.department === 'B2C' || user?.role === 'home_visit';
+    const isPrivileged = ['admin', 'superadmin'].includes(user?.role);
+
+    const activeFilterCount = [statusFilter, filters.startDate, filters.city, filters.companyName, filters.submittedBy].filter(Boolean).length;
+
+    const fetchEmployees = async () => {
+        try {
+            const res = await api.get('/users');
+            setEmployees(res.data.data || res.data || []);
+        } catch (err) {
+            console.error('Failed to fetch employees', err);
+        }
+    };
+
+    const fetchVisits = useCallback(async () => {
         setLoading(true);
         try {
-            const query = urlFormType ? `?formType=${urlFormType}` : '';
-            const res = await api.get(`/visits${query}`);
+            const params = {};
+            if (urlFormType) params.formType = urlFormType;
+            if (statusFilter) params.status = statusFilter;
+            if (filters.startDate) params.startDate = filters.startDate;
+            if (filters.endDate) params.endDate = filters.endDate;
+            if (filters.city) params.city = filters.city;
+            if (filters.companyName) params.companyName = filters.companyName;
+            if (filters.submittedBy && isPrivileged) params.submittedBy = filters.submittedBy;
+            const res = await api.get('/visits', { params });
             setVisits(res.data.data || []);
         } catch (err) {
             console.error('Failed to fetch visits', err);
         } finally {
             setLoading(false);
         }
+    }, [urlFormType, statusFilter, filters]);
+
+    useEffect(() => { fetchVisits(); }, [fetchVisits]);
+    useEffect(() => { if (isPrivileged) fetchEmployees(); }, [isPrivileged]);
+
+    const applyPreset = (preset) => {
+        const { start, end } = preset.getValue();
+        setFilters(prev => ({ ...prev, startDate: start, endDate: end }));
     };
 
-    useEffect(() => { fetchVisits(); }, [urlFormType]);
+    const clearFilters = () => {
+        setFilters({ startDate: '', endDate: '', city: '', companyName: '', submittedBy: '' });
+        setStatusFilter('');
+        setSearchTerm('');
+    };
 
     const handleVisitUpdated = (updatedVisit) => {
         setVisits(prev => prev.map(v => v._id === updatedVisit._id ? { ...v, ...updatedVisit } : v));
@@ -87,27 +139,25 @@ const VisitsList = () => {
 
     const q = searchTerm.toLowerCase();
     const filteredVisits = visits.filter(visit => {
-        const matchesSearch = !q || (
+        if (!q) return true;
+        return (
             (visit?.meta?.companyName || '').toLowerCase().includes(q) ||
             (visit?.studentInfo?.name || '').toLowerCase().includes(q) ||
             (visit?.agencyProfile?.address || '').toLowerCase().includes(q) ||
             (visit?.location?.address || '').toLowerCase().includes(q) ||
+            (visit?.location?.city || '').toLowerCase().includes(q) ||
             (visit?.submittedBy?.name || '').toLowerCase().includes(q)
         );
-        const matchesStatus = !statusFilter || visit.status === statusFilter;
-        return matchesSearch && matchesStatus;
     });
-
-
 
     return (
         <div className="space-y-5 page-enter">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="page-title">{isHomeVisit ? 'Home Visits' : 'Visit Reports'}</h1>
+                    <h1 className="page-title">Visit History</h1>
                     <p className="page-subtitle">
-                        {filteredVisits.length} of {visits.length} {isHomeVisit ? 'home visits' : 'visit reports'}
+                        {filteredVisits.length} of {visits.length} {isHomeVisit ? 'home visits' : 'visit records'}
                     </p>
                 </div>
                 {(user.role === 'user' || user.role === 'home_visit') && (
@@ -122,13 +172,13 @@ const VisitsList = () => {
             </div>
 
             {/* Search + Filter Bar */}
-            <div className="glass p-4 rounded-3xl border border-white/60 shadow-glass">
+            <div className="glass p-4 rounded-3xl border border-white/60 shadow-glass space-y-3">
                 <div className="flex flex-col sm:flex-row gap-3">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                             type="text"
-                            placeholder={`Search ${isHomeVisit ? 'student, address' : 'agent/company, address'}...`}
+                            placeholder={`Search by name, company, location...`}
                             className="input-field pl-10 h-10"
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
@@ -154,7 +204,114 @@ const VisitsList = () => {
                             <option value="closed">Closed</option>
                         </select>
                     </div>
+                    <button
+                        onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                        className={`flex items-center gap-2 px-4 h-10 rounded-xl border-2 text-sm font-bold transition-all shrink-0 ${
+                            showAdvancedFilters || activeFilterCount > 0
+                                ? 'border-brand-blue text-brand-blue bg-brand-blue/5'
+                                : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                        }`}
+                    >
+                        <SlidersHorizontal className="w-4 h-4" />
+                        Filters
+                        {activeFilterCount > 0 && (
+                            <span className="w-5 h-5 rounded-full bg-brand-blue text-white text-[10px] flex items-center justify-center font-bold">{activeFilterCount}</span>
+                        )}
+                        {showAdvancedFilters ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
                 </div>
+
+                {/* Advanced Filters Panel */}
+                {showAdvancedFilters && (
+                    <div className="border-t border-white/60 pt-4 space-y-4 animate-fade-in">
+                        {/* Date Presets */}
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Quick Date</p>
+                            <div className="flex flex-wrap gap-2">
+                                {DATE_PRESETS.map(p => (
+                                    <button
+                                        key={p.label}
+                                        onClick={() => applyPreset(p)}
+                                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 hover:border-brand-blue hover:text-brand-blue hover:bg-brand-blue/5 transition-all"
+                                    >
+                                        {p.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">From Date</label>
+                                <input
+                                    type="date"
+                                    className="input-field h-9 mt-1"
+                                    value={filters.startDate}
+                                    onChange={e => setFilters(p => ({ ...p, startDate: e.target.value }))}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">To Date</label>
+                                <input
+                                    type="date"
+                                    className="input-field h-9 mt-1"
+                                    value={filters.endDate}
+                                    onChange={e => setFilters(p => ({ ...p, endDate: e.target.value }))}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                    {isHomeVisit ? 'Student Name' : 'Company Name'}
+                                </label>
+                                <input
+                                    type="text"
+                                    className="input-field h-9 mt-1"
+                                    placeholder={isHomeVisit ? 'Student name...' : 'Company name...'}
+                                    value={filters.companyName}
+                                    onChange={e => setFilters(p => ({ ...p, companyName: e.target.value }))}
+                                />
+                            </div>
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">City / Place</label>
+                                <input
+                                    type="text"
+                                    className="input-field h-9 mt-1"
+                                    placeholder="City or area..."
+                                    value={filters.city}
+                                    onChange={e => setFilters(p => ({ ...p, city: e.target.value }))}
+                                />
+                            </div>
+                        </div>
+
+                        {isPrivileged && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                                        <UserIcon className="w-3 h-3" /> Team Member
+                                    </label>
+                                    <select
+                                        className="input-field h-9 mt-1"
+                                        value={filters.submittedBy}
+                                        onChange={e => setFilters(p => ({ ...p, submittedBy: e.target.value }))}
+                                    >
+                                        <option value="">All Members</option>
+                                        {employees.map(emp => (
+                                            <option key={emp._id} value={emp._id}>
+                                                {emp.name}{emp.employeeId ? ` (${emp.employeeId})` : ''}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
+                        )}
+
+                        {activeFilterCount > 0 && (
+                            <button onClick={clearFilters} className="text-xs font-bold text-red-500 hover:text-red-700 transition-all">
+                                Clear All Filters
+                            </button>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Content */}
@@ -171,9 +328,9 @@ const VisitsList = () => {
                     </div>
                     <p className="font-bold text-slate-600 text-lg">No visits found</p>
                     <p className="text-sm text-slate-400 mt-1">
-                        {searchTerm || statusFilter ? 'Try adjusting your filters' : 'Start by creating a new visit report'}
+                        {searchTerm || activeFilterCount > 0 ? 'Try adjusting your filters' : 'Start by creating a new visit report'}
                     </p>
-                    {!searchTerm && !statusFilter && (user.role === 'user' || user.role === 'home_visit') && (
+                    {!searchTerm && activeFilterCount === 0 && (user.role === 'user' || user.role === 'home_visit') && (
                         <button onClick={() => navigate('/new-visit')} className="btn-primary mt-5">
                             Create First Report
                         </button>
@@ -190,6 +347,7 @@ const VisitsList = () => {
                                     <th className="th">Status</th>
                                     <th className="th">Location</th>
                                     <th className="th">Date</th>
+                                    {isPrivileged && <th className="th">Submitted By</th>}
                                     <th className="th text-right">Actions</th>
                                 </tr>
                             </thead>
@@ -218,9 +376,6 @@ const VisitsList = () => {
                                                             <Bell className="w-3 h-3 text-red-500 animate-bounce" title="Action Required By Admin" />
                                                         )}
                                                     </p>
-                                                    <p className="text-xs text-slate-400 truncate mt-0.5">
-                                                        By: {visit?.submittedBy?.name || user?.name}
-                                                    </p>
                                                 </div>
                                             </div>
                                         </td>
@@ -231,7 +386,7 @@ const VisitsList = () => {
                                             <div className="flex items-center gap-1.5 text-xs text-slate-500 max-w-[200px]">
                                                 <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                                                 <span className="truncate">
-                                                    {visit?.gpsLocation?.substring(0, 30) || visit?.location?.city || visit?.agencyProfile?.address?.substring(0, 30) || '—'}
+                                                    {visit?.location?.city || visit?.gpsLocation?.substring(0, 25) || visit?.agencyProfile?.address?.substring(0, 25) || '—'}
                                                 </span>
                                             </div>
                                         </td>
@@ -241,6 +396,14 @@ const VisitsList = () => {
                                                 {new Date(visit.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                             </div>
                                         </td>
+                                        {isPrivileged && (
+                                            <td className="td">
+                                                <div className="flex items-center gap-1.5 text-xs text-slate-500">
+                                                    <UserIcon className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                                                    <span className="truncate max-w-[120px]">{visit?.submittedBy?.name || '—'}</span>
+                                                </div>
+                                            </td>
+                                        )}
                                         <td className="td text-right" onClick={(e) => e.stopPropagation()}>
                                             <div className="flex justify-end gap-1.5">
                                                 <button
@@ -309,6 +472,12 @@ const VisitsList = () => {
                                                 <p className="text-xs text-slate-400">
                                                     {new Date(visit.createdAt).toLocaleDateString()}
                                                 </p>
+                                                {isPrivileged && visit?.submittedBy?.name && (
+                                                    <p className="text-xs text-slate-400 flex items-center gap-1">
+                                                        <UserIcon className="w-3 h-3" />
+                                                        {visit.submittedBy.name}
+                                                    </p>
+                                                )}
                                                 {isAdmin && visit.unlockRequestSent && (
                                                     <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-600 text-[8px] font-black uppercase">
                                                         Unlock Req
@@ -353,7 +522,7 @@ const VisitsList = () => {
                                     <div className="flex items-center gap-1 text-xs text-slate-400">
                                         <MapPin className="w-3 h-3" />
                                         <span className="truncate max-w-[140px]">
-                                            {visit?.gpsLocation?.substring(0, 25) || visit?.location?.city || visit?.agencyProfile?.address?.substring(0, 25) || 'No location'}
+                                            {visit?.location?.city || visit?.gpsLocation?.substring(0, 22) || visit?.agencyProfile?.address?.substring(0, 22) || 'No location'}
                                         </span>
                                     </div>
                                 </div>

@@ -11,7 +11,19 @@
       "Bash(vercel link:*)",
       "Bash(ls *.json)",
       "Bash(gh api:*)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(git pull *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(npx vercel *)",
+      "Bash(vercel *)",
+      "Bash(git push *)",
+      "Bash(VERCEL_TEAM_ID=team_2e0eFeUAioofn6XLPR2tofzl vercel link *)",
+      "Read(//c/Users/Kanan/.local/share/com.vercel.cli/**)",
+      "Read(//c/Users/Kanan/AppData/Roaming/com.vercel.cli/**)",
+      "Read(//c/Users/Kanan/AppData/Roaming//**)",
+      "Bash(curl -s -H \"Authorization: Bearer vca_0r0vHVVfGYIfAGZwjaElR4HjRwcCfvt6ql0al289WTL43CdrZB4ZxmkO\" \"https://api.vercel.com/v9/projects/kagentvisit?teamId=team_2e0eFeUAioofn6XLPR2tofzl\")",
+      "Bash(python -m json.tool)"
     ]
   }
 }

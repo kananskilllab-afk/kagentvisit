@@ -7,7 +7,8 @@ import {
     Plane, Train, Bus, Car, Hotel, UtensilsCrossed, Users,
     Wifi, ParkingCircle, Stamp, Package, PenLine,
     Loader2, Calendar, IndianRupee, FileText, ArrowRight,
-    ChevronDown, ChevronUp, BarChart3, SlidersHorizontal
+    ChevronDown, ChevronUp, BarChart3, SlidersHorizontal,
+    User as UserIcon, ChevronRight
 } from 'lucide-react';
 
 const CATEGORY_META = {
@@ -37,6 +38,40 @@ const DATE_PRESETS = [
     { label: 'This Quarter', getValue: () => { const now = new Date(); const qm = Math.floor(now.getMonth() / 3) * 3; return { start: `${now.getFullYear()}-${String(qm + 1).padStart(2, '0')}-01`, end: now.toISOString().split('T')[0] }; } },
 ];
 
+function getInitials(name = '') {
+    return name.split(' ').filter(Boolean).slice(0, 2).map(n => n[0]).join('').toUpperCase() || '?';
+}
+
+const UserCard = ({ group, isSelected, onClick }) => (
+    <button
+        onClick={onClick}
+        className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
+            isSelected
+                ? 'border-brand-blue bg-brand-blue/5 shadow-sm'
+                : 'border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm'
+        }`}
+    >
+        <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-extrabold text-sm shrink-0 ${
+                isSelected ? 'bg-brand-blue text-white' : 'bg-slate-100 text-slate-600'
+            }`}>
+                {getInitials(group.user.name)}
+            </div>
+            <div className="flex-1 min-w-0">
+                <p className="font-bold text-slate-800 text-sm truncate">{group.user.name}</p>
+                <p className="text-xs text-slate-400">{group.expenses.length} expense{group.expenses.length !== 1 ? 's' : ''}</p>
+            </div>
+            <div className="text-right shrink-0">
+                <p className={`font-extrabold text-sm flex items-center gap-0.5 ${isSelected ? 'text-brand-blue' : 'text-slate-800'}`}>
+                    <IndianRupee className="w-3 h-3" />
+                    {group.totalAmount.toLocaleString('en-IN')}
+                </p>
+            </div>
+            <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${isSelected ? 'rotate-90 text-brand-blue' : 'text-slate-300'}`} />
+        </div>
+    </button>
+);
+
 const ExpenseList = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
@@ -48,8 +83,8 @@ const ExpenseList = () => {
     const [deleting, setDeleting] = useState(false);
     const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
     const [employees, setEmployees] = useState([]);
+    const [selectedUserId, setSelectedUserId] = useState(null);
 
-    // Advanced filters
     const [filters, setFilters] = useState({
         startDate: '',
         endDate: '',
@@ -116,6 +151,7 @@ const ExpenseList = () => {
     const clearFilters = () => {
         setFilters({ startDate: '', endDate: '', minAmount: '', maxAmount: '', paymentMethod: '', employee: '', cityTier: '' });
         setFilterCategory('');
+        setSelectedUserId(null);
     };
 
     const activeFilterCount = [filterCategory, filters.startDate, filters.minAmount, filters.maxAmount, filters.paymentMethod, filters.employee, filters.cityTier].filter(Boolean).length;
@@ -125,18 +161,37 @@ const ExpenseList = () => {
         (e.description || '').toLowerCase().includes(sq) ||
         (e.vendor || '').toLowerCase().includes(sq) ||
         (e.category || '').toLowerCase().includes(sq) ||
-        (e.createdBy?.name || '').toLowerCase().includes(sq)
+        (e.createdBy?.name || '').toLowerCase().includes(sq) ||
+        (e.travelFrom?.city || '').toLowerCase().includes(sq) ||
+        (e.travelTo?.city || '').toLowerCase().includes(sq)
     );
 
     const totalAmount = filtered.reduce((sum, e) => sum + (e.amount || 0), 0);
 
-    // Category breakdown for admin stats
-    const catBreakdown = {};
-    filtered.forEach(e => {
-        if (!catBreakdown[e.category]) catBreakdown[e.category] = { count: 0, total: 0 };
-        catBreakdown[e.category].count++;
-        catBreakdown[e.category].total += e.amount || 0;
-    });
+    // Group by user
+    const groupedByUser = Object.values(
+        filtered.reduce((acc, expense) => {
+            const uId = expense.createdBy?._id || 'unassigned';
+            if (!acc[uId]) {
+                acc[uId] = {
+                    user: expense.createdBy || { name: 'Unknown User', _id: 'unassigned' },
+                    expenses: [],
+                    totalAmount: 0
+                };
+            }
+            acc[uId].expenses.push(expense);
+            acc[uId].totalAmount += (expense.amount || 0);
+            return acc;
+        }, {})
+    );
+
+    const displayedExpenses = isPrivileged
+        ? (selectedUserId
+            ? filtered.filter(e => (e.createdBy?._id || 'unassigned') === selectedUserId)
+            : filtered)
+        : filtered;
+
+    const selectedGroup = selectedUserId ? groupedByUser.find(g => (g.user._id || 'unassigned') === selectedUserId) : null;
 
     return (
         <div className="space-y-5 page-enter">
@@ -177,20 +232,8 @@ const ExpenseList = () => {
                 </div>
                 <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Count</p>
-                    <p className="text-2xl font-extrabold text-slate-800">{filtered.length}</p>
+                    <p className="text-2xl font-extrabold text-slate-800">{displayedExpenses.length}</p>
                 </div>
-                {isPrivileged && Object.keys(catBreakdown).length > 0 && (
-                    <div className="flex-1 flex flex-wrap gap-2">
-                        {Object.entries(catBreakdown).slice(0, 5).map(([cat, data]) => {
-                            const meta = CATEGORY_META[cat] || CATEGORY_META.other;
-                            return (
-                                <div key={cat} className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold ${meta.color}`}>
-                                    {meta.label}: ₹{data.total.toLocaleString('en-IN')} ({data.count})
-                                </div>
-                            );
-                        })}
-                    </div>
-                )}
             </div>
 
             {/* Search & Filter */}
@@ -200,7 +243,7 @@ const ExpenseList = () => {
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
                             type="text"
-                            placeholder="Search expenses..."
+                            placeholder="Search expenses, vendor, city..."
                             className="input-field pl-10 h-10"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
@@ -221,29 +264,26 @@ const ExpenseList = () => {
                             <option key={val} value={val}>{meta.label}</option>
                         ))}
                     </select>
-                    {isPrivileged && (
-                        <button
-                            onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                            className={`flex items-center gap-2 px-4 h-10 rounded-xl border-2 text-sm font-bold transition-all shrink-0 ${
-                                showAdvancedFilters || activeFilterCount > 0
-                                    ? 'border-brand-blue text-brand-blue bg-brand-blue/5'
-                                    : 'border-slate-200 text-slate-500 hover:border-slate-300'
-                            }`}
-                        >
-                            <SlidersHorizontal className="w-4 h-4" />
-                            Filters
-                            {activeFilterCount > 0 && (
-                                <span className="w-5 h-5 rounded-full bg-brand-blue text-white text-[10px] flex items-center justify-center font-bold">{activeFilterCount}</span>
-                            )}
-                            {showAdvancedFilters ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                        </button>
-                    )}
+                    <button
+                        onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                        className={`flex items-center gap-2 px-4 h-10 rounded-xl border-2 text-sm font-bold transition-all shrink-0 ${
+                            showAdvancedFilters || activeFilterCount > 0
+                                ? 'border-brand-blue text-brand-blue bg-brand-blue/5'
+                                : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                        }`}
+                    >
+                        <SlidersHorizontal className="w-4 h-4" />
+                        Filters
+                        {activeFilterCount > 0 && (
+                            <span className="w-5 h-5 rounded-full bg-brand-blue text-white text-[10px] flex items-center justify-center font-bold">{activeFilterCount}</span>
+                        )}
+                        {showAdvancedFilters ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                    </button>
                 </div>
 
                 {/* Advanced Filter Panel */}
-                {isPrivileged && showAdvancedFilters && (
+                {showAdvancedFilters && (
                     <div className="border-t border-slate-100 pt-4 space-y-4 animate-fade-in">
-                        {/* Date Presets */}
                         <div>
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Quick Date</p>
                             <div className="flex flex-wrap gap-2">
@@ -280,13 +320,15 @@ const ExpenseList = () => {
                                     {Object.entries(PAYMENT_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                                 </select>
                             </div>
-                            <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Employee</label>
-                                <select className="input-field h-9 mt-1" value={filters.employee} onChange={e => setFilters(p => ({ ...p, employee: e.target.value }))}>
-                                    <option value="">All Employees</option>
-                                    {employees.map(emp => <option key={emp._id} value={emp._id}>{emp.name} ({emp.employeeId})</option>)}
-                                </select>
-                            </div>
+                            {isPrivileged && (
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Employee</label>
+                                    <select className="input-field h-9 mt-1" value={filters.employee} onChange={e => setFilters(p => ({ ...p, employee: e.target.value }))}>
+                                        <option value="">All Employees</option>
+                                        {employees.map(emp => <option key={emp._id} value={emp._id}>{emp.name} ({emp.employeeId})</option>)}
+                                    </select>
+                                </div>
+                            )}
                             <div>
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">City Tier</label>
                                 <select className="input-field h-9 mt-1" value={filters.cityTier} onChange={e => setFilters(p => ({ ...p, cityTier: e.target.value }))}>
@@ -319,48 +361,56 @@ const ExpenseList = () => {
                     <p className="text-sm text-slate-400 mt-1">Add your first expense to get started</p>
                 </div>
             ) : isPrivileged ? (
-                // Grouped View for Admins
-                <div className="space-y-6">
-                    {Object.values(
-                        filtered.reduce((acc, expense) => {
-                            const uId = expense.createdBy?._id || 'unassigned';
-                            if (!acc[uId]) {
-                                acc[uId] = {
-                                    user: expense.createdBy || { name: 'Unknown User' },
-                                    expenses: [],
-                                    totalAmount: 0
-                                };
-                            }
-                            acc[uId].expenses.push(expense);
-                            acc[uId].totalAmount += (expense.amount || 0);
-                            return acc;
-                        }, {})
-                    ).map(group => (
-                        <div key={group.user._id || 'unassigned'} className="space-y-3">
-                            {/* Group Header */}
-                            <div className="flex items-center justify-between pb-2 border-b border-slate-200">
-                                <h3 className="font-extrabold text-slate-800 text-lg flex items-center gap-2">
-                                    {group.user.name}
+                <div className="space-y-5">
+                    {/* User Cards Grid */}
+                    <div>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                            <UserIcon className="w-3 h-3" /> Team Members
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            {groupedByUser.map(group => (
+                                <UserCard
+                                    key={group.user._id || 'unassigned'}
+                                    group={group}
+                                    isSelected={(group.user._id || 'unassigned') === selectedUserId}
+                                    onClick={() => setSelectedUserId(prev =>
+                                        prev === (group.user._id || 'unassigned') ? null : (group.user._id || 'unassigned')
+                                    )}
+                                />
+                            ))}
+                        </div>
+                        {selectedUserId && (
+                            <button
+                                onClick={() => setSelectedUserId(null)}
+                                className="mt-2 text-xs font-bold text-brand-blue hover:underline flex items-center gap-1"
+                            >
+                                <X className="w-3 h-3" /> Show all employees
+                            </button>
+                        )}
+                    </div>
+
+                    {/* Expenses for selected user or all */}
+                    <div className="space-y-2">
+                        {selectedGroup && (
+                            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                                <h3 className="font-extrabold text-slate-800 flex items-center gap-2">
+                                    {selectedGroup.user.name}
                                     <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-bold">
-                                        {group.expenses.length} expense{group.expenses.length !== 1 ? 's' : ''}
+                                        {selectedGroup.expenses.length} expense{selectedGroup.expenses.length !== 1 ? 's' : ''}
                                     </span>
                                 </h3>
-                                <p className="font-extrabold text-slate-800 flex items-center gap-0.5">
+                                <p className="font-extrabold text-brand-blue flex items-center gap-0.5">
                                     <IndianRupee className="w-4 h-4" />
-                                    {group.totalAmount.toLocaleString('en-IN')}
+                                    {selectedGroup.totalAmount.toLocaleString('en-IN')}
                                 </p>
                             </div>
-                            {/* Group Items */}
-                            <div className="space-y-2 pl-2 sm:pl-4 border-l-2 border-slate-100">
-                                {group.expenses.map(expense => (
-                                    <ExpenseCard key={expense._id} expense={expense} isPrivileged={isPrivileged} setDeleteTarget={setDeleteTarget} />
-                                ))}
-                            </div>
-                        </div>
-                    ))}
+                        )}
+                        {displayedExpenses.map(expense => (
+                            <ExpenseCard key={expense._id} expense={expense} isPrivileged={isPrivileged} setDeleteTarget={setDeleteTarget} />
+                        ))}
+                    </div>
                 </div>
             ) : (
-                // Flat View for Standard Users
                 <div className="space-y-2">
                     {filtered.map(expense => (
                         <ExpenseCard key={expense._id} expense={expense} isPrivileged={isPrivileged} setDeleteTarget={setDeleteTarget} />
@@ -398,12 +448,11 @@ const ExpenseList = () => {
     );
 };
 
-// Extracted ExpenseCard component for reuse
 const ExpenseCard = ({ expense, isPrivileged, setDeleteTarget }) => {
     const cat = CATEGORY_META[expense.category] || CATEGORY_META.other;
     const Icon = cat.icon;
     const isClaimed = !!expense.claimRef;
-    
+
     return (
         <div className="card p-4 hover:shadow-md transition-all">
             <div className="flex items-center gap-3">
