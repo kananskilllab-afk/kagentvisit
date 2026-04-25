@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     X, Building2, MapPin, Calendar, Clock, User, Star,
     CheckCircle, XCircle, FileText, MessageSquare, Briefcase, Users, BarChart3,
@@ -109,13 +109,37 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
     const [fuOutcomes, setFuOutcomes] = useState('');
     const [addingFollowUp, setAddingFollowUp] = useState(false);
 
+    const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
+    const autoTriggered = useRef(false);
+
+    // Auto-generate AI when modal opens for submitted visits without AI data
+    useEffect(() => {
+        if (!visit || visit.status === 'draft' || autoTriggered.current) return;
+        autoTriggered.current = true;
+
+        if (!visit.aiInsights) {
+            setGeneratingAI(true);
+            api.post(`/visits/${visit._id}/ai/insights`)
+                .then(res => { if (res.data?.success) setAiInsights(res.data.data); })
+                .catch(err => setAiError(err.response?.data?.message || 'AI generation failed.'))
+                .finally(() => setGeneratingAI(false));
+        }
+
+        if (!visit.adminAuditEval && isAdmin) {
+            setGeneratingAudit(true);
+            api.post(`/visits/${visit._id}/ai/audit`)
+                .then(res => { if (res.data?.success) setAdminAuditEval(res.data.data); })
+                .catch(err => setAuditError(err.response?.data?.message || 'Audit generation failed.'))
+                .finally(() => setGeneratingAudit(false));
+        }
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
     if (!visit) return null;
 
     const isB2C = visit.formType === 'home_visit';
     const cfg = STATUS_CFG[visit.status] || STATUS_CFG.draft;
     const title = visit?.studentInfo?.name || visit?.meta?.companyName || 'Visit Details';
     const isOwner = visit.submittedBy?._id === user?._id || visit.submittedBy === user?._id;
-    const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
 
     const handleGenerateInsights = async () => {
         if (!visit._id) return;
@@ -236,6 +260,192 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
 
                 {/* ── Body ────────────────────────────────────────── */}
                 <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+
+                    {/* ═══ AI Insights ═══ */}
+                    {visit.status !== 'draft' && (
+                    <div className="mb-5">
+                        <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                            {/* AI Header bar */}
+                            <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-5 py-3 flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                    <Sparkles className="w-4 h-4 text-amber-400" />
+                                    <span className="text-sm font-bold text-white">AI Analysis</span>
+                                    {totalMeetings > 1 && (
+                                        <span className="text-[10px] text-slate-300 bg-white/10 px-2 py-0.5 rounded-full">
+                                            Covers all {totalMeetings} visits
+                                        </span>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={handleGenerateInsights}
+                                    disabled={generatingAI}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-white/10 hover:bg-white/20 text-white transition-all disabled:opacity-50"
+                                >
+                                    {generatingAI ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
+                                    {generatingAI ? 'Analyzing...' : aiInsights ? 'Regenerate' : 'Generate Insights'}
+                                </button>
+                            </div>
+
+                            {/* AI Content */}
+                            {generatingAI && !aiInsights ? (
+                                <div className="p-6 flex flex-col items-center gap-3 bg-slate-50/50">
+                                    <Loader2 className="w-6 h-6 animate-spin text-slate-400" />
+                                    <p className="text-xs text-slate-500 font-medium">AI is analyzing this visit...</p>
+                                </div>
+                            ) : aiInsights ? (
+                                <div className="p-5 space-y-4 bg-slate-50/50">
+                                    <div>
+                                        <h4 className="text-[10px] font-black text-slate-500 mb-1.5 uppercase tracking-widest flex items-center gap-1.5">
+                                            <FileText className="w-3 h-3" /> Summary
+                                        </h4>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{aiInsights.summary}</p>
+                                    </div>
+                                    <div className="border-t border-slate-100 pt-4">
+                                        <h4 className="text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest flex items-center gap-1.5">
+                                            <MessageSquare className="w-3 h-3" /> Minutes of Meeting
+                                        </h4>
+                                        <ul className="space-y-1.5">
+                                            {aiInsights.bulletPoints?.map((bp, i) => (
+                                                <li key={i} className="text-sm text-slate-700 flex items-start gap-2">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-brand-blue mt-1.5 shrink-0" />
+                                                    {bp}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                    <div className="border-t border-slate-100 pt-4">
+                                        <h4 className="text-[10px] font-black text-slate-500 mb-1.5 uppercase tracking-widest flex items-center gap-1.5">
+                                            <Sparkles className="w-3 h-3" /> Suggestions & Next Steps
+                                        </h4>
+                                        <p className="text-sm text-slate-700 leading-relaxed">{aiInsights.suggestions}</p>
+                                    </div>
+                                    {aiInsights.generatedAt && (
+                                        <p className="text-[10px] text-slate-400 text-right pt-1">Generated {fmtDateTime(aiInsights.generatedAt)}</p>
+                                    )}
+                                </div>
+                            ) : (
+                                <div className="p-6 text-center bg-slate-50/50">
+                                    {aiError && (
+                                        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                            <p className="text-xs text-red-600 font-medium">{aiError}</p>
+                                        </div>
+                                    )}
+                                    <p className="text-xs text-slate-400">Click "Generate Insights" to get an AI-powered summary, meeting minutes, and suggestions{totalMeetings > 1 ? ' across all visits in this thread' : ''}.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                    )}
+
+                    {/* ═══ AI Audit (Admin Only) ═══ */}
+                    {isAdmin && visit.status !== 'draft' && (
+                        <div className="mb-5">
+                            <div className="rounded-2xl border border-red-200/60 overflow-hidden">
+                                {/* Audit Header */}
+                                <div className="bg-gradient-to-r from-red-800 to-red-700 px-5 py-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-2.5">
+                                        <ShieldAlert className="w-4 h-4 text-red-300" />
+                                        <span className="text-sm font-bold text-white">Audit Evaluation</span>
+                                    </div>
+                                    <button
+                                        onClick={handleGenerateAudit}
+                                        disabled={generatingAudit}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-white/10 hover:bg-white/20 text-white transition-all disabled:opacity-50"
+                                    >
+                                        {generatingAudit ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldAlert className="w-3 h-3" />}
+                                        {generatingAudit ? 'Evaluating...' : adminAuditEval ? 'Re-evaluate' : 'Run Audit'}
+                                    </button>
+                                </div>
+
+                                {/* Audit Content */}
+                                {generatingAudit && !adminAuditEval ? (
+                                    <div className="p-6 flex flex-col items-center gap-3 bg-red-50/30">
+                                        <Loader2 className="w-6 h-6 animate-spin text-red-300" />
+                                        <p className="text-xs text-slate-500 font-medium">Running audit evaluation...</p>
+                                    </div>
+                                ) : adminAuditEval ? (
+                                    <div className="p-5 space-y-4 bg-red-50/30">
+                                        {/* Verdict + Score */}
+                                        <div className="flex items-center gap-3 flex-wrap">
+                                            <div className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shrink-0 ${
+                                                adminAuditEval.status === 'successful' ? 'bg-green-100 text-green-700' :
+                                                adminAuditEval.status === 'failed' ? 'bg-red-100 text-red-700' :
+                                                'bg-amber-100 text-amber-700'
+                                            }`}>
+                                                {adminAuditEval.status === 'successful' ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
+                                                {adminAuditEval.status?.replace('_', ' ')}
+                                            </div>
+                                            {adminAuditEval.score && (
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-24 h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                                                        <div
+                                                            className={`h-full rounded-full transition-all ${
+                                                                adminAuditEval.score >= 7 ? 'bg-green-500' :
+                                                                adminAuditEval.score >= 4 ? 'bg-amber-500' : 'bg-red-500'
+                                                            }`}
+                                                            style={{ width: `${adminAuditEval.score * 10}%` }}
+                                                        />
+                                                    </div>
+                                                    <span className={`text-sm font-extrabold ${
+                                                        adminAuditEval.score >= 7 ? 'text-green-600' :
+                                                        adminAuditEval.score >= 4 ? 'text-amber-600' : 'text-red-600'
+                                                    }`}>{adminAuditEval.score}/10</span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Assessment */}
+                                        <p className="text-sm text-slate-700 leading-relaxed">{adminAuditEval.reasoning}</p>
+
+                                        {/* Strengths & Weaknesses */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            {adminAuditEval.strengths?.length > 0 && (
+                                                <div className="p-3 bg-green-50 rounded-xl border border-green-100">
+                                                    <h4 className="text-[10px] font-black text-green-700 mb-2 uppercase tracking-wide flex items-center gap-1.5">
+                                                        <CheckCircle className="w-3 h-3" /> Strengths
+                                                    </h4>
+                                                    <ul className="space-y-1">
+                                                        {adminAuditEval.strengths.map((s, i) => (
+                                                            <li key={i} className="text-[11px] text-green-800 leading-snug flex items-start gap-1.5">
+                                                                <span className="text-green-400 mt-0.5 shrink-0">+</span> {s}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                            {adminAuditEval.weaknesses?.length > 0 && (
+                                                <div className="p-3 bg-red-50 rounded-xl border border-red-100">
+                                                    <h4 className="text-[10px] font-black text-red-700 mb-2 uppercase tracking-wide flex items-center gap-1.5">
+                                                        <AlertCircle className="w-3 h-3" /> Weaknesses
+                                                    </h4>
+                                                    <ul className="space-y-1">
+                                                        {adminAuditEval.weaknesses.map((w, i) => (
+                                                            <li key={i} className="text-[11px] text-red-800 leading-snug flex items-start gap-1.5">
+                                                                <span className="text-red-400 mt-0.5 shrink-0">-</span> {w}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {adminAuditEval.evaluatedAt && (
+                                            <p className="text-[10px] text-slate-400 text-right pt-1">Evaluated {fmtDateTime(adminAuditEval.evaluatedAt)}</p>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="p-6 text-center bg-red-50/30">
+                                        {auditError && (
+                                            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+                                                <p className="text-xs text-red-600 font-medium">{auditError}</p>
+                                            </div>
+                                        )}
+                                        <p className="text-xs text-slate-400">Click "Run Audit" for an honest evaluation of this visit's quality and completeness.</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
 
                     {/* ---------- B2B Sections ---------- */}
                     {!isB2C && (
@@ -545,179 +755,6 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
                         )}
                     </div>
 
-                    {/* ═══ AI Insights ═══ */}
-                    <div className="mb-5">
-                        <div className="rounded-2xl border border-slate-200 overflow-hidden">
-                            {/* AI Header bar */}
-                            <div className="bg-gradient-to-r from-slate-800 to-slate-700 px-5 py-3 flex items-center justify-between">
-                                <div className="flex items-center gap-2.5">
-                                    <Sparkles className="w-4 h-4 text-amber-400" />
-                                    <span className="text-sm font-bold text-white">AI Analysis</span>
-                                    {totalMeetings > 1 && (
-                                        <span className="text-[10px] text-slate-300 bg-white/10 px-2 py-0.5 rounded-full">
-                                            Covers all {totalMeetings} visits
-                                        </span>
-                                    )}
-                                </div>
-                                <button
-                                    onClick={handleGenerateInsights}
-                                    disabled={generatingAI}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-white/10 hover:bg-white/20 text-white transition-all disabled:opacity-50"
-                                >
-                                    {generatingAI ? <Loader2 className="w-3 h-3 animate-spin" /> : <Wand2 className="w-3 h-3" />}
-                                    {generatingAI ? 'Analyzing...' : 'Generate Insights'}
-                                </button>
-                            </div>
-
-                            {/* AI Content */}
-                            {aiInsights ? (
-                                <div className="p-5 space-y-4 bg-slate-50/50">
-                                    <div>
-                                        <h4 className="text-[10px] font-black text-slate-500 mb-1.5 uppercase tracking-widest flex items-center gap-1.5">
-                                            <FileText className="w-3 h-3" /> Summary
-                                        </h4>
-                                        <p className="text-sm text-slate-700 leading-relaxed">{aiInsights.summary}</p>
-                                    </div>
-                                    <div className="border-t border-slate-100 pt-4">
-                                        <h4 className="text-[10px] font-black text-slate-500 mb-2 uppercase tracking-widest flex items-center gap-1.5">
-                                            <MessageSquare className="w-3 h-3" /> Minutes of Meeting
-                                        </h4>
-                                        <ul className="space-y-1.5">
-                                            {aiInsights.bulletPoints?.map((bp, i) => (
-                                                <li key={i} className="text-sm text-slate-700 flex items-start gap-2">
-                                                    <span className="w-1.5 h-1.5 rounded-full bg-brand-blue mt-1.5 shrink-0" />
-                                                    {bp}
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    </div>
-                                    <div className="border-t border-slate-100 pt-4">
-                                        <h4 className="text-[10px] font-black text-slate-500 mb-1.5 uppercase tracking-widest flex items-center gap-1.5">
-                                            <Sparkles className="w-3 h-3" /> Suggestions & Next Steps
-                                        </h4>
-                                        <p className="text-sm text-slate-700 leading-relaxed">{aiInsights.suggestions}</p>
-                                    </div>
-                                    {aiInsights.generatedAt && (
-                                        <p className="text-[10px] text-slate-400 text-right pt-1">Generated {fmtDateTime(aiInsights.generatedAt)}</p>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="p-6 text-center bg-slate-50/50">
-                                    {aiError && (
-                                        <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                                            <p className="text-xs text-red-600 font-medium">{aiError}</p>
-                                        </div>
-                                    )}
-                                    <p className="text-xs text-slate-400">Click "Generate Insights" to get an AI-powered summary, meeting minutes, and suggestions{totalMeetings > 1 ? ' across all visits in this thread' : ''}.</p>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* ═══ AI Audit (Admin Only) ═══ */}
-                    {isAdmin && (
-                        <div className="mb-5">
-                            <div className="rounded-2xl border border-red-200/60 overflow-hidden">
-                                {/* Audit Header */}
-                                <div className="bg-gradient-to-r from-red-800 to-red-700 px-5 py-3 flex items-center justify-between">
-                                    <div className="flex items-center gap-2.5">
-                                        <ShieldAlert className="w-4 h-4 text-red-300" />
-                                        <span className="text-sm font-bold text-white">Audit Evaluation</span>
-                                    </div>
-                                    <button
-                                        onClick={handleGenerateAudit}
-                                        disabled={generatingAudit}
-                                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold bg-white/10 hover:bg-white/20 text-white transition-all disabled:opacity-50"
-                                    >
-                                        {generatingAudit ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShieldAlert className="w-3 h-3" />}
-                                        {generatingAudit ? 'Evaluating...' : 'Run Audit'}
-                                    </button>
-                                </div>
-
-                                {/* Audit Content */}
-                                {adminAuditEval ? (
-                                    <div className="p-5 space-y-4 bg-red-50/30">
-                                        {/* Verdict + Score */}
-                                        <div className="flex items-center gap-3 flex-wrap">
-                                            <div className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 shrink-0 ${
-                                                adminAuditEval.status === 'successful' ? 'bg-green-100 text-green-700' :
-                                                adminAuditEval.status === 'failed' ? 'bg-red-100 text-red-700' :
-                                                'bg-amber-100 text-amber-700'
-                                            }`}>
-                                                {adminAuditEval.status === 'successful' ? <CheckCircle className="w-3.5 h-3.5" /> : <AlertCircle className="w-3.5 h-3.5" />}
-                                                {adminAuditEval.status?.replace('_', ' ')}
-                                            </div>
-                                            {adminAuditEval.score && (
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-24 h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                                                        <div
-                                                            className={`h-full rounded-full transition-all ${
-                                                                adminAuditEval.score >= 7 ? 'bg-green-500' :
-                                                                adminAuditEval.score >= 4 ? 'bg-amber-500' : 'bg-red-500'
-                                                            }`}
-                                                            style={{ width: `${adminAuditEval.score * 10}%` }}
-                                                        />
-                                                    </div>
-                                                    <span className={`text-sm font-extrabold ${
-                                                        adminAuditEval.score >= 7 ? 'text-green-600' :
-                                                        adminAuditEval.score >= 4 ? 'text-amber-600' : 'text-red-600'
-                                                    }`}>{adminAuditEval.score}/10</span>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {/* Assessment */}
-                                        <p className="text-sm text-slate-700 leading-relaxed">{adminAuditEval.reasoning}</p>
-
-                                        {/* Strengths & Weaknesses */}
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                            {adminAuditEval.strengths?.length > 0 && (
-                                                <div className="p-3 bg-green-50 rounded-xl border border-green-100">
-                                                    <h4 className="text-[10px] font-black text-green-700 mb-2 uppercase tracking-wide flex items-center gap-1.5">
-                                                        <CheckCircle className="w-3 h-3" /> Strengths
-                                                    </h4>
-                                                    <ul className="space-y-1">
-                                                        {adminAuditEval.strengths.map((s, i) => (
-                                                            <li key={i} className="text-[11px] text-green-800 leading-snug flex items-start gap-1.5">
-                                                                <span className="text-green-400 mt-0.5 shrink-0">+</span> {s}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                            {adminAuditEval.weaknesses?.length > 0 && (
-                                                <div className="p-3 bg-red-50 rounded-xl border border-red-100">
-                                                    <h4 className="text-[10px] font-black text-red-700 mb-2 uppercase tracking-wide flex items-center gap-1.5">
-                                                        <AlertCircle className="w-3 h-3" /> Weaknesses
-                                                    </h4>
-                                                    <ul className="space-y-1">
-                                                        {adminAuditEval.weaknesses.map((w, i) => (
-                                                            <li key={i} className="text-[11px] text-red-800 leading-snug flex items-start gap-1.5">
-                                                                <span className="text-red-400 mt-0.5 shrink-0">-</span> {w}
-                                                            </li>
-                                                        ))}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        {adminAuditEval.evaluatedAt && (
-                                            <p className="text-[10px] text-slate-400 text-right pt-1">Evaluated {fmtDateTime(adminAuditEval.evaluatedAt)}</p>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="p-6 text-center bg-red-50/30">
-                                        {auditError && (
-                                            <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
-                                                <p className="text-xs text-red-600 font-medium">{auditError}</p>
-                                            </div>
-                                        )}
-                                        <p className="text-xs text-slate-400">Click "Run Audit" for an honest evaluation of this visit's quality and completeness.</p>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
                 </div>
 
                 {/* ── Footer ──────────────────────────────────────── */}

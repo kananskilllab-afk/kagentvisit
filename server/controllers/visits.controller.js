@@ -1,5 +1,34 @@
 const Visit = require('../models/Visit');
 const Agent = require('../models/Agent');
+const aiService = require('../services/ai.service');
+
+// Fire-and-forget: generate both AI insights + audit and save to MongoDB
+const triggerBackgroundAI = (visitId) => {
+    (async () => {
+        try {
+            const v = await Visit.findById(visitId);
+            if (!v) return;
+            const visitData = v.toObject();
+            const [insightsResult, auditResult] = await Promise.allSettled([
+                aiService.generateVisitInsights(visitData),
+                aiService.evaluateAdminAudit(visitData)
+            ]);
+            const updateFields = {};
+            if (insightsResult.status === 'fulfilled') {
+                updateFields.aiInsights = { ...insightsResult.value, generatedAt: new Date() };
+            }
+            if (auditResult.status === 'fulfilled') {
+                updateFields.adminAuditEval = { ...auditResult.value, evaluatedAt: new Date() };
+            }
+            if (Object.keys(updateFields).length > 0) {
+                await Visit.findByIdAndUpdate(visitId, updateFields);
+            }
+            console.log(`[AI] Background generation complete for visit ${visitId}`);
+        } catch (e) {
+            console.error(`[AI] Background generation failed for visit ${visitId}:`, e.message);
+        }
+    })();
+};
 
 // @desc    Get all visits (User: own, Admin+: all)
 exports.getVisits = async (req, res) => {
@@ -108,6 +137,11 @@ exports.createVisit = async (req, res) => {
             });
         }
 
+        // Auto-generate AI analysis in background (non-blocking)
+        if (visit.status !== 'draft') {
+            triggerBackgroundAI(visit._id);
+        }
+
         res.status(201).json({ success: true, data: visit });
     } catch (error) {
         res.status(400).json({ success: false, message: error.message });
@@ -183,6 +217,10 @@ exports.updateVisit = async (req, res) => {
             }
         }
 
+        // Determine effective status after this update
+        const effectiveNewStatus = req.body.status || visit.status;
+        const shouldRegenerateAI = effectiveNewStatus !== 'draft';
+
         // Prepare update data
         let updateData = { ...req.body };
 
@@ -202,6 +240,11 @@ exports.updateVisit = async (req, res) => {
         // Set submittedAt when transitioning from draft to submitted
         if (visit.status === 'draft' && updateData.status === 'submitted' && !visit.submittedAt) {
             updateData.submittedAt = new Date();
+        }
+
+        // Clear stale AI data so frontend knows to refresh after edit
+        if (shouldRegenerateAI) {
+            updateData.$unset = { aiInsights: '', adminAuditEval: '' };
         }
 
         // Record history
@@ -247,6 +290,11 @@ exports.updateVisit = async (req, res) => {
                     $inc: { visitCount: -1 }
                 });
             }
+        }
+
+        // Regenerate AI in background for non-draft visits
+        if (shouldRegenerateAI) {
+            triggerBackgroundAI(req.params.id);
         }
 
         res.json({ success: true, data: updatedVisit });
