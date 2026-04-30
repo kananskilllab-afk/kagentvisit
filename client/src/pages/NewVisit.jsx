@@ -2,13 +2,13 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import axios from 'axios';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import api from '../utils/api';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import StepIndicator from '../components/SurveyForm/StepIndicator';
 import DynamicField from '../components/FormBuilder/DynamicField';
-import { Save, ChevronLeft, ChevronRight, CheckCircle, Info, Loader2, MapPin, AlertCircle, Bell, ShieldAlert, FileText } from 'lucide-react';
+import { buildVisitFormSchema, describeFormError } from '../utils/visitFormValidation';
+import { Save, ChevronLeft, ChevronRight, CheckCircle, Info, Loader2, MapPin, AlertCircle, Bell, ShieldAlert, FileText, User as UserIcon } from 'lucide-react';
 
 const NewVisit = () => {
     const [currentStep, setCurrentStep] = useState(0);
@@ -33,6 +33,9 @@ const NewVisit = () => {
     const [submittedAt, setSubmittedAt] = useState(null);
     const [visitStatus, setVisitStatus] = useState('draft');
     const [adminNotes, setAdminNotes] = useState([]);
+    const [forUser, setForUser] = useState('');
+    const [assignableUsers, setAssignableUsers] = useState([]);
+    const [validationNotice, setValidationNotice] = useState(null);
 
     // --- Draft logic helpers ---
     const isDraft = visitStatus === 'draft';
@@ -76,159 +79,9 @@ const NewVisit = () => {
 
     const urlFormType = searchParams.get('formType');
 
-    const schema = useMemo(() => {
-        if (!config || !config.fields) return z.object({});
-        const shape = {};
-        config.fields.forEach(field => {
-            let fieldSchema;
-            switch (field.type) {
-                case 'number':
-                case 'star-rating':
-                    fieldSchema = z.preprocess((val) => {
-                        if (val === '' || val === undefined || val === null || isNaN(Number(val))) return undefined;
-                        return Number(val);
-                    }, field.required ? z.number({ invalid_type_error: `${field.label} must be a number` }).min(0) : z.number().optional());
+    const schema = useMemo(() => buildVisitFormSchema(config), [config]);
 
-                    if (field.required) {
-                        fieldSchema = fieldSchema.refine(val => val !== undefined, { message: `${field.label} is required` });
-                    }
-                    break;
-                case 'toggle':
-                    fieldSchema = z.boolean().default(false);
-                    break;
-                case 'multi-select':
-                    fieldSchema = z.array(z.string());
-                    if (field.required) fieldSchema = fieldSchema.min(1, `Select at least one ${field.label}`);
-                    break;
-                case 'textarea':
-                    fieldSchema = z.string();
-                    if (field.required) fieldSchema = fieldSchema.min(10, `${field.label} must be at least 10 characters`);
-                    else fieldSchema = fieldSchema.optional().or(z.literal(''));
-                    break;
-                case 'date':
-                case 'datetime':
-                    fieldSchema = z.string();
-                    if (field.required) fieldSchema = fieldSchema.min(1, `${field.label} is required`);
-                    else fieldSchema = fieldSchema.optional().or(z.literal(''));
-                    break;
-                case 'photo-upload':
-                    fieldSchema = z.string().optional().or(z.literal(''));
-                    break;
-                case 'dynamic-list':
-                    fieldSchema = z.array(z.string());
-                    if (field.required) {
-                        fieldSchema = fieldSchema.min(1, `${field.label} requires at least one entry`).refine(arr => arr.some(v => v.trim() !== ''), { message: `${field.label} cannot be entirely empty` });
-                    } else {
-                        fieldSchema = fieldSchema.optional();
-                    }
-                    break;
-                case 'dynamic-contacts':
-                    const contactObjSchema = z.object({
-                        name: z.string().optional().or(z.literal('')),
-                        designation: z.string().optional().or(z.literal('')),
-                        number: z.string().optional().or(z.literal(''))
-                    });
-                    fieldSchema = z.array(contactObjSchema);
-                    if (field.required) {
-                        fieldSchema = fieldSchema.min(1, `${field.label} requires at least one entry`).refine(arr => arr.some(v => v.name || v.designation || v.number), { message: `At least one contact must have some details entered` });
-                    } else {
-                        fieldSchema = fieldSchema.optional();
-                    }
-                    break;
-                case 'office-area-combo':
-                    fieldSchema = z.string().optional().or(z.literal(''));
-                    if (field.required) fieldSchema = z.string().min(1, `${field.label} is required`);
-                    break;
-                default:
-                    fieldSchema = z.string();
-                    if (field.required) fieldSchema = fieldSchema.min(1, `${field.label} is required`);
-                    else fieldSchema = fieldSchema.optional().or(z.literal(''));
-            }
-            const parts = field.id.split('.');
-            if (parts.length > 1) {
-                const [group, key] = parts;
-                if (!shape[group]) shape[group] = {};
-                shape[group][key] = fieldSchema;
-
-                // Dynamically allow Other variants without strict fails
-                if (['dropdown', 'multi-select'].includes(field.type)) {
-                    shape[group][`other${key.charAt(0).toUpperCase() + key.slice(1)}`] = z.string().optional().or(z.literal(''));
-                }
-                if (field.id === 'kananTools.useAcademyPortal') shape[group]['academyPortalOther'] = z.string().optional().or(z.literal(''));
-                if (field.id === 'kananTools.useBooks') shape[group]['booksOther'] = z.string().optional().or(z.literal(''));
-            } else {
-                shape[field.id] = fieldSchema;
-            }
-        });
-
-        // Add officeArea explicitly since office-area-combo only maps the Type field in fixConfigs
-        if (shape.agencyProfile) {
-            shape.agencyProfile.officeArea = z.preprocess((val) => {
-                if (val === '' || val === undefined || val === null || isNaN(Number(val))) return undefined;
-                return Number(val);
-            }, z.number().optional());
-        }
-
-        // Add teamMembers only if visitInfo fields exist in config (B2C only)
-        if (shape.visitInfo) {
-            shape.visitInfo = {
-                ...shape.visitInfo,
-                teamMembers: z.array(z.string()).optional()
-            };
-        }
-
-        // Add waGroupName only if checklist fields exist in config (B2C only)
-        if (shape.checklist) {
-            shape.checklist = {
-                ...shape.checklist,
-                waGroupName: z.string().optional()
-            };
-        }
-
-        const finalShape = {};
-        Object.keys(shape).forEach(key => {
-            if (typeof shape[key] === 'object' && !shape[key].safeParse) {
-                finalShape[key] = z.object(shape[key]);
-            } else {
-                finalShape[key] = shape[key];
-            }
-        });
-        const baseSchema = z.object(finalShape);
-
-        // Add conditional refinements
-        return baseSchema.superRefine((data, ctx) => {
-            const prepcomStatus = data.kananSpecific?.prepcomAcademy;
-            const isPrepcomOrBoth = ['Prepcom', 'Both'].includes(prepcomStatus);
-
-            if (isPrepcomOrBoth) {
-                if (!data.kananTools?.portalCourses || data.kananTools.portalCourses.length === 0) {
-                    ctx.addIssue({
-                        code: z.ZodIssueCode.custom,
-                        message: "Courses for which Portal used is required for Prepcom/Both partners",
-                        path: ['kananTools', 'portalCourses']
-                    });
-                }
-
-                if (!data.kananTools?.bookCourses || data.kananTools.bookCourses.length === 0) {
-                    ctx.addIssue({
-                        code: z.ZodIssueCode.custom,
-                        message: "Courses for which Books used is required for Prepcom/Both partners",
-                        path: ['kananTools', 'bookCourses']
-                    });
-                }
-
-                if (!data.kananTools?.trainerRating || data.kananTools.trainerRating === 0) {
-                    ctx.addIssue({
-                        code: z.ZodIssueCode.custom,
-                        message: "Trainer Knowledge Rating is required for Prepcom/Both partners",
-                        path: ['kananTools', 'trainerRating']
-                    });
-                }
-            }
-        });
-    }, [config]);
-
-    const { control, handleSubmit, register, reset, watch, setValue, trigger, formState: { errors, isValid, isDirty } } = useForm({
+    const { control, handleSubmit, register, reset, watch, setValue, trigger, formState: { errors, isDirty } } = useForm({
         resolver: zodResolver(schema),
         mode: 'onChange',
         defaultValues: {
@@ -361,6 +214,10 @@ const NewVisit = () => {
                     setSubmittedAt(visitData.submittedAt || null);
                     setVisitStatus(visitData.status || 'draft');
                     setAdminNotes(visitData.adminNotes || []);
+                    if (visitData.forUser) {
+                        const fId = typeof visitData.forUser === 'object' ? visitData.forUser._id : visitData.forUser;
+                        setForUser(fId || '');
+                    }
 
                     // Handle deep link to specific step
                     const stepParam = searchParams.get('step');
@@ -379,6 +236,13 @@ const NewVisit = () => {
 
         if (user) loadForm();
     }, [user, id, urlFormType, reset]);
+
+    useEffect(() => {
+        if (!isAdmin) return;
+        api.get('/users/assignable').then(res => {
+            setAssignableUsers(res.data.data || []);
+        }).catch(() => {});
+    }, [isAdmin]);
 
     // Re-fetch form config when tab regains focus (new visits only) so superadmin changes appear immediately
     useEffect(() => {
@@ -418,7 +282,8 @@ const NewVisit = () => {
                 gpsCoordinates: gpsCoords,
                 status: 'draft',
                 formVersion: config?.version,
-                formType: config?.formType
+                formType: config?.formType,
+                ...(isAdmin && forUser ? { forUser } : {})
             };
             if (visitId) {
                 await api.put(`/visits/${visitId}`, payload);
@@ -489,53 +354,15 @@ const NewVisit = () => {
     const onValidationError = (errors) => {
         console.error('Submission Validation Errors:', errors);
 
-        const getFirstErrorId = (errs, prefix = '') => {
-            if (!errs || typeof errs !== 'object') return null;
-            if (errs.message) return prefix;
-
-            for (const key in errs) {
-                const fullPath = prefix ? `${prefix}.${key}` : key;
-                const fieldError = errs[key];
-
-                if (fieldError?.message) return fullPath;
-
-                if (typeof fieldError === 'object') {
-                    const nested = getFirstErrorId(fieldError, fullPath);
-                    if (nested) return nested;
-                }
-            }
-            return null;
-        };
-
-        const firstErrorId = getFirstErrorId(errors);
-        if (firstErrorId) {
-            if (firstErrorId.startsWith('visitInfo')) {
-                alert(`Submission blocked: Please check "Visit Team Details" in Step 1 (Visit Meta)\n\nError: ${errors.visitInfo?.teamSize?.message || errors.visitInfo?.teamMembers?.[0]?.message || 'Missing team information'}`);
-                setCurrentStep(0);
-                window.scrollTo(0, 0);
-                return;
-            }
-
-            const field = config.fields.find(f => f.id === firstErrorId || firstErrorId.startsWith(f.id));
-            if (field) {
-                const targetStep = groups.indexOf(field.group);
-                if (targetStep !== -1) {
-                    const firstPart = firstErrorId.split('.')[0];
-                    const secondPart = firstErrorId.split('.')[1];
-                    const errorMsg = errors[firstPart]?.[secondPart]?.message || errors[firstErrorId]?.message || 'Missing required information';
-
-                    alert(`Submission blocked: Please check "${field.label}" in Step ${targetStep + 1} (${field.group})\n\nError: ${errorMsg}`);
-                    setCurrentStep(targetStep);
-                    window.scrollTo(0, 0);
-                    return;
-                }
-            }
-            alert(`Please correct errors in your form: ${firstErrorId}`);
-        }
+        const notice = describeFormError(errors, config, groups);
+        setValidationNotice(notice);
+        setCurrentStep(notice.stepIndex);
+        window.scrollTo(0, 0);
     };
 
     const onSubmit = async (data) => {
         setIsSaving(true);
+        setValidationNotice(null);
         try {
             const payload = {
                 ...data,
@@ -543,7 +370,8 @@ const NewVisit = () => {
                 gpsCoordinates: gpsCoords,
                 status: 'submitted',
                 formVersion: config?.version,
-                formType: config?.formType
+                formType: config?.formType,
+                ...(isAdmin && forUser ? { forUser } : {})
             };
             if (visitId) {
                 await api.put(`/visits/${visitId}`, payload);
@@ -568,15 +396,27 @@ const NewVisit = () => {
     const nextStep = async () => {
         const currentGroup = groups[currentStep];
         const stepFieldIds = config.fields.filter(f => f.group === currentGroup).map(f => f.id);
+        if (stepFieldIds.includes('visitInfo.teamSize')) {
+            stepFieldIds.push('visitInfo.teamMembers');
+        }
         const isStepValid = await trigger(stepFieldIds);
         if (isStepValid) {
+            setValidationNotice(null);
             if (isDraft) saveDraftRef.current?.();
             setCurrentStep(prev => Math.min(prev + 1, groups.length - 1));
+            window.scrollTo(0, 0);
+        } else {
+            setValidationNotice({
+                title: 'Complete this step',
+                message: 'Please fix the highlighted fields before continuing.',
+                stepIndex: currentStep
+            });
             window.scrollTo(0, 0);
         }
     };
 
     const prevStep = () => {
+        setValidationNotice(null);
         if (isDraft) saveDraftRef.current?.();
         setCurrentStep(prev => Math.max(prev - 1, 0));
         window.scrollTo(0, 0);
@@ -748,6 +588,18 @@ const NewVisit = () => {
                 </div>
             )}
 
+            {validationNotice && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl flex items-start gap-4 shadow-sm">
+                    <div className="p-2 bg-white rounded-xl text-red-500 shadow-sm border border-red-100 shrink-0">
+                        <AlertCircle className="w-5 h-5" />
+                    </div>
+                    <div>
+                        <h4 className="text-sm font-black uppercase tracking-tight leading-none mb-1">{validationNotice.title}</h4>
+                        <p className="text-xs font-bold text-red-700/80">{validationNotice.message}</p>
+                    </div>
+                </div>
+            )}
+
             {/* Edit window notifications — only for submitted visits, NEVER for drafts */}
             {!isLocked && !isDraft && id && editWindow && (
                 <div className="mb-6 space-y-3">
@@ -770,6 +622,33 @@ const NewVisit = () => {
                             </p>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Visit For — admin/superadmin only */}
+            {isAdmin && assignableUsers.length > 0 && (
+                <div className="mb-6 p-4 bg-brand-blue/5 border border-brand-blue/20 rounded-2xl flex flex-col sm:flex-row sm:items-center gap-3">
+                    <div className="flex items-center gap-2 shrink-0">
+                        <div className="w-7 h-7 rounded-lg bg-brand-blue/10 flex items-center justify-center">
+                            <UserIcon className="w-4 h-4 text-brand-blue" />
+                        </div>
+                        <span className="text-sm font-bold text-slate-700">Visit For</span>
+                    </div>
+                    <select
+                        className="input-field flex-1 h-10"
+                        value={forUser}
+                        onChange={(e) => setForUser(e.target.value)}
+                    >
+                        <option value="">Self (default)</option>
+                        {assignableUsers.map(u => (
+                            <option key={u._id} value={u._id}>{u.name} ({u.employeeId})</option>
+                        ))}
+                    </select>
+                    {forUser && (
+                        <p className="text-xs text-brand-blue font-bold sm:shrink-0">
+                            Visit will appear in this user's list
+                        </p>
+                    )}
                 </div>
             )}
 

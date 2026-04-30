@@ -124,9 +124,11 @@ const Layout = () => {
             { label: 'Manage Agent',  icon: Building2,   path: '/agents',      roles: ['admin','superadmin'] },
             { label: 'Form Reports',  icon: ClipboardList, path: '/forms-admin', roles: ['admin','superadmin'] },
         ] : isAccounts ? [] : [
+            // Visit History always visible — users may have visits assigned to them regardless of formAccess
+            { label: 'Visit History', icon: List, path: '/visits', roles: ['user','home_visit','regional_bdm','hod'] },
+            // New Visit only shown when user has B2B/B2C visit form access (or no formAccess restriction at all)
             ...(!user?.formAccess?.length || hasFormAccess('b2b_visit') || hasFormAccess('b2c_visit') ? [
-                { label: 'New Visit',     icon: PlusCircle, path: '/new-visit', roles: ['user','home_visit','regional_bdm'] },
-                { label: 'Visit History', icon: List,       path: '/visits',    roles: ['user','home_visit','regional_bdm'] },
+                { label: 'New Visit', icon: PlusCircle, path: '/new-visit', roles: ['user','home_visit','regional_bdm'] },
             ] : []),
         ]),
         { label: 'Forms',     icon: ClipboardList, path: '/forms',       roles: ['user','admin','superadmin','home_visit','accounts','regional_bdm'] },

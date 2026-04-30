@@ -35,9 +35,9 @@ exports.getVisits = async (req, res) => {
     try {
         let query = {};
 
-        // Role-based filtering
-        if (req.user.role === 'user' || req.user.role === 'home_visit') {
-            query.submittedBy = req.user._id;
+        // Non-admins see only visits they submitted OR visits created for them
+        if (!['admin', 'superadmin'].includes(req.user.role)) {
+            query.$and = [{ $or: [{ submittedBy: req.user._id }, { forUser: req.user._id }] }];
         }
 
         // Additional filters from query params
@@ -90,6 +90,8 @@ exports.getVisits = async (req, res) => {
 
         const visits = await Visit.find(query)
             .populate('submittedBy', 'name employeeId')
+            .populate('forUser', 'name employeeId')
+            .populate('reviewedBy', 'name')
             .select('-__v')
             .sort({ createdAt: -1 });
 
@@ -153,15 +155,23 @@ exports.getVisitById = async (req, res) => {
     try {
         const visit = await Visit.findById(req.params.id)
             .populate('submittedBy', 'name employeeId')
-            .populate('adminNotes.addedBy', 'name');
+            .populate('forUser', 'name employeeId')
+            .populate('adminNotes.addedBy', 'name')
+            .populate('reviewedBy', 'name');
 
         if (!visit) {
             return res.status(404).json({ success: false, message: 'Visit not found' });
         }
 
-        // Check ownership
+        // Check ownership — allow access if submittedBy or forUser matches
         const ownerId = visit.submittedBy?._id?.toString() || visit.submittedBy?.toString();
-        if ((req.user.role === 'user' || req.user.role === 'home_visit') && ownerId !== req.user._id.toString()) {
+        const forUserId = visit.forUser?._id?.toString() || visit.forUser?.toString();
+        const isUserLevel = !['admin', 'superadmin'].includes(req.user.role);
+        if (
+            isUserLevel &&
+            ownerId !== req.user._id.toString() &&
+            forUserId !== req.user._id.toString()
+        ) {
             return res.status(403).json({ success: false, message: 'Not authorized to view this visit' });
         }
 
@@ -191,10 +201,11 @@ exports.updateVisit = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Visit not found' });
         }
 
-        // Check permission
+        // Check permission — submittedBy or forUser can edit
         const ownerId = visit.submittedBy?.toString();
-        const isOwner = ownerId === req.user._id.toString();
-        const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
+        const forUserId = visit.forUser?.toString();
+        const isOwner = ownerId === req.user._id.toString() || forUserId === req.user._id.toString();
+        const isAdmin = ['admin', 'superadmin'].includes(req.user.role);
 
         if (!isOwner && !isAdmin) {
             return res.status(403).json({ success: false, message: 'Not authorized to update this visit' });
@@ -318,8 +329,10 @@ exports.deleteVisit = async (req, res) => {
             return res.json({ success: true, message: 'Visit removed' });
         }
 
-        // User can only delete own visits
-        if (visit.submittedBy.toString() === req.user._id.toString()) {
+        // User can delete own visits or visits created for them
+        const isOwner = visit.submittedBy?.toString() === req.user._id.toString() ||
+                        visit.forUser?.toString() === req.user._id.toString();
+        if (isOwner) {
             await visit.deleteOne();
             return res.json({ success: true, message: 'Visit removed' });
         }
@@ -365,6 +378,51 @@ exports.approveVisitUnlock = async (req, res) => {
         await visit.save();
         
         res.json({ success: true, message: unlock ? 'Visit unlocked for editing' : 'Visit lock maintained' });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// @desc    Update visit status (Admin only: reviewed / action_required / closed)
+exports.updateVisitStatus = async (req, res) => {
+    try {
+        const { status, comment } = req.body;
+        const allowed = ['reviewed', 'action_required', 'closed', 'submitted'];
+        if (!allowed.includes(status)) {
+            return res.status(400).json({ success: false, message: `Invalid status. Allowed: ${allowed.join(', ')}` });
+        }
+
+        const visit = await Visit.findById(req.params.id);
+        if (!visit) return res.status(404).json({ success: false, message: 'Visit not found' });
+
+        if (visit.status === 'draft') {
+            return res.status(400).json({ success: false, message: 'Cannot review a draft visit' });
+        }
+
+        if (status === 'action_required' && !comment?.trim()) {
+            return res.status(400).json({ success: false, message: 'A comment is required when requesting action' });
+        }
+
+        visit.statusHistory.push({
+            status,
+            changedBy: req.user._id,
+            comment: comment?.trim() || null,
+            timestamp: new Date()
+        });
+
+        visit.status = status;
+        visit.reviewedBy = req.user._id;
+        visit.reviewedAt = new Date();
+        visit.reviewComment = comment?.trim() || null;
+
+        await visit.save();
+
+        const populated = await Visit.findById(visit._id)
+            .populate('submittedBy', 'name employeeId')
+            .populate('reviewedBy', 'name')
+            .populate('adminNotes.addedBy', 'name');
+
+        res.json({ success: true, data: populated });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

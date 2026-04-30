@@ -23,6 +23,7 @@ const FORM_ACCESS_OPTIONS = [
     { value: 'post_field_day',label: 'Post Field Day',  icon: '📋' },
     { value: 'daily_report',      label: 'Daily Report',           icon: '📝' },
     { value: 'post_demo_feedback', label: 'Post-Demo Feedback',    icon: '💬' },
+    { value: 'post_in_person_visit', label: 'Post In-Person Visit', icon: '🤝' },
 ];
 
 const ROLE_BADGE = {
@@ -291,15 +292,13 @@ const UserManagement = () => {
                                                     >
                                                         <Edit2 className="w-3.5 h-3.5" />
                                                     </button>
-                                                    {['admin', 'superadmin', 'accounts'].includes(user.role) && (
-                                                        <button
-                                                            onClick={() => openAssignModal(user)}
-                                                            className="p-1.5 rounded-lg border border-brand-purple/20 text-brand-purple hover:bg-brand-purple/5 transition-all"
-                                                            title="Assign Employees"
-                                                        >
-                                                            <Link2 className="w-3.5 h-3.5" />
-                                                        </button>
-                                                    )}
+                                                    <button
+                                                        onClick={() => openAssignModal(user)}
+                                                        className="p-1.5 rounded-lg border border-brand-purple/20 text-brand-purple hover:bg-brand-purple/5 transition-all"
+                                                        title="Assign Users"
+                                                    >
+                                                        <Link2 className="w-3.5 h-3.5" />
+                                                    </button>
                                                     <button
                                                         onClick={() => toggleUserStatus(user)}
                                                         className={`p-1.5 rounded-lg border transition-all ${
@@ -364,11 +363,9 @@ const UserManagement = () => {
                                         <button onClick={() => openEdit(user)} className="flex-1 py-2 rounded-xl border border-brand-blue/20 text-brand-blue text-xs font-bold hover:bg-brand-blue/5">
                                             Edit
                                         </button>
-                                        {['admin', 'superadmin', 'accounts'].includes(user.role) && (
-                                            <button onClick={() => openAssignModal(user)} className="flex-1 py-2 rounded-xl border border-brand-purple/20 text-brand-purple text-xs font-bold hover:bg-brand-purple/5">
-                                                Assign
-                                            </button>
-                                        )}
+                                        <button onClick={() => openAssignModal(user)} className="flex-1 py-2 rounded-xl border border-brand-purple/20 text-brand-purple text-xs font-bold hover:bg-brand-purple/5">
+                                            Assign
+                                        </button>
                                         <button onClick={() => toggleUserStatus(user)} className={`flex-1 py-2 rounded-xl border text-xs font-bold ${user.isActive ? 'border-brand-orange/20 text-brand-orange' : 'border-brand-green/20 text-brand-green'}`}>
                                             {user.isActive ? 'Deactivate' : 'Activate'}
                                         </button>
@@ -537,9 +534,9 @@ const UserManagement = () => {
                     <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl animate-fade-in max-h-[85vh] flex flex-col">
                         <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
                             <div>
-                                <h3 className="text-lg font-bold text-slate-800">Assign Employees</h3>
+                                <h3 className="text-lg font-bold text-slate-800">Assign Users</h3>
                                 <p className="text-xs text-slate-400 mt-0.5">
-                                    Select employees to assign to <strong>{assignModal.name}</strong>
+                                    Select users to assign to <strong>{assignModal.name}</strong>
                                 </p>
                             </div>
                             <button
@@ -554,14 +551,14 @@ const UserManagement = () => {
                                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                 <input
                                     type="text"
-                                    placeholder="Search employees..."
+                                    placeholder="Search users..."
                                     className="input-field pl-10 h-10"
                                     value={assignSearch}
                                     onChange={(e) => setAssignSearch(e.target.value)}
                                 />
                             </div>
                             <p className="text-xs text-slate-400 mt-2 font-bold">
-                                {assignedIds.length} employee{assignedIds.length !== 1 ? 's' : ''} assigned
+                                {assignedIds.length} user{assignedIds.length !== 1 ? 's' : ''} assigned
                             </p>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-1">

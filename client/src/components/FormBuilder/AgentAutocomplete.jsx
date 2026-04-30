@@ -60,16 +60,17 @@ const AgentAutocomplete = ({ value, onChange, placeholder, disabled, error, name
         
         // If we are setting meta.companyName, also set meta.agentId and potentially BDM/RM
         if (name === 'meta.companyName' && setValue) {
-            setValue('meta.agentId', agent._id);
-            if (agent.bdmName) setValue('meta.bdmName', agent.bdmName);
-            if (agent.rmName) setValue('meta.rmName', agent.rmName);
+            const opts = { shouldValidate: true, shouldDirty: true };
+            setValue('meta.agentId', agent._id, opts);
+            if (agent.bdmName) setValue('meta.bdmName', agent.bdmName, opts);
+            if (agent.rmName) setValue('meta.rmName', agent.rmName, opts);
             
             // Auto-fill agency profile if available
-            if (agent.emailId) setValue('meta.email', agent.emailId);
-            if (agent.city) setValue('agencyProfile.city', agent.city);
-            if (agent.state) setValue('agencyProfile.state', agent.state);
-            if (agent.pinCode) setValue('agencyProfile.pinCode', agent.pinCode);
-            if (agent.mobile) setValue('agencyProfile.contactNumber', agent.mobile);
+            if (agent.emailId) setValue('meta.email', agent.emailId, opts);
+            if (agent.city) setValue('agencyProfile.city', agent.city, opts);
+            if (agent.state) setValue('agencyProfile.state', agent.state, opts);
+            if (agent.pinCode) setValue('agencyProfile.pinCode', agent.pinCode, opts);
+            if (agent.mobile) setValue('agencyProfile.contactNumber', agent.mobile, opts);
         }
         
         setShowSuggestions(false);

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ClipboardList, BookOpen, MessageSquare, ChevronRight, BarChart2 } from 'lucide-react';
+import { ClipboardList, BookOpen, MessageSquare, ChevronRight, BarChart2, Users } from 'lucide-react';
 
 const FORM_DEFS = [
     {
@@ -33,6 +33,16 @@ const FORM_DEFS = [
         iconBg: 'bg-brand-purple/10',
         iconColor: 'text-brand-purple',
         border: 'hover:border-brand-purple/30',
+    },
+    {
+        key: 'post_in_person_visit',
+        label: 'Post In-Person Visit',
+        description: 'Record post in-person visit outcomes and business notes',
+        icon: Users,
+        path: '/post-in-person-visit',
+        iconBg: 'bg-brand-orange/10',
+        iconColor: 'text-brand-orange',
+        border: 'hover:border-brand-orange/30',
     },
 ];
 

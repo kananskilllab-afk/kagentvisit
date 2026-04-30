@@ -39,7 +39,7 @@ const userSchema = new mongoose.Schema({
     region: { type: String, trim: true },
     formAccess: [{
         type: String,
-        enum: ['b2b_visit', 'b2c_visit', 'post_field_day', 'daily_report', 'post_demo_feedback']
+        enum: ['b2b_visit', 'b2c_visit', 'post_field_day', 'daily_report', 'post_demo_feedback', 'post_in_person_visit']
     }],
     isActive: {
         type: Boolean,

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Star } from 'lucide-react';
 
-const StarRating = ({ value = 0, onChange, max = 5 }) => {
+const StarRating = ({ value = 0, onChange, max = 5, disabled = false }) => {
     const [hover, setHover] = useState(null);
     const active = hover ?? value;
 
@@ -14,10 +14,11 @@ const StarRating = ({ value = 0, onChange, max = 5 }) => {
                     <button
                         key={i}
                         type="button"
-                        onClick={() => onChange(rating)}
-                        onMouseEnter={() => setHover(rating)}
-                        onMouseLeave={() => setHover(null)}
-                        className="focus:outline-none transition-all hover:scale-110 active:scale-95"
+                        onClick={() => !disabled && onChange(rating)}
+                        onMouseEnter={() => !disabled && setHover(rating)}
+                        onMouseLeave={() => !disabled && setHover(null)}
+                        disabled={disabled}
+                        className="focus:outline-none transition-all hover:scale-110 active:scale-95 disabled:cursor-not-allowed disabled:hover:scale-100"
                         title={`Rate ${rating} out of ${max}`}
                     >
                         <Star

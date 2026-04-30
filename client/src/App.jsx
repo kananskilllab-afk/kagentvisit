@@ -22,6 +22,7 @@ import Calendar from './pages/Calendar';
 import PostFieldDay from './pages/PostFieldDay';
 import DailyReport from './pages/DailyReport';
 import PostDemoFeedback from './pages/PostDemoFeedback';
+import PostInPersonVisit from './pages/PostInPersonVisit';
 import FormsAdmin from './pages/FormsAdmin';
 import FormsHub from './pages/FormsHub';
 
@@ -51,7 +52,7 @@ function App() {
                     <Route path="new-visit" element={<NewVisit />} />
                     <Route path="edit-visit/:id" element={<NewVisit />} />
                     <Route path="visits" element={
-                        <ProtectedRoute roles={['user', 'admin', 'superadmin', 'home_visit']}>
+                        <ProtectedRoute roles={['user', 'admin', 'superadmin', 'home_visit', 'hod', 'regional_bdm']}>
                             <VisitsList />
                         </ProtectedRoute>
                     } />
@@ -101,6 +102,11 @@ function App() {
                     <Route path="post-demo-feedback" element={
                         <ProtectedRoute formAccess="post_demo_feedback">
                             <PostDemoFeedback />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="post-in-person-visit" element={
+                        <ProtectedRoute formAccess="post_in_person_visit">
+                            <PostInPersonVisit />
                         </ProtectedRoute>
                     } />
                     <Route path="forms" element={<FormsHub />} />

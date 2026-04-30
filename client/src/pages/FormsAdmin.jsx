@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import api from '../utils/api';
 import {
-    MessageSquare, BookOpen, ClipboardList, ChevronDown, ChevronUp,
+    MessageSquare, BookOpen, ClipboardList, ChevronDown, ChevronUp, Users,
     ChevronRight, Loader2, Send, X
 } from 'lucide-react';
 
@@ -18,6 +18,7 @@ const TABS = [
     { key: 'post_demo_feedback', label: 'Post-Demo Feedback', icon: MessageSquare, apiPath: '/post-demo-feedback' },
     { key: 'daily_report',       label: 'Daily Report',       icon: BookOpen,      apiPath: '/daily-report' },
     { key: 'post_field_day',     label: 'Post Field Day',     icon: ClipboardList, apiPath: '/post-field-day' },
+    { key: 'post_in_person_visit', label: 'Post In-Person Visit', icon: Users, apiPath: '/post-in-person-visit' },
 ];
 
 const InfoRow = ({ label, value }) => value == null || value === '' ? null : (
@@ -105,6 +106,32 @@ const PostFieldDayDetail = ({ rec }) => (
     </div>
 );
 
+const PostInPersonVisitDetail = ({ rec }) => (
+    <div className="space-y-3 text-sm">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <InfoRow label="SPOC Name" value={rec.spocName} />
+            <InfoRow label="Owner Name" value={rec.ownerName} />
+            <InfoRow label="Whatsapp Number" value={rec.whatsappNumber} />
+            <InfoRow label="Promoters" value={rec.numPromoters} />
+            <InfoRow label="Promoter Involvement" value={rec.promoterInvolvement} />
+            <InfoRow label="Partnership Type" value={rec.partnershipType} />
+            <InfoRow label="Decision Maker Available" value={rec.decisionMakerAvailable} />
+            <InfoRow label="Meeting Planned" value={rec.meetingPlanned} />
+            <InfoRow label="Meeting Duration" value={rec.meetingDuration ? `${rec.meetingDuration} mins` : null} />
+            <InfoRow label="Closure Probability" value={rec.closureProbability} />
+            <InfoRow label="Interested in Admissions" value={rec.interestedInAdmissions} />
+            <InfoRow label="Follow-Up Date" value={fmtDate(rec.nextFollowUpDate)} />
+        </div>
+        <InfoRow label="Other People Designation" value={rec.otherPeopleDesignation} />
+        <InfoRow label="Office Size" value={rec.officeSize} />
+        <InfoRow label="Team Distribution" value={rec.teamDistribution} />
+        <InfoRow label="Admission Potential" value={rec.admissionPotential} />
+        <InfoRow label="Academy Courses Taught" value={Array.isArray(rec.academyCoursesTaught) ? rec.academyCoursesTaught.join(', ') : ''} />
+        <InfoRow label="Other Issues Faced" value={Array.isArray(rec.otherIssuesFaced) ? rec.otherIssuesFaced.join(', ') : ''} />
+        {rec.nextStepsMOM && <div className="p-3 bg-slate-50 rounded-xl text-xs text-slate-600">{rec.nextStepsMOM}</div>}
+    </div>
+);
+
 const CommentsSection = ({ record, apiPath, onUpdate }) => {
     const [text, setText] = useState('');
     const [saving, setSaving] = useState(false);
@@ -171,6 +198,8 @@ const SubmissionCard = ({ record, tabKey, apiPath, onUpdate }) => {
         ? record.accountBusinessName || 'Unnamed Account'
         : tabKey === 'daily_report'
         ? record.bdmName || 'Daily Report'
+        : tabKey === 'post_in_person_visit'
+        ? record.spocName || record.ownerName || 'Post In-Person Visit'
         : record.representativeName || 'Field Day Report';
 
     const subtitle = fmtDate(
@@ -209,6 +238,7 @@ const SubmissionCard = ({ record, tabKey, apiPath, onUpdate }) => {
                         {tabKey === 'post_demo_feedback' && <PostDemoDetail rec={record} />}
                         {tabKey === 'daily_report' && <DailyReportDetail rec={record} />}
                         {tabKey === 'post_field_day' && <PostFieldDayDetail rec={record} />}
+                        {tabKey === 'post_in_person_visit' && <PostInPersonVisitDetail rec={record} />}
                     </div>
                     <CommentsSection record={record} apiPath={apiPath} onUpdate={onUpdate} />
                 </div>

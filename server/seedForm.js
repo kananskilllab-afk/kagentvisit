@@ -189,6 +189,10 @@ const b2cFields = [
     { id: 'outcome.photo',   group: 'Final Outcome', label: 'Visit Verification Photo', type: 'photo-upload', required: false }
 ];
 
+const b2bFieldsWithoutPostInPerson = b2bFields.filter(
+    (field) => !String(field.id || '').startsWith('postInPerson.')
+);
+
 async function seed() {
     try {
         console.log('Connecting to:', process.env.MONGODB_URI);
@@ -203,11 +207,11 @@ async function seed() {
                 isActive: true,
                 formType: 'generic',
                 description: 'Standard B2B agency visit form',
-                fields: b2bFields
+                fields: b2bFieldsWithoutPostInPerson
             });
             console.log('B2B form configuration seeded.');
         } else {
-            existingB2B.fields = b2bFields;
+            existingB2B.fields = b2bFieldsWithoutPostInPerson;
             existingB2B.version = `${existingB2B.version}-upd-${Date.now().toString().slice(-4)}`;
             await existingB2B.save();
             console.log('Active B2B form updated with new fields.');

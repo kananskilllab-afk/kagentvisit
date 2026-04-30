@@ -4,109 +4,113 @@ import {
     ChevronLeft, ChevronRight, Plus, Calendar as CalIcon, Clock, MapPin,
     Bell, X, Pencil, Trash2, AlertCircle, CheckCircle2, Link2, Unlink,
     ExternalLink, RefreshCw, Filter, List, LayoutGrid, Rows, Building2,
-    Users, IndianRupee, Copy, XCircle, ChevronDown, Search
+    Users, IndianRupee, Copy, XCircle, ChevronDown, Search, Wifi, WifiOff,
+    Sparkles, CalendarDays
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import PlanModal from '../components/PlanModal';
 
 const API = import.meta.env.VITE_API_URL || '/api';
 
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-const MONTHS = ['January','February','March','April','May','June',
-    'July','August','September','October','November','December'];
+const DAYS        = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAYS_FULL   = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const MONTHS      = ['January','February','March','April','May','June',
+                     'July','August','September','October','November','December'];
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-const STATUS_STYLE = {
-    pending:   'bg-blue-50 border-blue-200 text-blue-800',
-    attended:  'bg-green-50 border-green-200 text-green-800',
-    missed:    'bg-red-50 border-red-200 text-red-800',
-    cancelled: 'bg-gray-50 border-gray-200 text-gray-500 line-through opacity-60',
+const STATUS_CFG = {
+    pending:   { bar: 'bg-amber-400',  pill: 'bg-amber-50 border-amber-200 text-amber-800',  badge: 'bg-amber-100 text-amber-700',  label: 'Pending'   },
+    attended:  { bar: 'bg-emerald-500',pill: 'bg-emerald-50 border-emerald-200 text-emerald-800', badge: 'bg-emerald-100 text-emerald-700', label: 'Attended' },
+    missed:    { bar: 'bg-red-400',    pill: 'bg-red-50 border-red-200 text-red-800',          badge: 'bg-red-100 text-red-700',    label: 'Missed'    },
+    cancelled: { bar: 'bg-slate-300',  pill: 'bg-slate-50 border-slate-200 text-slate-400',   badge: 'bg-slate-100 text-slate-500', label: 'Cancelled' },
 };
 
-const PLAN_STATUS_DOT = {
-    draft:       'bg-gray-400',
+const PLAN_DOT = {
+    draft:       'bg-slate-400',
     scheduled:   'bg-blue-500',
-    in_progress: 'bg-yellow-500',
-    completed:   'bg-green-500',
+    in_progress: 'bg-amber-500',
+    completed:   'bg-emerald-500',
     cancelled:   'bg-red-400',
-    closed:      'bg-gray-600',
+    closed:      'bg-slate-600',
 };
 
 const VIEWS = ['month', 'week', 'day', 'agenda'];
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function sameDay(a, b) {
     return a.getFullYear() === b.getFullYear() &&
-        a.getMonth() === b.getMonth() &&
-        a.getDate() === b.getDate();
+        a.getMonth()    === b.getMonth()    &&
+        a.getDate()     === b.getDate();
 }
-
 function startOfWeek(date) {
     const d = new Date(date);
     d.setDate(d.getDate() - d.getDay());
     d.setHours(0, 0, 0, 0);
     return d;
 }
-
 function addDays(date, n) {
     const d = new Date(date);
     d.setDate(d.getDate() + n);
     return d;
 }
-
 function fmtTime(d) {
     return new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
-
 function fmtDate(d) {
     return new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
 }
-
+function fmtFull(d) {
+    return new Date(d).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+}
 function initials(name = '') {
     return name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
 }
-
 function savedFilters() {
     try { return JSON.parse(localStorage.getItem('cal_filters') || '{}'); } catch { return {}; }
 }
 
 // ── EventPill ─────────────────────────────────────────────────────────────────
 function EventPill({ schedule, compact = false, onClick }) {
-    const plan = schedule.visitPlanRef;
-    const agent = schedule.agentId;
-    const status = schedule.status || 'pending';
-    const cls = STATUS_STYLE[status] || STATUS_STYLE.pending;
-    const photoStatus = schedule.clientPhoto?.verificationStatus;
+    const cfg    = STATUS_CFG[schedule.status || 'pending'] || STATUS_CFG.pending;
+    const plan   = schedule.visitPlanRef;
+    const agent  = schedule.agentId;
+    const photo  = schedule.clientPhoto?.verificationStatus;
 
     return (
         <div
-            className={`rounded border px-1.5 py-0.5 text-xs cursor-pointer hover:shadow-sm transition-shadow ${cls} ${compact ? 'truncate' : ''}`}
+            className={`flex items-stretch rounded-md overflow-hidden border cursor-pointer hover:shadow-md transition-all group ${cfg.pill}`}
             onClick={e => { e.stopPropagation(); onClick(schedule); }}
             title={`${schedule.title}${agent ? ' · ' + agent.name : ''}`}
         >
-            <div className="flex items-center gap-1 min-w-0">
-                {plan && (
-                    <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${PLAN_STATUS_DOT[plan.status] || 'bg-gray-400'}`} />
-                )}
-                <span className="truncate font-medium">{schedule.title}</span>
-                {agent && !compact && (
-                    <span className="ml-auto flex-shrink-0 w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-[9px] flex items-center justify-center font-bold">
-                        {initials(agent.name)}
-                    </span>
-                )}
-                {photoStatus === 'pending' && (
-                    <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-orange-400" title="Photo pending verification" />
+            <div className={`w-1.5 flex-shrink-0 ${cfg.bar}`} />
+            <div className="flex-1 min-w-0 px-1.5 py-0.5">
+                <div className="flex items-center gap-1 min-w-0">
+                    {plan && (
+                        <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${PLAN_DOT[plan.status] || 'bg-gray-400'}`} />
+                    )}
+                    <span className="text-xs font-semibold truncate leading-tight">{schedule.title}</span>
+                    {photo === 'pending' && (
+                        <span className="flex-shrink-0 w-1.5 h-1.5 rounded-full bg-orange-400 ml-auto" title="Photo pending" />
+                    )}
+                </div>
+                {!compact && (
+                    <div className="text-[10px] opacity-60 mt-0.5">{fmtTime(schedule.scheduledDate)}</div>
                 )}
             </div>
-            {!compact && (
-                <div className="text-[10px] opacity-70 mt-0.5">{fmtTime(schedule.scheduledDate)}</div>
+            {!compact && agent && (
+                <div className="flex-shrink-0 flex items-center pr-1.5">
+                    <span className="w-5 h-5 rounded-full bg-indigo-100 text-indigo-700 text-[8px] flex items-center justify-center font-bold">
+                        {initials(agent.name)}
+                    </span>
+                </div>
             )}
         </div>
     );
 }
 
-// ── MonthView ────────────────────────────────────────────────────────────────
+// ── MonthView ─────────────────────────────────────────────────────────────────
 function MonthView({ year, month, schedules, today, onDayClick, onEventClick }) {
-    const firstDay = new Date(year, month, 1).getDay();
+    const firstDay    = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
     const cells = [];
     for (let i = 0; i < firstDay; i++) cells.push(null);
@@ -116,34 +120,50 @@ function MonthView({ year, month, schedules, today, onDayClick, onEventClick }) 
         schedules.filter(s => sameDay(new Date(s.scheduledDate), date));
 
     return (
-        <div className="flex-1 overflow-auto">
-            <div className="grid grid-cols-7 border-b border-gray-200">
-                {DAYS.map(d => (
-                    <div key={d} className="text-center text-xs font-semibold text-gray-500 py-2">{d}</div>
+        <div className="flex-1 flex flex-col overflow-auto">
+            {/* Day headers */}
+            <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/80 flex-shrink-0">
+                {DAYS.map((d, i) => (
+                    <div key={d} className={`text-center text-[11px] font-bold py-2.5 tracking-wide uppercase
+                        ${i === 0 || i === 6 ? 'text-slate-400' : 'text-slate-500'}`}>
+                        {d}
+                    </div>
                 ))}
             </div>
+            {/* Cells */}
             <div className="grid grid-cols-7 flex-1">
                 {cells.map((date, idx) => {
-                    if (!date) return <div key={`empty-${idx}`} className="h-28 border-b border-r border-gray-100 bg-gray-50/40" />;
-                    const daySchedules = schedulesForDay(date);
+                    if (!date) return (
+                        <div key={`e-${idx}`}
+                            className="min-h-[7rem] border-b border-r border-slate-100 bg-slate-50/40" />
+                    );
+                    const ds      = schedulesForDay(date);
                     const isToday = sameDay(date, today);
+                    const isWknd  = date.getDay() === 0 || date.getDay() === 6;
                     return (
                         <div
                             key={date.toISOString()}
-                            className={`h-28 border-b border-r border-gray-100 p-1 overflow-hidden cursor-pointer hover:bg-blue-50/30 transition-colors
-                                ${isToday ? 'bg-blue-50/50' : ''}`}
                             onClick={() => onDayClick(date)}
+                            className={`min-h-[7rem] border-b border-r border-slate-100 p-1.5 overflow-hidden cursor-pointer transition-colors group
+                                ${isToday ? 'bg-blue-50/70' : isWknd ? 'bg-slate-50/60' : 'hover:bg-blue-50/20'}`}
                         >
-                            <div className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full mb-1
-                                ${isToday ? 'bg-blue-600 text-white' : 'text-gray-700'}`}>
-                                {date.getDate()}
+                            <div className="flex items-start justify-between mb-1">
+                                <span className={`text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full transition-colors
+                                    ${isToday ? 'bg-blue-600 text-white shadow-sm' : isWknd ? 'text-slate-400' : 'text-slate-600 group-hover:text-blue-600'}`}>
+                                    {date.getDate()}
+                                </span>
+                                {ds.length > 0 && (
+                                    <span className="text-[9px] text-slate-400 font-medium">{ds.length} visit{ds.length !== 1 ? 's' : ''}</span>
+                                )}
                             </div>
                             <div className="space-y-0.5">
-                                {daySchedules.slice(0, 3).map(s => (
+                                {ds.slice(0, 3).map(s => (
                                     <EventPill key={s._id} schedule={s} compact onClick={onEventClick} />
                                 ))}
-                                {daySchedules.length > 3 && (
-                                    <div className="text-[10px] text-gray-500 pl-1">+{daySchedules.length - 3} more</div>
+                                {ds.length > 3 && (
+                                    <div className="text-[10px] text-blue-500 font-semibold pl-2 py-0.5 bg-blue-50 rounded">
+                                        +{ds.length - 3} more
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -154,35 +174,51 @@ function MonthView({ year, month, schedules, today, onDayClick, onEventClick }) 
     );
 }
 
-// ── WeekView ─────────────────────────────────────────────────────────────────
+// ── WeekView ──────────────────────────────────────────────────────────────────
 function WeekView({ weekStart, schedules, today, onSlotClick, onEventClick }) {
     const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
     return (
         <div className="flex-1 overflow-auto">
-            <div className="grid grid-cols-7 border-b border-gray-200">
-                {days.map(d => (
-                    <div key={d.toISOString()} className={`text-center py-2 text-xs font-semibold
-                        ${sameDay(d, today) ? 'text-blue-600' : 'text-gray-500'}`}>
-                        <div>{DAYS[d.getDay()]}</div>
-                        <div className={`w-7 h-7 mx-auto flex items-center justify-center rounded-full
-                            ${sameDay(d, today) ? 'bg-blue-600 text-white' : ''}`}>
-                            {d.getDate()}
+            {/* Column headers */}
+            <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/80 sticky top-0 z-10">
+                {days.map((d, i) => {
+                    const isToday = sameDay(d, today);
+                    const isWknd  = i === 0 || i === 6;
+                    return (
+                        <div key={d.toISOString()}
+                            className={`text-center py-3 border-r border-slate-100 last:border-r-0
+                                ${isToday ? 'bg-blue-50' : ''}`}>
+                            <div className={`text-[11px] font-bold uppercase tracking-wide mb-1
+                                ${isWknd ? 'text-slate-400' : 'text-slate-500'}`}>
+                                {DAYS[d.getDay()]}
+                            </div>
+                            <div className={`w-8 h-8 mx-auto flex items-center justify-center rounded-full text-sm font-bold transition-all
+                                ${isToday ? 'bg-blue-600 text-white shadow-sm' : isWknd ? 'text-slate-400' : 'text-slate-700'}`}>
+                                {d.getDate()}
+                            </div>
                         </div>
-                    </div>
-                ))}
+                    );
+                })}
             </div>
-            <div className="grid grid-cols-7">
-                {days.map(d => {
-                    const dayS = schedules.filter(s => sameDay(new Date(s.scheduledDate), d));
+            {/* Day columns */}
+            <div className="grid grid-cols-7 min-h-64">
+                {days.map((d, i) => {
+                    const dayS   = schedules.filter(s => sameDay(new Date(s.scheduledDate), d));
+                    const isToday = sameDay(d, today);
                     return (
                         <div
                             key={d.toISOString()}
-                            className={`min-h-40 border-r border-gray-100 p-1 space-y-1 cursor-pointer hover:bg-blue-50/20
-                                ${sameDay(d, today) ? 'bg-blue-50/30' : ''}`}
                             onClick={() => onSlotClick(d)}
+                            className={`border-r border-slate-100 last:border-r-0 p-1.5 space-y-1 cursor-pointer min-h-32 transition-colors
+                                ${isToday ? 'bg-blue-50/40' : 'hover:bg-slate-50/60'}`}
                         >
                             {dayS.map(s => <EventPill key={s._id} schedule={s} onClick={onEventClick} />)}
+                            {dayS.length === 0 && (
+                                <div className="h-full flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                    <Plus className="w-4 h-4 text-slate-300" />
+                                </div>
+                            )}
                         </div>
                     );
                 })}
@@ -191,49 +227,77 @@ function WeekView({ weekStart, schedules, today, onSlotClick, onEventClick }) {
     );
 }
 
-// ── DayView ──────────────────────────────────────────────────────────────────
+// ── DayView ───────────────────────────────────────────────────────────────────
 function DayView({ date, schedules, onEventClick, onAddClick }) {
     const dayS = schedules.filter(s => sameDay(new Date(s.scheduledDate), date));
+
     return (
-        <div className="flex-1 overflow-auto p-4">
-            <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-800">
-                    {date.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                </h3>
-                <button onClick={() => onAddClick(date)}
-                    className="flex items-center gap-1 text-sm text-blue-600 hover:text-blue-800">
-                    <Plus className="w-4 h-4" /> Schedule visit
-                </button>
-            </div>
-            {dayS.length === 0 ? (
-                <div className="text-center py-12 text-gray-400">
-                    <CalIcon className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                    <p>No visits scheduled for this day</p>
-                    <button onClick={() => onAddClick(date)} className="mt-3 text-blue-600 text-sm hover:underline">
-                        Create a visit plan
+        <div className="flex-1 overflow-auto p-5">
+            <div className="max-w-2xl mx-auto">
+                <div className="flex items-center justify-between mb-5">
+                    <div>
+                        <h3 className="text-lg font-bold text-slate-800">{fmtFull(date)}</h3>
+                        <p className="text-xs text-slate-400 mt-0.5">{dayS.length} visit{dayS.length !== 1 ? 's' : ''} scheduled</p>
+                    </div>
+                    <button onClick={() => onAddClick(date)}
+                        className="flex items-center gap-1.5 text-sm bg-blue-600 text-white px-3 py-2 rounded-xl hover:bg-blue-700 transition-colors shadow-sm">
+                        <Plus className="w-4 h-4" /> New Plan
                     </button>
                 </div>
-            ) : (
-                <div className="space-y-2">
-                    {dayS.map(s => (
-                        <div key={s._id} onClick={() => onEventClick(s)}
-                            className="flex items-start gap-3 p-3 rounded-lg border border-gray-200 hover:shadow-sm cursor-pointer transition-shadow bg-white">
-                            <div className="text-xs text-gray-500 pt-0.5 w-16 flex-shrink-0">
-                                {fmtTime(s.scheduledDate)}
-                                {s.scheduledEndDate && <><br />{fmtTime(s.scheduledEndDate)}</>}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="font-medium text-sm text-gray-800">{s.title}</div>
-                                {s.agentId && <div className="text-xs text-gray-500">{s.agentId.name}</div>}
-                                {s.location && <div className="text-xs text-gray-400 flex items-center gap-1 mt-0.5"><MapPin className="w-3 h-3" />{s.location}</div>}
-                            </div>
-                            <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_STYLE[s.status || 'pending']}`}>
-                                {s.status || 'pending'}
-                            </span>
+
+                {dayS.length === 0 ? (
+                    <div className="text-center py-16 text-slate-400">
+                        <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                            <CalendarDays className="w-8 h-8 opacity-40" />
                         </div>
-                    ))}
-                </div>
-            )}
+                        <p className="text-sm font-medium mb-1">No visits scheduled</p>
+                        <p className="text-xs mb-4">Free day — a great time to plan ahead.</p>
+                        <button onClick={() => onAddClick(date)}
+                            className="text-blue-600 text-sm font-semibold hover:underline">
+                            Create a visit plan →
+                        </button>
+                    </div>
+                ) : (
+                    <div className="space-y-3">
+                        {dayS.map(s => {
+                            const cfg = STATUS_CFG[s.status || 'pending'] || STATUS_CFG.pending;
+                            return (
+                                <div key={s._id} onClick={() => onEventClick(s)}
+                                    className="flex items-stretch gap-0 rounded-2xl border border-slate-200 overflow-hidden hover:shadow-md cursor-pointer transition-all bg-white group">
+                                    <div className={`w-1.5 flex-shrink-0 ${cfg.bar}`} />
+                                    <div className="flex-1 p-4 min-w-0">
+                                        <div className="flex items-start justify-between gap-2 mb-2">
+                                            <h4 className="font-semibold text-slate-800 text-sm leading-snug">{s.title}</h4>
+                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${cfg.badge}`}>
+                                                {cfg.label}
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500">
+                                            <span className="flex items-center gap-1">
+                                                <Clock className="w-3 h-3" />
+                                                {fmtTime(s.scheduledDate)}
+                                                {s.scheduledEndDate && ` – ${fmtTime(s.scheduledEndDate)}`}
+                                            </span>
+                                            {s.agentId && (
+                                                <span className="flex items-center gap-1">
+                                                    <Building2 className="w-3 h-3" />
+                                                    {s.agentId.name}
+                                                </span>
+                                            )}
+                                            {s.location && (
+                                                <span className="flex items-center gap-1">
+                                                    <MapPin className="w-3 h-3" />
+                                                    {s.location}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
@@ -242,48 +306,82 @@ function DayView({ date, schedules, onEventClick, onAddClick }) {
 function AgendaView({ schedules, onEventClick, onAddClick }) {
     const groups = {};
     schedules.forEach(s => {
-        const key = new Date(s.scheduledDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(s);
+        const d   = new Date(s.scheduledDate);
+        const key = `${d.getFullYear()}-${String(d.getMonth()).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        if (!groups[key]) groups[key] = { date: d, items: [] };
+        groups[key].items.push(s);
     });
-    const sortedKeys = Object.keys(groups).sort((a, b) =>
-        new Date(groups[a][0].scheduledDate) - new Date(groups[b][0].scheduledDate)
-    );
+    const sortedKeys = Object.keys(groups).sort();
 
     if (sortedKeys.length === 0) {
         return (
-            <div className="flex-1 flex items-center justify-center flex-col gap-3 text-gray-400 p-8">
-                <CalIcon className="w-12 h-12 opacity-30" />
-                <p className="text-sm">No upcoming visits in this period.</p>
-                <button onClick={() => onAddClick(new Date())} className="text-blue-600 text-sm hover:underline">
-                    Schedule a visit to start claiming
+            <div className="flex-1 flex items-center justify-center flex-col gap-3 text-slate-400 p-8">
+                <div className="w-20 h-20 rounded-3xl bg-slate-100 flex items-center justify-center mb-2">
+                    <CalendarDays className="w-10 h-10 opacity-30" />
+                </div>
+                <p className="text-sm font-medium">No upcoming visits in the next 30 days</p>
+                <button onClick={() => onAddClick(new Date())}
+                    className="mt-1 text-blue-600 text-sm font-semibold hover:underline">
+                    Schedule a visit →
                 </button>
             </div>
         );
     }
 
+    const today = new Date();
+
     return (
-        <div className="flex-1 overflow-auto divide-y divide-gray-100">
-            {sortedKeys.map(key => (
-                <div key={key} className="px-4 py-3">
-                    <div className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wide">{key}</div>
-                    <div className="space-y-1.5">
-                        {groups[key].map(s => (
-                            <div key={s._id} onClick={() => onEventClick(s)}
-                                className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer">
-                                <div className="text-xs text-gray-400 w-14">{fmtTime(s.scheduledDate)}</div>
-                                <div className="flex-1 min-w-0">
-                                    <span className="text-sm font-medium text-gray-800">{s.title}</span>
-                                    {s.agentId && <span className="text-xs text-gray-500 ml-2">{s.agentId.name}</span>}
-                                </div>
-                                <span className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_STYLE[s.status || 'pending']}`}>
-                                    {s.status || 'pending'}
-                                </span>
+        <div className="flex-1 overflow-auto">
+            {sortedKeys.map(key => {
+                const { date, items } = groups[key];
+                const isToday  = sameDay(date, today);
+                const isPast   = date < today && !isToday;
+                return (
+                    <div key={key} className="border-b border-slate-100 last:border-0">
+                        {/* Date header */}
+                        <div className={`sticky top-0 z-10 px-5 py-2.5 flex items-center gap-3 border-b border-slate-100
+                            ${isToday ? 'bg-blue-50' : 'bg-slate-50/90 backdrop-blur-sm'}`}>
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0
+                                ${isToday ? 'bg-blue-600 text-white shadow-sm' : isPast ? 'bg-slate-200 text-slate-500' : 'bg-white border border-slate-200 text-slate-700'}`}>
+                                {date.getDate()}
                             </div>
-                        ))}
+                            <div>
+                                <div className={`text-xs font-bold uppercase tracking-wider ${isToday ? 'text-blue-700' : 'text-slate-500'}`}>
+                                    {isToday ? 'Today' : DAYS_FULL[date.getDay()]}
+                                </div>
+                                <div className="text-[11px] text-slate-400">
+                                    {MONTHS_SHORT[date.getMonth()]} {date.getFullYear()}
+                                </div>
+                            </div>
+                            <span className="ml-auto text-[10px] text-slate-400 font-medium">{items.length} visit{items.length !== 1 ? 's' : ''}</span>
+                        </div>
+                        {/* Events */}
+                        <div className="px-5 py-3 space-y-2">
+                            {items.map(s => {
+                                const cfg = STATUS_CFG[s.status || 'pending'] || STATUS_CFG.pending;
+                                return (
+                                    <div key={s._id} onClick={() => onEventClick(s)}
+                                        className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:shadow-md hover:border-slate-300 cursor-pointer transition-all bg-white group">
+                                        <div className={`w-1 self-stretch rounded-full flex-shrink-0 ${cfg.bar}`} />
+                                        <div className="flex-shrink-0 text-xs text-slate-400 font-medium w-16">
+                                            {fmtTime(s.scheduledDate)}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <span className="text-sm font-semibold text-slate-800 block truncate">{s.title}</span>
+                                            {s.agentId && (
+                                                <span className="text-xs text-slate-400">{s.agentId.name}{s.agentId.city ? ` · ${s.agentId.city}` : ''}</span>
+                                            )}
+                                        </div>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${cfg.badge}`}>
+                                            {cfg.label}
+                                        </span>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
-                </div>
-            ))}
+                );
+            })}
         </div>
     );
 }
@@ -292,93 +390,143 @@ function AgendaView({ schedules, onEventClick, onAddClick }) {
 function ScheduleDrawer({ schedule, balance, onClose, onEdit, onDelete }) {
     if (!schedule) return null;
     const plan = schedule.visitPlanRef;
+    const cfg  = STATUS_CFG[schedule.status || 'pending'] || STATUS_CFG.pending;
+
+    const spent   = balance?.spentAmount   || 0;
+    const granted = balance?.grantedAmount || 0;
+    const pct     = granted > 0 ? Math.min(100, (spent / granted) * 100) : 0;
 
     return (
-        <div className="w-80 border-l border-gray-200 bg-white overflow-y-auto flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-gray-100">
-                <h3 className="font-semibold text-gray-800 truncate">{schedule.title}</h3>
-                <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-                    <X className="w-4 h-4" />
+        <div className="w-80 border-l border-slate-200 bg-white overflow-y-auto flex flex-col shadow-xl">
+            {/* Header */}
+            <div className="relative bg-gradient-to-br from-slate-800 to-slate-700 p-5 pb-4">
+                <button onClick={onClose}
+                    className="absolute top-3 right-3 p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors">
+                    <X className="w-3.5 h-3.5" />
                 </button>
-            </div>
-            <div className="p-4 space-y-3 text-sm flex-1">
-                <div className="flex items-center gap-2 text-gray-600">
-                    <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                    <span>{fmtDate(schedule.scheduledDate)} · {fmtTime(schedule.scheduledDate)}
-                        {schedule.scheduledEndDate && ` – ${fmtTime(schedule.scheduledEndDate)}`}
+                <div className="pr-8">
+                    <span className={`inline-block text-[10px] font-bold px-2 py-0.5 rounded-full mb-2 ${cfg.badge}`}>
+                        {cfg.label}
                     </span>
-                </div>
-                {schedule.location && (
-                    <div className="flex items-center gap-2 text-gray-600">
-                        <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                        <span>{schedule.location}</span>
-                    </div>
-                )}
-                {schedule.agentId && (
-                    <div className="flex items-center gap-2 text-gray-600">
-                        <Building2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                        <span>{schedule.agentId.name}{schedule.agentId.city ? ` · ${schedule.agentId.city}` : ''}</span>
-                    </div>
-                )}
-
-                {/* Client photo status */}
-                <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500">Client photo:</span>
-                    {!schedule.clientPhoto?.uploadRef ? (
-                        <span className="text-xs text-orange-600 font-medium">Not uploaded</span>
-                    ) : (
-                        <span className={`text-xs font-medium ${
-                            schedule.clientPhoto.verificationStatus === 'verified' ? 'text-green-600' :
-                            schedule.clientPhoto.verificationStatus === 'rejected' ? 'text-red-600' :
-                            'text-yellow-600'
-                        }`}>
-                            {schedule.clientPhoto.verificationStatus}
-                        </span>
+                    <h3 className="font-bold text-white text-sm leading-snug">{schedule.title}</h3>
+                    {schedule.agentId && (
+                        <div className="flex items-center gap-1.5 mt-1.5">
+                            <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[9px] font-bold text-white">
+                                {initials(schedule.agentId.name)}
+                            </div>
+                            <span className="text-white/70 text-xs">{schedule.agentId.name}</span>
+                        </div>
                     )}
                 </div>
+            </div>
 
-                {plan && (
-                    <div className="rounded-lg border border-gray-200 p-3 space-y-2">
-                        <div className="flex items-center gap-2">
-                            <span className={`w-2 h-2 rounded-full ${PLAN_STATUS_DOT[plan.status]}`} />
-                            <span className="font-medium text-gray-700">{plan.title}</span>
+            {/* Details */}
+            <div className="flex-1 p-4 space-y-3">
+                {/* Time */}
+                <div className="flex items-start gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <Clock className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                        <div className="text-xs font-bold text-slate-700">
+                            {fmtDate(schedule.scheduledDate)} · {fmtTime(schedule.scheduledDate)}
+                            {schedule.scheduledEndDate && ` – ${fmtTime(schedule.scheduledEndDate)}`}
                         </div>
-                        <div className="text-xs text-gray-500">{plan.city} · {plan.planType === 'multi_same_city' ? 'Multi-visit' : 'Single'}</div>
-                        {balance && (
-                            <div>
-                                <div className="flex justify-between text-xs mb-1">
-                                    <span className="text-gray-500">Balance</span>
-                                    <span className={`font-medium ${balance.spentAmount > balance.grantedAmount ? 'text-red-600' : 'text-green-700'}`}>
-                                        ₹{((balance.grantedAmount || 0) - (balance.spentAmount || 0)).toLocaleString('en-IN')} left
-                                    </span>
-                                </div>
-                                <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                    <div className={`h-full rounded-full transition-all ${
-                                        (balance.spentAmount / balance.grantedAmount) > 1 ? 'bg-red-500' :
-                                        (balance.spentAmount / balance.grantedAmount) > 0.7 ? 'bg-yellow-500' :
-                                        'bg-green-500'
-                                    }`} style={{ width: `${Math.min(100, ((balance.spentAmount || 0) / (balance.grantedAmount || 1)) * 100)}%` }} />
-                                </div>
-                                <div className="text-[10px] text-gray-400 mt-0.5">
-                                    ₹{(balance.spentAmount || 0).toLocaleString('en-IN')} / ₹{(balance.grantedAmount || 0).toLocaleString('en-IN')} granted
-                                </div>
+                        {schedule.scheduledEndDate && (
+                            <div className="text-[10px] text-slate-400 mt-0.5">
+                                {Math.round((new Date(schedule.scheduledEndDate) - new Date(schedule.scheduledDate)) / 60000)} min
                             </div>
                         )}
                     </div>
+                </div>
+
+                {/* Location */}
+                {schedule.location && (
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                        <MapPin className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                        <span className="text-xs text-slate-700">{schedule.location}</span>
+                    </div>
                 )}
 
+                {/* Agent */}
+                {schedule.agentId?.city && (
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                        <Building2 className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                        <div>
+                            <div className="text-xs font-semibold text-slate-700">{schedule.agentId.name}</div>
+                            <div className="text-[10px] text-slate-400">{schedule.agentId.city}{schedule.agentId.state ? `, ${schedule.agentId.state}` : ''}</div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Client Photo */}
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100">
+                    <Users className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                    <div>
+                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wide mb-0.5">Client Photo</div>
+                        {!schedule.clientPhoto?.uploadRef ? (
+                            <span className="text-xs text-orange-600 font-semibold">Not uploaded</span>
+                        ) : (
+                            <span className={`text-xs font-semibold capitalize ${
+                                schedule.clientPhoto.verificationStatus === 'verified' ? 'text-emerald-600' :
+                                schedule.clientPhoto.verificationStatus === 'rejected' ? 'text-red-600' :
+                                'text-amber-600'
+                            }`}>
+                                {schedule.clientPhoto.verificationStatus}
+                            </span>
+                        )}
+                    </div>
+                </div>
+
+                {/* Visit Plan */}
+                {plan && (
+                    <div className="rounded-xl border border-blue-100 bg-blue-50/50 overflow-hidden">
+                        <div className="px-3 py-2.5 border-b border-blue-100 flex items-center gap-2">
+                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${PLAN_DOT[plan.status] || 'bg-slate-400'}`} />
+                            <span className="text-xs font-bold text-slate-700 truncate">{plan.title}</span>
+                        </div>
+                        <div className="p-3 space-y-2">
+                            <div className="text-[10px] text-slate-500">
+                                {plan.city} · {plan.planType === 'multi_same_city' ? 'Multi-visit' : 'Single visit'}
+                            </div>
+                            {balance && granted > 0 && (
+                                <div>
+                                    <div className="flex justify-between text-[10px] mb-1.5">
+                                        <span className="text-slate-500 font-medium">Budget used</span>
+                                        <span className={`font-bold ${spent > granted ? 'text-red-600' : 'text-emerald-700'}`}>
+                                            ₹{(granted - spent).toLocaleString('en-IN')} left
+                                        </span>
+                                    </div>
+                                    <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                        <div className={`h-full rounded-full transition-all ${
+                                            pct > 100 ? 'bg-red-500' : pct > 70 ? 'bg-amber-500' : 'bg-emerald-500'
+                                        }`} style={{ width: `${pct}%` }} />
+                                    </div>
+                                    <div className="text-[9px] text-slate-400 mt-1 text-right">
+                                        ₹{spent.toLocaleString('en-IN')} / ₹{granted.toLocaleString('en-IN')}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Notes */}
                 {schedule.notes && (
-                    <p className="text-xs text-gray-500 italic">{schedule.notes}</p>
+                    <div className="p-3 rounded-xl bg-amber-50/60 border border-amber-100">
+                        <div className="text-[10px] font-bold text-amber-700 uppercase tracking-wide mb-1">Notes</div>
+                        <p className="text-xs text-slate-600 leading-relaxed">{schedule.notes}</p>
+                    </div>
                 )}
             </div>
-            <div className="p-4 border-t border-gray-100 flex gap-2">
+
+            {/* Actions */}
+            <div className="p-4 border-t border-slate-100 flex gap-2">
                 <button onClick={() => onEdit(schedule)}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-sm text-blue-600 hover:bg-blue-50 py-1.5 rounded-lg transition-colors">
-                    <Pencil className="w-3.5 h-3.5" /> Edit
+                    className="flex-1 flex items-center justify-center gap-1.5 text-sm font-semibold text-blue-600 border border-blue-200 bg-blue-50 hover:bg-blue-100 py-2 rounded-xl transition-colors">
+                    <Pencil className="w-3.5 h-3.5" /> Edit Plan
                 </button>
                 <button onClick={() => onDelete(schedule)}
-                    className="flex-1 flex items-center justify-center gap-1.5 text-sm text-red-500 hover:bg-red-50 py-1.5 rounded-lg transition-colors">
-                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                    className="flex items-center justify-center gap-1.5 text-sm font-semibold text-red-500 border border-red-100 bg-red-50 hover:bg-red-100 px-4 py-2 rounded-xl transition-colors">
+                    <Trash2 className="w-3.5 h-3.5" />
                 </button>
             </div>
         </div>
@@ -387,32 +535,41 @@ function ScheduleDrawer({ schedule, balance, onClose, onEdit, onDelete }) {
 
 // ── Filter Bar ────────────────────────────────────────────────────────────────
 function FilterBar({ filters, onChange, agents }) {
+    const sel = 'text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:ring-1 focus:ring-blue-300 focus:border-blue-300 text-slate-700 outline-none cursor-pointer';
     return (
-        <div className="flex items-center gap-2 flex-wrap bg-gray-50 border-b border-gray-200 px-4 py-2">
-            <Filter className="w-3.5 h-3.5 text-gray-400" />
-            <select className="text-xs border border-gray-200 rounded px-2 py-1 bg-white"
-                value={filters.agent || ''} onChange={e => onChange({ ...filters, agent: e.target.value || undefined })}>
+        <div className="flex items-center gap-2 flex-wrap bg-white border-b border-slate-200 px-4 py-2.5 shadow-sm">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Filters</span>
+            <div className="w-px h-4 bg-slate-200" />
+            <select className={sel} value={filters.agent || ''}
+                onChange={e => onChange({ ...filters, agent: e.target.value || undefined })}>
                 <option value="">All agents</option>
                 {agents.map(a => <option key={a._id} value={a._id}>{a.name}</option>)}
             </select>
-            <select className="text-xs border border-gray-200 rounded px-2 py-1 bg-white"
-                value={filters.status || ''} onChange={e => onChange({ ...filters, status: e.target.value || undefined })}>
+            <select className={sel} value={filters.status || ''}
+                onChange={e => onChange({ ...filters, status: e.target.value || undefined })}>
                 <option value="">All statuses</option>
-                {['pending','attended','missed','cancelled'].map(s => <option key={s} value={s}>{s}</option>)}
+                {['pending','attended','missed','cancelled'].map(s => (
+                    <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                ))}
             </select>
-            <select className="text-xs border border-gray-200 rounded px-2 py-1 bg-white"
-                value={filters.planStatus || ''} onChange={e => onChange({ ...filters, planStatus: e.target.value || undefined })}>
-                <option value="">All plan statuses</option>
-                {['draft','scheduled','in_progress','completed','cancelled','closed'].map(s => <option key={s} value={s}>{s}</option>)}
+            <select className={sel} value={filters.planStatus || ''}
+                onChange={e => onChange({ ...filters, planStatus: e.target.value || undefined })}>
+                <option value="">All plan stages</option>
+                {['draft','scheduled','in_progress','completed','cancelled','closed'].map(s => (
+                    <option key={s} value={s}>{s.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase())}</option>
+                ))}
             </select>
-            <label className="flex items-center gap-1 text-xs text-gray-600 cursor-pointer">
+            <label className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer select-none px-2.5 py-1.5 border border-slate-200 rounded-lg bg-white hover:bg-slate-50 transition-colors">
                 <input type="checkbox" checked={!!filters.hasOpenClaim}
-                    onChange={e => onChange({ ...filters, hasOpenClaim: e.target.checked || undefined })} />
+                    onChange={e => onChange({ ...filters, hasOpenClaim: e.target.checked || undefined })}
+                    className="accent-blue-600" />
                 Open claim
             </label>
             {Object.values(filters).some(Boolean) && (
                 <button onClick={() => onChange({})}
-                    className="text-xs text-red-500 hover:text-red-700 ml-1">Clear</button>
+                    className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-2.5 py-1.5 rounded-lg border border-red-100 bg-red-50 hover:bg-red-100 transition-colors font-semibold">
+                    <XCircle className="w-3 h-3" /> Clear
+                </button>
             )}
         </div>
     );
@@ -425,121 +582,115 @@ export default function Calendar() {
     const [searchParams, setSearchParams] = useSearchParams();
     const today = new Date();
 
-    // View state from URL
     const viewParam = searchParams.get('view') || 'month';
     const dateParam = searchParams.get('date');
-    const [view, setView] = useState(VIEWS.includes(viewParam) ? viewParam : 'month');
+    const [view, setView]       = useState(VIEWS.includes(viewParam) ? viewParam : 'month');
     const [curDate, setCurDate] = useState(dateParam ? new Date(dateParam) : today);
 
-    const [schedules, setSchedules] = useState([]);
-    const [agents, setAgents] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [filters, setFilters] = useState(savedFilters);
-
+    const [schedules, setSchedules]         = useState([]);
+    const [agents, setAgents]               = useState([]);
+    const [loading, setLoading]             = useState(true);
+    const [error, setError]                 = useState(null);
+    const [filters, setFilters]             = useState(savedFilters);
     const [drawerSchedule, setDrawerSchedule] = useState(null);
     const [drawerBalance, setDrawerBalance] = useState(null);
-    const [showFilters, setShowFilters] = useState(false);
+    const [showFilters, setShowFilters]     = useState(false);
+    const [planModal, setPlanModal]         = useState({ open: false, defaultDate: null });
 
-    const [planModal, setPlanModal] = useState({ open: false, defaultDate: null });
-
-    // Google Calendar State
+    // Google Calendar
     const [googleConnected, setGoogleConnected] = useState(false);
-    const [toastMessage, setToastMessage] = useState(null);
+    const [gcalEmail, setGcalEmail]             = useState(null);
+    const [toastMessage, setToastMessage]       = useState(null);
 
-    // Derived date ranges
-    const viewYear = curDate.getFullYear();
+    const viewYear  = curDate.getFullYear();
     const viewMonth = curDate.getMonth();
     const weekStart = startOfWeek(curDate);
 
-    // ── Persist view + date to URL ──────────────────────────────────────────
+    // ── Persist view + date to URL ────────────────────────────────────────────
     useEffect(() => {
-        const d = curDate.toISOString().slice(0, 10);
-        setSearchParams({ view, date: d }, { replace: true });
+        setSearchParams({ view, date: curDate.toISOString().slice(0, 10) }, { replace: true });
     }, [view, curDate]);
 
-    // ── Persist filters to localStorage ────────────────────────────────────
+    // ── Persist filters ───────────────────────────────────────────────────────
     useEffect(() => {
         localStorage.setItem('cal_filters', JSON.stringify(filters));
     }, [filters]);
 
-    // ── Check Google Calendar Status ────────────────────────────────────────
+    // ── Google Calendar status ────────────────────────────────────────────────
     useEffect(() => {
-        const fetchGcalStatus = async () => {
+        (async () => {
             try {
-                const res = await fetch(`${API}/google-calendar/status`, { credentials: 'include' });
+                const res  = await fetch(`${API}/google-calendar/status`, { credentials: 'include' });
                 const data = await res.json();
                 if (data.success) {
-                    setGoogleConnected(data.data.connected);
+                    setGoogleConnected(data.connected);   // ← flat response, not data.data
+                    setGcalEmail(data.email || null);
                 }
-            } catch (e) { }
-        };
-        fetchGcalStatus();
+            } catch { /* non-critical */ }
+        })();
 
-        // Handle gcal callback params
+        // Handle OAuth callback params
         const gcalStatus = searchParams.get('gcal');
         if (gcalStatus === 'connected') {
-            setToastMessage({ type: 'success', text: 'Successfully connected to Google Calendar!' });
-            searchParams.delete('gcal');
-            setSearchParams(searchParams, { replace: true });
+            setToastMessage({ type: 'success', text: 'Google Calendar connected successfully!' });
+            // Refresh status after connect
+            setTimeout(async () => {
+                try {
+                    const res  = await fetch(`${API}/google-calendar/status`, { credentials: 'include' });
+                    const data = await res.json();
+                    if (data.success) { setGoogleConnected(data.connected); setGcalEmail(data.email || null); }
+                } catch { /* ignore */ }
+            }, 800);
         } else if (gcalStatus === 'error') {
-            setToastMessage({ type: 'error', text: 'Failed to connect to Google Calendar.' });
-            searchParams.delete('gcal');
-            setSearchParams(searchParams, { replace: true });
+            setToastMessage({ type: 'error', text: 'Failed to connect Google Calendar. Please try again.' });
         }
-
         if (gcalStatus) {
-            setTimeout(() => setToastMessage(null), 3000);
+            const sp = new URLSearchParams(searchParams);
+            sp.delete('gcal');
+            setSearchParams(sp, { replace: true });
+            setTimeout(() => setToastMessage(null), 4000);
         }
     }, []);
 
-    // ── Keyboard shortcuts ──────────────────────────────────────────────────
+    // ── Keyboard shortcuts ────────────────────────────────────────────────────
     useEffect(() => {
         const handler = (e) => {
             if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
-            switch (e.key) {
-                case 't': case 'T': setCurDate(new Date()); break;
-                case 'n': case 'N': setPlanModal({ open: true, defaultDate: curDate }); break;
-                case 'ArrowLeft':  navigate(-1); break;
-                case 'ArrowRight': navigate(1); break;
-                case '1': setView('month'); break;
-                case '2': setView('week'); break;
-                case '3': setView('day'); break;
-                case '4': setView('agenda'); break;
-            }
+            if (e.key === 't' || e.key === 'T') setCurDate(new Date());
+            if (e.key === 'n' || e.key === 'N') setPlanModal({ open: true, defaultDate: curDate });
+            if (e.key === '1') setView('month');
+            if (e.key === '2') setView('week');
+            if (e.key === '3') setView('day');
+            if (e.key === '4') setView('agenda');
         };
         window.addEventListener('keydown', handler);
         return () => window.removeEventListener('keydown', handler);
     }, [curDate]);
 
-    // ── Fetch ───────────────────────────────────────────────────────────────
+    // ── Fetch schedules ───────────────────────────────────────────────────────
     const fetchSchedules = useCallback(async () => {
         setLoading(true); setError(null);
         try {
             let start, end;
             if (view === 'month') {
                 start = new Date(viewYear, viewMonth, 1);
-                end = new Date(viewYear, viewMonth + 1, 0);
+                end   = new Date(viewYear, viewMonth + 1, 0);
             } else if (view === 'week') {
                 start = weekStart;
-                end = addDays(weekStart, 6);
+                end   = addDays(weekStart, 6);
             } else if (view === 'day') {
                 start = new Date(curDate); start.setHours(0,0,0,0);
-                end = new Date(curDate); end.setHours(23,59,59,999);
-            } else { // agenda — next 30 days
+                end   = new Date(curDate); end.setHours(23,59,59,999);
+            } else {
                 start = new Date(); start.setHours(0,0,0,0);
-                end = addDays(start, 30);
+                end   = addDays(start, 30);
             }
-
-            const params = new URLSearchParams({
-                start: start.toISOString(),
-                end: end.toISOString()
-            });
-            if (filters.agent) params.set('agent', filters.agent);
+            const params = new URLSearchParams({ start: start.toISOString(), end: end.toISOString() });
+            if (filters.agent)      params.set('agent',      filters.agent);
             if (filters.planStatus) params.set('planStatus', filters.planStatus);
             if (filters.hasOpenClaim) params.set('hasOpenClaim', 'true');
 
-            const res = await fetch(`${API}/calendar?${params}`, { credentials: 'include' });
+            const res  = await fetch(`${API}/calendar?${params}`, { credentials: 'include' });
             const data = await res.json();
             if (!data.success) throw new Error(data.message);
 
@@ -562,7 +713,7 @@ export default function Calendar() {
             .catch(() => {});
     }, []);
 
-    // ── Balance for drawer ──────────────────────────────────────────────────
+    // ── Drawer balance ────────────────────────────────────────────────────────
     useEffect(() => {
         if (!drawerSchedule?.visitPlanRef?._id) { setDrawerBalance(null); return; }
         fetch(`${API}/visit-plans/${drawerSchedule.visitPlanRef._id}/balance`, { credentials: 'include' })
@@ -571,27 +722,23 @@ export default function Calendar() {
             .catch(() => setDrawerBalance(null));
     }, [drawerSchedule]);
 
-    // ── Navigation ──────────────────────────────────────────────────────────
+    // ── Navigation ────────────────────────────────────────────────────────────
     const navigate_cal = (dir) => {
         const d = new Date(curDate);
-        if (view === 'month') d.setMonth(d.getMonth() + dir);
-        else if (view === 'week') d.setDate(d.getDate() + dir * 7);
-        else d.setDate(d.getDate() + dir);
+        if (view === 'month')      d.setMonth(d.getMonth() + dir);
+        else if (view === 'week')  d.setDate(d.getDate() + dir * 7);
+        else                       d.setDate(d.getDate() + dir);
         setCurDate(d);
     };
 
     const headerLabel = () => {
-        if (view === 'month') return `${MONTHS[viewMonth]} ${viewYear}`;
-        if (view === 'week') {
-            const ws = weekStart;
-            const we = addDays(ws, 6);
-            return `${fmtDate(ws)} – ${fmtDate(we)}`;
-        }
-        if (view === 'day') return curDate.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-        return 'Upcoming 30 days';
+        if (view === 'month')  return `${MONTHS[viewMonth]} ${viewYear}`;
+        if (view === 'week')   return `${fmtDate(weekStart)} – ${fmtDate(addDays(weekStart, 6))}`;
+        if (view === 'day')    return fmtFull(curDate);
+        return 'Next 30 days';
     };
 
-    // ── Delete handler ──────────────────────────────────────────────────────
+    // ── Delete ────────────────────────────────────────────────────────────────
     const handleDelete = async (schedule) => {
         if (!window.confirm(`Delete "${schedule.title}"?`)) return;
         try {
@@ -600,135 +747,150 @@ export default function Calendar() {
             if (!d.success) throw new Error(d.message);
             setDrawerSchedule(null);
             fetchSchedules();
-        } catch (e) {
-            alert(e.message);
+        } catch (e) { alert(e.message); }
+    };
+
+    // ── Google Calendar toggle ────────────────────────────────────────────────
+    const handleGoogleCalendarToggle = async () => {
+        if (googleConnected) {
+            if (!window.confirm('Disconnect Google Calendar? Future schedules will not sync.')) return;
+            try {
+                const res  = await fetch(`${API}/google-calendar/disconnect`, { method: 'POST', credentials: 'include' });
+                const data = await res.json();
+                if (data.success) {
+                    setGoogleConnected(false);
+                    setGcalEmail(null);
+                    setToastMessage({ type: 'success', text: 'Google Calendar disconnected.' });
+                    setTimeout(() => setToastMessage(null), 3000);
+                }
+            } catch { alert('Failed to disconnect Google Calendar'); }
+        } else {
+            try {
+                const res  = await fetch(`${API}/google-calendar/auth-url`, { credentials: 'include' });
+                const data = await res.json();
+                if (data.success && data.url) window.location.href = data.url;
+            } catch { alert('Failed to get Google Calendar authorization URL'); }
         }
     };
 
     const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
-    // ── Google Calendar Toggle Handler ──────────────────────────────────────
-    const handleGoogleCalendarToggle = async () => {
-        if (googleConnected) {
-            if (!window.confirm('Disconnect Google Calendar? Future schedules will not sync.')) return;
-            try {
-                const res = await fetch(`${API}/google-calendar/disconnect`, { method: 'POST', credentials: 'include' });
-                const data = await res.json();
-                if (data.success) {
-                    setGoogleConnected(false);
-                    setToastMessage({ type: 'success', text: 'Google Calendar disconnected.' });
-                    setTimeout(() => setToastMessage(null), 3000);
-                }
-            } catch (e) {
-                alert('Failed to disconnect Google Calendar');
-            }
-        } else {
-            // Get Auth URL and redirect
-            try {
-                const res = await fetch(`${API}/google-calendar/auth-url`, { credentials: 'include' });
-                const data = await res.json();
-                if (data.success && data.url) {
-                    window.location.href = data.url;
-                }
-            } catch (e) {
-                alert('Failed to get Google Calendar authorization URL');
-            }
-        }
-    };
-
     return (
-        <div className="h-screen flex flex-col bg-white">
-            {/* ── Toolbar ── */}
-            <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-200 flex-shrink-0">
-                <div className="flex items-center gap-1">
-                    <button onClick={() => navigate_cal(-1)} className="p-1.5 rounded hover:bg-gray-100 transition-colors">
+        <div className="h-screen flex flex-col bg-slate-50">
+            {/* ── Toolbar ─────────────────────────────────────────────── */}
+            <div className="flex items-center gap-2 px-4 py-3 bg-white border-b border-slate-200 shadow-sm flex-shrink-0">
+                {/* Nav */}
+                <div className="flex items-center gap-0.5">
+                    <button onClick={() => navigate_cal(-1)}
+                        className="p-2 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors">
                         <ChevronLeft className="w-4 h-4" />
                     </button>
                     <button onClick={() => setCurDate(new Date())}
-                        className="text-xs text-blue-600 hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-50">
+                        className="text-xs font-semibold text-blue-600 hover:text-blue-800 px-3 py-1.5 rounded-lg hover:bg-blue-50 transition-colors">
                         Today
                     </button>
-                    <button onClick={() => navigate_cal(1)} className="p-1.5 rounded hover:bg-gray-100 transition-colors">
+                    <button onClick={() => navigate_cal(1)}
+                        className="p-2 rounded-lg hover:bg-slate-100 text-slate-600 transition-colors">
                         <ChevronRight className="w-4 h-4" />
                     </button>
                 </div>
-                <h2 className="font-semibold text-gray-800 text-sm min-w-0">{headerLabel()}</h2>
+
+                <h2 className="font-bold text-slate-800 text-sm min-w-0 truncate ml-1">{headerLabel()}</h2>
+
+                {loading && <RefreshCw className="w-3.5 h-3.5 text-slate-400 animate-spin ml-1" />}
 
                 <div className="ml-auto flex items-center gap-1.5">
                     {/* View switcher */}
-                    <div className="flex rounded-lg border border-gray-200 overflow-hidden text-xs">
+                    <div className="hidden sm:flex rounded-lg border border-slate-200 overflow-hidden bg-slate-50 text-xs">
                         {[
-                            { key: 'month', icon: LayoutGrid, label: 'Month' },
-                            { key: 'week',  icon: Rows, label: 'Week' },
-                            { key: 'day',   icon: CalIcon, label: 'Day' },
-                            { key: 'agenda', icon: List, label: 'Agenda' },
+                            { key: 'month',  icon: LayoutGrid, label: 'Month'  },
+                            { key: 'week',   icon: Rows,       label: 'Week'   },
+                            { key: 'day',    icon: CalIcon,    label: 'Day'    },
+                            { key: 'agenda', icon: List,       label: 'Agenda' },
                         ].map(({ key, icon: Icon, label }) => (
                             <button key={key} onClick={() => setView(key)}
-                                className={`flex items-center gap-1 px-2.5 py-1.5 transition-colors
-                                    ${view === key ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
+                                className={`flex items-center gap-1 px-2.5 py-1.5 transition-all font-medium
+                                    ${view === key
+                                        ? 'bg-blue-600 text-white shadow-inner'
+                                        : 'text-slate-600 hover:bg-white hover:text-slate-800'}`}>
                                 <Icon className="w-3.5 h-3.5" />
-                                <span className="hidden sm:inline">{label}</span>
+                                <span className="hidden md:inline">{label}</span>
                             </button>
                         ))}
                     </div>
 
-                    {/* Filters toggle */}
+                    {/* Filters */}
                     <button onClick={() => setShowFilters(f => !f)}
-                        className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border transition-colors
-                            ${activeFilterCount > 0 ? 'border-blue-400 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+                        className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border font-semibold transition-all
+                            ${activeFilterCount > 0
+                                ? 'border-blue-400 bg-blue-600 text-white shadow-sm'
+                                : 'border-slate-200 text-slate-600 hover:bg-slate-50 bg-white'}`}>
                         <Filter className="w-3.5 h-3.5" />
-                        {activeFilterCount > 0 && <span className="font-semibold">{activeFilterCount}</span>}
+                        <span className="hidden sm:inline">Filter</span>
+                        {activeFilterCount > 0 && (
+                            <span className="w-4 h-4 bg-white/30 rounded-full text-[10px] font-bold flex items-center justify-center">
+                                {activeFilterCount}
+                            </span>
+                        )}
                     </button>
 
-                    {/* Google Calendar Toggle */}
+                    {/* Google Calendar */}
                     <button onClick={handleGoogleCalendarToggle}
-                        className={`flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border transition-colors
-                            ${googleConnected ? 'border-green-200 bg-green-50 text-green-700 hover:bg-green-100' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
-                        {googleConnected ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Link2 className="w-3.5 h-3.5" />}
-                        <span className="hidden sm:inline">{googleConnected ? 'GCal Connected' : 'Connect GCal'}</span>
+                        className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border font-semibold transition-all
+                            ${googleConnected
+                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
+                        title={googleConnected ? `Connected: ${gcalEmail || 'Google Calendar'}` : 'Connect Google Calendar'}>
+                        {googleConnected
+                            ? <><span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" /><span className="hidden sm:inline">GCal On</span></>
+                            : <><Link2 className="w-3.5 h-3.5" /><span className="hidden sm:inline">Connect GCal</span></>
+                        }
                     </button>
 
-                    {/* New plan */}
+                    {/* New Plan */}
                     <button onClick={() => setPlanModal({ open: true, defaultDate: curDate })}
-                        className="flex items-center gap-1 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors">
-                        <Plus className="w-3.5 h-3.5" /> New Plan
+                        className="flex items-center gap-1 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-semibold">
+                        <Plus className="w-3.5 h-3.5" />
+                        <span className="hidden sm:inline">New Plan</span>
                     </button>
-
-                    {loading && <RefreshCw className="w-4 h-4 text-gray-400 animate-spin" />}
                 </div>
             </div>
 
-            {/* ── Keyboard hints ── */}
-            <div className="hidden md:flex items-center gap-3 px-4 py-1 bg-gray-50 border-b border-gray-100 text-[10px] text-gray-400">
-                <span><kbd className="font-mono bg-gray-200 px-1 rounded">T</kbd> Today</span>
-                <span><kbd className="font-mono bg-gray-200 px-1 rounded">N</kbd> New plan</span>
-                <span><kbd className="font-mono bg-gray-200 px-1 rounded">1</kbd>–<kbd className="font-mono bg-gray-200 px-1 rounded">4</kbd> Views</span>
+            {/* ── Keyboard hints ─────────────────────────────────────── */}
+            <div className="hidden lg:flex items-center gap-4 px-4 py-1.5 bg-slate-100/80 border-b border-slate-200 text-[10px] text-slate-400">
+                {[['T','Today'],['N','New plan'],['1–4','Switch view']].map(([k,d]) => (
+                    <span key={k}><kbd className="font-mono bg-white border border-slate-200 px-1 py-0.5 rounded text-[9px]">{k}</kbd> {d}</span>
+                ))}
             </div>
 
-            {/* ── Filter bar ── */}
+            {/* ── Filter bar ─────────────────────────────────────────── */}
             {showFilters && <FilterBar filters={filters} onChange={setFilters} agents={agents} />}
 
-            {/* ── Error ── */}
+            {/* ── Error ──────────────────────────────────────────────── */}
             {error && (
-                <div className="mx-4 mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center gap-2">
+                <div className="mx-4 mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700 flex items-center gap-2 shadow-sm">
                     <AlertCircle className="w-4 h-4 flex-shrink-0" />
-                    {error}
-                    <button onClick={fetchSchedules} className="ml-auto text-red-600 hover:underline">Retry</button>
+                    <span>{error}</span>
+                    <button onClick={fetchSchedules} className="ml-auto text-red-600 font-semibold hover:underline text-xs">Retry</button>
                 </div>
             )}
 
-            {/* ── Toast ── */}
+            {/* ── Toast ──────────────────────────────────────────────── */}
             {toastMessage && (
-                <div className={`fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 text-sm font-medium animate-fade-in
-                    ${toastMessage.type === 'error' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-green-50 text-green-700 border border-green-200'}`}>
-                    {toastMessage.type === 'error' ? <AlertCircle className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
+                <div className={`fixed bottom-5 right-5 z-50 px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 text-sm font-semibold animate-fade-in border
+                    ${toastMessage.type === 'error'
+                        ? 'bg-white text-red-700 border-red-200 shadow-red-100'
+                        : 'bg-white text-emerald-700 border-emerald-200 shadow-emerald-100'}`}>
+                    {toastMessage.type === 'error'
+                        ? <AlertCircle className="w-4 h-4 text-red-500" />
+                        : <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
                     {toastMessage.text}
                 </div>
             )}
 
-            {/* ── Main content + drawer ── */}
+            {/* ── Main content + drawer ──────────────────────────────── */}
             <div className="flex flex-1 overflow-hidden">
-                <div className="flex-1 flex flex-col overflow-hidden">
+                <div className="flex-1 flex flex-col overflow-hidden bg-white">
                     {view === 'month' && (
                         <MonthView
                             year={viewYear} month={viewMonth}
@@ -770,16 +932,14 @@ export default function Calendar() {
                         onClose={() => setDrawerSchedule(null)}
                         onEdit={s => {
                             setDrawerSchedule(null);
-                            if (s.visitPlanRef?._id) {
-                                navigate(`/visit-plans/${s.visitPlanRef._id}`);
-                            }
+                            if (s.visitPlanRef?._id) navigate(`/visit-plans/${s.visitPlanRef._id}`);
                         }}
                         onDelete={handleDelete}
                     />
                 )}
             </div>
 
-            {/* ── Plan creation modal ── */}
+            {/* ── Plan modal ──────────────────────────────────────────── */}
             {planModal.open && (
                 <PlanModal
                     defaultDate={planModal.defaultDate}

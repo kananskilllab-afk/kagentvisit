@@ -3,20 +3,20 @@ const User = require('../models/User');
 
 const SCOPES = ['https://www.googleapis.com/auth/calendar.events'];
 
-function getOAuth2Client() {
+function getOAuth2Client(redirectUri) {
     return new google.auth.OAuth2(
         process.env.GOOGLE_CLIENT_ID,
         process.env.GOOGLE_CLIENT_SECRET,
-        process.env.GOOGLE_REDIRECT_URI
+        redirectUri || process.env.GOOGLE_REDIRECT_URI
     );
 }
 
 /**
  * Generate the Google OAuth consent URL.
- * We pass the user's DB id as `state` so the callback can link tokens to the right user.
+ * redirectUri must match what is registered in Google Cloud Console.
  */
-function getAuthUrl(userId) {
-    const client = getOAuth2Client();
+function getAuthUrl(userId, redirectUri) {
+    const client = getOAuth2Client(redirectUri);
     return client.generateAuthUrl({
         access_type: 'offline',
         prompt: 'consent',
@@ -27,9 +27,10 @@ function getAuthUrl(userId) {
 
 /**
  * Exchange the authorization code for tokens and persist them on the User document.
+ * redirectUri must exactly match the one used in getAuthUrl.
  */
-async function handleCallback(code, userId) {
-    const client = getOAuth2Client();
+async function handleCallback(code, userId, redirectUri) {
+    const client = getOAuth2Client(redirectUri);
     const { tokens } = await client.getToken(code);
     client.setCredentials(tokens);
 

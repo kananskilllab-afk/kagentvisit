@@ -375,6 +375,11 @@ const VisitsList = () => {
                                                         {!isAdmin && visit.status === 'action_required' && (
                                                             <Bell className="w-3 h-3 text-red-500 animate-bounce" title="Action Required By Admin" />
                                                         )}
+                                                        {!isAdmin && visit.forUser && visit.submittedBy?.name && (
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[8px] font-black bg-brand-purple/10 text-brand-purple shrink-0">
+                                                                By {visit.submittedBy.name}
+                                                            </span>
+                                                        )}
                                                     </p>
                                                 </div>
                                             </div>
@@ -424,7 +429,7 @@ const VisitsList = () => {
                                                         Unlock
                                                     </button>
                                                 )}
-                                                {(isAdmin || visit.submittedBy?._id === user?._id) && (
+                                                {(isAdmin || visit.submittedBy?._id === user?._id || visit.forUser?._id === user?._id) && (
                                                     <button
                                                         onClick={() => navigate(`/edit-visit/${visit._id}`)}
                                                         className="p-1.5 rounded-lg border border-brand-blue/20 text-brand-blue hover:bg-brand-blue/5 transition-all"
@@ -433,7 +438,7 @@ const VisitsList = () => {
                                                         <Edit className="w-3.5 h-3.5" />
                                                     </button>
                                                 )}
-                                                {(user?.role === 'superadmin' || visit.submittedBy?._id === user?._id) && (
+                                                {(user?.role === 'superadmin' || visit.submittedBy?._id === user?._id || visit.forUser?._id === user?._id) && (
                                                     <button
                                                         onClick={() => setVisitToDelete(visit)}
                                                         className="p-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-all"
@@ -468,7 +473,7 @@ const VisitsList = () => {
                                                 {visit?.studentInfo?.name || visit?.meta?.companyName || 'Untitled'}
                                                 {visit.isLocked && <Lock className="w-3 h-3 text-red-400" />}
                                             </p>
-                                            <div className="flex items-center gap-2 mt-0.5">
+                                            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                                                 <p className="text-xs text-slate-400">
                                                     {new Date(visit.createdAt).toLocaleDateString()}
                                                 </p>
@@ -477,6 +482,11 @@ const VisitsList = () => {
                                                         <UserIcon className="w-3 h-3" />
                                                         {visit.submittedBy.name}
                                                     </p>
+                                                )}
+                                                {!isAdmin && visit.forUser && visit.submittedBy?.name && (
+                                                    <span className="px-1.5 py-0.5 rounded bg-brand-purple/10 text-brand-purple text-[8px] font-black">
+                                                        By {visit.submittedBy.name}
+                                                    </span>
                                                 )}
                                                 {isAdmin && visit.unlockRequestSent && (
                                                     <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-600 text-[8px] font-black uppercase">
@@ -498,7 +508,7 @@ const VisitsList = () => {
                                                 Unlock
                                             </button>
                                         )}
-                                        {(isAdmin || visit.submittedBy?._id === user?._id) && (
+                                        {(isAdmin || visit.submittedBy?._id === user?._id || visit.forUser?._id === user?._id) && (
                                             <button
                                                 onClick={() => navigate(`/edit-visit/${visit._id}`)}
                                                 className="p-2 rounded-lg border border-brand-blue/20 text-brand-blue hover:bg-brand-blue/5"
@@ -506,7 +516,7 @@ const VisitsList = () => {
                                                 <Edit className="w-4 h-4" />
                                             </button>
                                         )}
-                                        {(user?.role === 'superadmin' || visit.submittedBy?._id === user?._id) && (
+                                        {(user?.role === 'superadmin' || visit.submittedBy?._id === user?._id || visit.forUser?._id === user?._id) && (
                                             <button
                                                 onClick={() => setVisitToDelete(visit)}
                                                 className="p-2 rounded-lg border border-red-200 text-red-500 hover:bg-red-50"

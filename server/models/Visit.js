@@ -10,6 +10,13 @@ const adminNoteSchema = new mongoose.Schema({
     addedAt:   { type: Date, default: Date.now }
 }, { _id: true });
 
+const statusHistorySchema = new mongoose.Schema({
+    status:    { type: String, required: true },
+    changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    comment:   { type: String },
+    timestamp: { type: Date, default: Date.now }
+}, { _id: true });
+
 const editHistorySchema = new mongoose.Schema({
     editedAt:        { type: Date, default: Date.now },
     editedBy:        { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -35,6 +42,11 @@ const visitSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true,
+        index: true
+    },
+    forUser: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
         index: true
     },
     status: {
@@ -334,7 +346,13 @@ const visitSchema = new mongoose.Schema({
 
     // Locking & Unlocking (24h rule from submission, NOT creation)
     isAdminUnlocked:   { type: Boolean, default: false },
-    unlockRequestSent: { type: Boolean, default: false }
+    unlockRequestSent: { type: Boolean, default: false },
+
+    // Review tracking
+    reviewedBy:     { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+    reviewedAt:     { type: Date, default: null },
+    reviewComment:  { type: String, default: null },
+    statusHistory:  [statusHistorySchema]
 
 }, {
     timestamps: true

@@ -1,9 +1,33 @@
 const User = require('../models/User');
 
-// @desc    Get all users
+// @desc    Get users assignable for visit creation (admin: their assignedEmployees, superadmin: all)
+exports.getAssignableUsers = async (req, res) => {
+    try {
+        let users;
+        if (req.user.role === 'superadmin') {
+            users = await User.find({ isActive: true }).select('-passwordHash').sort({ name: 1 });
+        } else {
+            const admin = await User.findById(req.user._id).populate('assignedEmployees', '-passwordHash');
+            users = (admin.assignedEmployees || []).filter(u => u.isActive);
+        }
+        res.json({ success: true, data: users });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// @desc    Get all users (superadmin: all, admin: own department only)
 exports.getUsers = async (req, res) => {
     try {
-        const users = await User.find({}).select('-passwordHash').sort({ createdAt: -1 });
+        let query = {};
+
+        if (req.user.role === 'admin') {
+            // Admins only see field users in their department
+            query.department = req.user.department;
+            query.role = { $in: ['user', 'home_visit'] };
+        }
+
+        const users = await User.find(query).select('-passwordHash').sort({ name: 1 });
         res.json({ success: true, data: users });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

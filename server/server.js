@@ -1,6 +1,5 @@
 const express = require('express');
 const path = require('path');
-const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -8,6 +7,8 @@ const mongoSanitize = require('express-mongo-sanitize');
 const dotenv = require('dotenv');
 const { globalLimiter } = require('./middleware/rateLimiter');
 const auditLogger = require('./middleware/auditLogger');
+const { connectDB } = require('./config/db');
+const { seedData } = require('./services/bootstrapSeed.service');
 
 // Load environment variables
 dotenv.config();
@@ -16,34 +17,6 @@ const app = express();
 
 // Trust proxy for express-rate-limit behind Vercel/proxies
 app.set('trust proxy', 1);
-
-// Database connection singleton for Serverless
-let isConnected = false;
-
-const connectDB = async () => {
-    if (isConnected && mongoose.connection.readyState === 1) {
-        return;
-    }
-
-    if (!process.env.MONGODB_URI) {
-        console.error('CRITICAL: MONGODB_URI is missing from environment variables!');
-        throw new Error('MONGODB_URI_MISSING');
-    }
-
-    try {
-        console.log('Connecting to MongoDB Atlas...');
-        const db = await mongoose.connect(process.env.MONGODB_URI, {
-            serverSelectionTimeoutMS: 5000,
-            socketTimeoutMS: 45000,
-            maxPoolSize: 10
-        });
-        isConnected = !!db.connections[0].readyState;
-        console.log('Successfully connected to MongoDB Atlas');
-    } catch (error) {
-        console.error('CRITICAL: MongoDB Connection Error!', error.message);
-        throw error;
-    }
-};
 
 // Define form field configurations
 const genericFields = [
@@ -247,71 +220,6 @@ const b2cFields = [
     { id: 'outcome.remarks', group: 'Final Outcome', label: 'Remarks / Notes', type: 'textarea', required: true }
 ];
 
-// Seeding logic (only once per instance)
-let isSeeded = false;
-const FormConfig = require('./models/FormConfig');
-const { seedPolicies, seedExpenseTemplates } = require('./services/policySeed');
-const seedData = async () => {
-    if (isSeeded) return;
-    try {
-        // Auto-seed FormConfigs if missing
-        const activeB2B = await FormConfig.findOne({ formType: 'generic', isActive: true });
-        const hasB2C = await FormConfig.findOne({ formType: 'home_visit', isActive: true });
-        
-        const shouldReseedB2B = process.env.RESEED_DB === 'true';
-
-        if (!activeB2B || shouldReseedB2B) {
-            console.log('Seeding/Updating B2B form configuration...');
-            if (activeB2B && shouldReseedB2B) {
-                await FormConfig.updateMany({ formType: 'generic' }, { isActive: false });
-            }
-            await FormConfig.create({
-                version: `5.0-B2B-${Date.now()}`,
-                isActive: true,
-                formType: 'generic',
-                description: 'Standard B2B agency visit form',
-                fields: genericFields
-            });
-            console.log('B2B Form configuration seeded.');
-        } else {
-            // Patch: ensure onboarding date fields are never required in the active B2B config
-            const NEVER_REQUIRED = ['kananSpecific.onboardingDate', 'kananSpecific.appcomOnboardingDate'];
-            const needsPatch = activeB2B.fields.some(
-                f => NEVER_REQUIRED.includes(f.id) && f.required === true
-            );
-            if (needsPatch) {
-                activeB2B.fields = activeB2B.fields.map(f =>
-                    NEVER_REQUIRED.includes(f.id) ? { ...f.toObject(), required: false } : f
-                );
-                await activeB2B.save();
-                console.log('Patched onboarding date fields to required: false in active B2B config.');
-            }
-        }
-
-        if (!hasB2C || hasB2C.fields.length < 17) {
-            console.log('Seeding B2C form configuration...');
-            if (hasB2C) {
-                await FormConfig.updateMany({ formType: 'home_visit' }, { isActive: false });
-            }
-            await FormConfig.create({
-                version: `3.0-B2C-${Date.now()}`,
-                isActive: true,
-                formType: 'home_visit',
-                description: 'Standard B2C home visit form',
-                fields: b2cFields
-            });
-            console.log('B2C Form configuration seeded.');
-        }
-        // Seed policies and expense templates
-        await seedPolicies();
-        await seedExpenseTemplates();
-
-        isSeeded = true;
-    } catch (err) {
-        console.error('Seeding Error:', err.message);
-    }
-};
-
 // Middleware
 app.use(helmet()); // Security headers
 app.use(cors({
@@ -368,6 +276,7 @@ const uploadsRoutes = require('./routes/uploads.routes');
 const postFieldDayRoutes = require('./routes/postFieldDay.routes');
 const dailyReportRoutes = require('./routes/dailyReport.routes');
 const postDemoFeedbackRoutes = require('./routes/postDemoFeedback.routes');
+const postInPersonVisitRoutes = require('./routes/postInPersonVisit.routes');
 
 // Use Routes
 app.use('/api/auth', authRoutes);
@@ -392,6 +301,7 @@ app.use('/api/uploads', uploadsRoutes);
 app.use('/api/post-field-day', postFieldDayRoutes);
 app.use('/api/daily-report', dailyReportRoutes);
 app.use('/api/post-demo-feedback', postDemoFeedbackRoutes);
+app.use('/api/post-in-person-visit', postInPersonVisitRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
@@ -409,7 +319,7 @@ if (process.env.NODE_ENV !== 'production' || require.main === module) {
     connectDB()
         .then(() => {
             console.log('MongoDB auto-connected successfully on startup.');
-            return seedData(); // Ensure B2B/B2C configurations are synced
+            return seedData({ genericFields, b2cFields }); // Ensure B2B/B2C configurations are synced
         })
         .then(() => {
             app.listen(PORT, () => {

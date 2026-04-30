@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
     getUsers,
+    getAssignableUsers,
     createUser,
     updateUser,
     deleteUser,
@@ -11,16 +12,16 @@ const { protect } = require('../middleware/auth.middleware');
 const { authorize } = require('../middleware/role.middleware');
 
 router.use(protect);
-router.use(authorize('superadmin'));
 
 router.route('/')
-    .get(getUsers)
-    .post(createUser);
+    .get(authorize('admin', 'superadmin'), getUsers)
+    .post(authorize('superadmin'), createUser);
 
-router.post('/bulk-import', bulkImportUsers);
+router.get('/assignable', authorize('admin', 'superadmin'), getAssignableUsers);
+router.post('/bulk-import', authorize('superadmin'), bulkImportUsers);
 
 router.route('/:id')
-    .put(updateUser)
-    .delete(deleteUser);
+    .put(authorize('superadmin'), updateUser)
+    .delete(authorize('superadmin'), deleteUser);
 
 module.exports = router;

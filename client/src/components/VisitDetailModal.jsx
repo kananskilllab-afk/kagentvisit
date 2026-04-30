@@ -3,7 +3,8 @@ import {
     X, Building2, MapPin, Calendar, Clock, User, Star,
     CheckCircle, XCircle, FileText, MessageSquare, Briefcase, Users, BarChart3,
     Wrench, DollarSign, HelpCircle, Edit, Home, GraduationCap, ClipboardCheck,
-    Sparkles, Wand2, Loader2, ShieldAlert, AlertCircle, Globe, Phone, Plus, ChevronDown, ChevronUp
+    Sparkles, Wand2, Loader2, ShieldAlert, AlertCircle, Globe, Phone, Plus, ChevronDown, ChevronUp,
+    ThumbsUp, AlertTriangle, Archive, RotateCcw
 } from 'lucide-react';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
@@ -90,17 +91,18 @@ const StarField = ({ label, value }) => {
 
 /* ─── Main Modal ─────────────────────────────────────────────────────── */
 
-const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
+const VisitDetailModal = ({ visit: initialVisit, onClose, onEdit, onVisitUpdated }) => {
     const { user } = useAuth();
-    const [aiInsights, setAiInsights] = useState(visit?.aiInsights || null);
-    const [adminAuditEval, setAdminAuditEval] = useState(visit?.adminAuditEval || null);
+    const [visit, setVisit] = useState(initialVisit);
+    const [aiInsights, setAiInsights] = useState(initialVisit?.aiInsights || null);
+    const [adminAuditEval, setAdminAuditEval] = useState(initialVisit?.adminAuditEval || null);
     const [generatingAI, setGeneratingAI] = useState(false);
     const [generatingAudit, setGeneratingAudit] = useState(false);
     const [aiError, setAiError] = useState(null);
     const [auditError, setAuditError] = useState(null);
 
     // Follow-up meeting form state
-    const [followUps, setFollowUps] = useState(visit?.followUpMeetings || []);
+    const [followUps, setFollowUps] = useState(initialVisit?.followUpMeetings || []);
     const [showFollowUpForm, setShowFollowUpForm] = useState(false);
     const [fuDate, setFuDate] = useState(new Date().toISOString().slice(0, 10));
     const [fuStart, setFuStart] = useState('');
@@ -108,6 +110,12 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
     const [fuNotes, setFuNotes] = useState('');
     const [fuOutcomes, setFuOutcomes] = useState('');
     const [addingFollowUp, setAddingFollowUp] = useState(false);
+
+    // Review action state
+    const [reviewAction, setReviewAction] = useState(null); // 'reviewed' | 'action_required' | 'closed' | 'submitted'
+    const [reviewComment, setReviewComment] = useState('');
+    const [submittingReview, setSubmittingReview] = useState(false);
+    const [reviewError, setReviewError] = useState(null);
 
     const isAdmin = user?.role === 'admin' || user?.role === 'superadmin';
     const autoTriggered = useRef(false);
@@ -133,6 +141,29 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
                 .finally(() => setGeneratingAudit(false));
         }
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const handleStatusUpdate = async () => {
+        if (!reviewAction) return;
+        setSubmittingReview(true);
+        setReviewError(null);
+        try {
+            const res = await api.put(`/visits/${visit._id}/status`, {
+                status: reviewAction,
+                comment: reviewComment.trim() || undefined
+            });
+            if (res.data?.success) {
+                const updated = res.data.data;
+                setVisit(updated);
+                setReviewAction(null);
+                setReviewComment('');
+                if (onVisitUpdated) onVisitUpdated(updated);
+            }
+        } catch (err) {
+            setReviewError(err.response?.data?.message || 'Failed to update status. Please try again.');
+        } finally {
+            setSubmittingReview(false);
+        }
+    };
 
     if (!visit) return null;
 
@@ -260,6 +291,154 @@ const VisitDetailModal = ({ visit, onClose, onEdit, onVisitUpdated }) => {
 
                 {/* ── Body ────────────────────────────────────────── */}
                 <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+
+                    {/* ═══ Admin Review Panel ═══ */}
+                    {isAdmin && visit.status !== 'draft' && (
+                        <div className="mb-5">
+                            <div className="rounded-2xl border border-slate-200 overflow-hidden">
+                                <div className="bg-gradient-to-r from-slate-700 to-slate-600 px-5 py-3 flex items-center justify-between">
+                                    <div className="flex items-center gap-2.5">
+                                        <ShieldAlert className="w-4 h-4 text-slate-300" />
+                                        <span className="text-sm font-bold text-white">Review Actions</span>
+                                    </div>
+                                    {visit.reviewedBy?.name && (
+                                        <span className="text-[10px] text-slate-300 bg-white/10 px-2 py-0.5 rounded-full">
+                                            Last action by {visit.reviewedBy.name}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="p-4 bg-slate-50/50 space-y-3">
+                                    {/* Review comment display */}
+                                    {visit.reviewComment && visit.status !== 'submitted' && (
+                                        <div className={`p-3 rounded-xl border text-sm leading-relaxed ${
+                                            visit.status === 'action_required'
+                                                ? 'bg-red-50 border-red-200 text-red-700'
+                                                : 'bg-blue-50 border-blue-200 text-blue-700'
+                                        }`}>
+                                            <p className="text-[10px] font-bold uppercase tracking-wider mb-1 opacity-70">
+                                                {visit.status === 'action_required' ? 'Action Required Note' : 'Review Note'}
+                                            </p>
+                                            {visit.reviewComment}
+                                        </div>
+                                    )}
+
+                                    {/* Action buttons */}
+                                    {reviewAction ? (
+                                        <div className="space-y-2.5 animate-slide-down">
+                                            <div className="flex items-center gap-2">
+                                                <div className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+                                                    reviewAction === 'reviewed' ? 'bg-blue-100 text-blue-700' :
+                                                    reviewAction === 'action_required' ? 'bg-red-100 text-red-700' :
+                                                    reviewAction === 'closed' ? 'bg-green-100 text-green-700' :
+                                                    'bg-orange-100 text-orange-700'
+                                                }`}>
+                                                    {reviewAction === 'reviewed' && <ThumbsUp className="w-3 h-3" />}
+                                                    {reviewAction === 'action_required' && <AlertTriangle className="w-3 h-3" />}
+                                                    {reviewAction === 'closed' && <Archive className="w-3 h-3" />}
+                                                    {reviewAction === 'submitted' && <RotateCcw className="w-3 h-3" />}
+                                                    {reviewAction === 'reviewed' && 'Mark as Reviewed'}
+                                                    {reviewAction === 'action_required' && 'Request Action'}
+                                                    {reviewAction === 'closed' && 'Close Visit'}
+                                                    {reviewAction === 'submitted' && 'Re-open Visit'}
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label className="text-[10px] font-bold text-slate-500 uppercase">
+                                                    Comment {reviewAction === 'action_required' ? '*' : '(optional)'}
+                                                </label>
+                                                <textarea
+                                                    value={reviewComment}
+                                                    onChange={e => setReviewComment(e.target.value)}
+                                                    rows={2}
+                                                    placeholder={
+                                                        reviewAction === 'action_required'
+                                                            ? 'Describe what needs to be fixed or updated...'
+                                                            : 'Add a note (optional)...'
+                                                    }
+                                                    className="input-field text-sm mt-0.5 resize-none"
+                                                />
+                                            </div>
+                                            {reviewError && (
+                                                <p className="text-xs text-red-600 font-medium">{reviewError}</p>
+                                            )}
+                                            <div className="flex items-center gap-2">
+                                                <button
+                                                    onClick={handleStatusUpdate}
+                                                    disabled={submittingReview}
+                                                    className="btn-primary py-2 px-4 text-xs flex items-center gap-1.5"
+                                                >
+                                                    {submittingReview ? <Loader2 className="w-3 h-3 animate-spin" /> : <CheckCircle className="w-3 h-3" />}
+                                                    {submittingReview ? 'Saving...' : 'Confirm'}
+                                                </button>
+                                                <button
+                                                    onClick={() => { setReviewAction(null); setReviewComment(''); setReviewError(null); }}
+                                                    className="btn-outline py-2 px-4 text-xs"
+                                                >
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            {visit.status !== 'reviewed' && (
+                                                <button
+                                                    onClick={() => setReviewAction('reviewed')}
+                                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-blue-100 text-blue-700 hover:bg-blue-200 transition-all"
+                                                >
+                                                    <ThumbsUp className="w-3.5 h-3.5" />
+                                                    Mark Reviewed
+                                                </button>
+                                            )}
+                                            {visit.status !== 'action_required' && (
+                                                <button
+                                                    onClick={() => setReviewAction('action_required')}
+                                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-red-100 text-red-700 hover:bg-red-200 transition-all"
+                                                >
+                                                    <AlertTriangle className="w-3.5 h-3.5" />
+                                                    Action Required
+                                                </button>
+                                            )}
+                                            {visit.status !== 'closed' && (
+                                                <button
+                                                    onClick={() => setReviewAction('closed')}
+                                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-green-100 text-green-700 hover:bg-green-200 transition-all"
+                                                >
+                                                    <Archive className="w-3.5 h-3.5" />
+                                                    Close Visit
+                                                </button>
+                                            )}
+                                            {(visit.status === 'reviewed' || visit.status === 'action_required' || visit.status === 'closed') && (
+                                                <button
+                                                    onClick={() => setReviewAction('submitted')}
+                                                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-orange-100 text-orange-700 hover:bg-orange-200 transition-all"
+                                                >
+                                                    <RotateCcw className="w-3.5 h-3.5" />
+                                                    Re-open
+                                                </button>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ═══ Action Required Banner (for non-admins) ═══ */}
+                    {!isAdmin && visit.status === 'action_required' && visit.reviewComment && (
+                        <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-2xl">
+                            <div className="flex items-start gap-3">
+                                <AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+                                <div>
+                                    <p className="text-xs font-bold text-red-600 uppercase tracking-wider mb-1">Action Required</p>
+                                    <p className="text-sm text-red-700 leading-relaxed">{visit.reviewComment}</p>
+                                    {visit.reviewedBy?.name && (
+                                        <p className="text-[10px] text-red-400 mt-1.5">— {visit.reviewedBy.name}, {fmt(visit.reviewedAt)}</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                     {/* ═══ AI Insights ═══ */}
                     {visit.status !== 'draft' && (
