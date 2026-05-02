@@ -52,7 +52,10 @@
   3. Every mutation appends one entry to that item's `history[]` and writes one `AuditLog` row with `targetModel: 'ActionItem'`
   4. The 09:00 server-time cron emits one `action_item_overdue` digest notification per user with overdue items
   5. Overdue and per-agent open-items queries return in <100ms against a realistic dataset
-**Plans**: TBD
+**Plans**: 3 plans
+  - [ ] 02-01-PLAN.md — Schema extensions: actionItems[] on Visit + VisitSchedule; AuditLog + Notification enum extensions; compound indexes
+  - [ ] 02-02-PLAN.md — REST API: actionItems.controller.js (5 handlers + canMutateActionItem + auditActionItem); visits.routes.js sub-resource wiring
+  - [ ] 02-03-PLAN.md — Cron + indexes: node-cron install; overdueActionItems.job.js; server.js registration; index coverage verification
 
 ### Phase 3: Action Item Tracker — Frontend & FormConfig Field Type
 **Goal**: Agents and reviewers interact with action items through the visit form, the review drawer, and the dashboard.
@@ -167,7 +170,7 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Design-System Extraction & Foundation | 4/4 | Complete   | 2026-05-02 |
-| 2. Action Item Tracker — Backend & Data Model | 0/0 | Not started | - |
+| 2. Action Item Tracker — Backend & Data Model | 0/3 | Not started | - |
 | 3. Action Item Tracker — Frontend & FormConfig Field Type | 0/0 | Not started | - |
 | 4. Agent History — Backend Aggregation & API | 0/0 | Not started | - |
 | 5. Agent History — UI in PlanModal & ManageAgent | 0/0 | Not started | - |
