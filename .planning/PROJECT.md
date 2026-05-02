@@ -14,6 +14,7 @@ A field agent must be able to plan a visit, attend it with a structured form, ca
 
 <!-- Shipped and confirmed valuable. -->
 
+- ✓ Meridian design-system foundation: Inter + Manrope fonts, meridian.* Tailwind tokens, 12 primitive components (Card/Btn/Input/Lbl/Avatar/StatusBadge/EmptyState/NotifBell/RolePill/SectionTitle/SparkArea/SparkBar), Icon+IC catalog, design barrel — Phase 01 (2026-05-02)
 - ✓ Visit Plan workflow: VisitPlan + VisitSchedule + VisitPlanBalance with advance → reimbursement lifecycle — v1.0
 - ✓ Calendar (Month / Week / Day / Agenda) with reschedule, bulk-cancel, conflict-check — v1.0
 - ✓ Dynamic visit forms via FormConfig (admin-configurable steps + fields) — v1.0
