@@ -1,24 +1,45 @@
+---
+gsd_state_version: 1.0
+milestone: v1.1
+milestone_name: milestone
+status: Ready to execute
+last_updated: "2026-05-02T09:42:57.693Z"
+progress:
+  total_phases: 11
+  completed_phases: 0
+  total_plans: 4
+  completed_plans: 1
+---
+
 # STATE
 
 ## Current Position
 
-Phase: Phase 1 — Design-System Extraction & Foundation
-Plan: — (pending `/gsd:plan-phase 1`)
-Status: Roadmap approved, ready to plan Phase 1
-Last activity: 2026-05-01 — ROADMAP.md created from approved Meridian blueprint (11 phases, 47 REQ-IDs, 100% coverage)
+Phase: 01 (design-system-extraction-foundation) — EXECUTING
+Plan: 2 of 4
 
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-05-01)
 
 **Core value:** Field agent → plan → visit → expense → claim, end-to-end, with audit trail.
-**Current focus:** v1.1 Meridian UI + Action Items + Agent History — Phase 1 next.
+**Current focus:** Phase 01 — design-system-extraction-foundation
 
 ## Performance Metrics
 
+| Phase | Plan | Duration | Tasks | Files |
+|-------|------|----------|-------|-------|
+| 01-design-system-extraction-foundation | 01 | 2min | 2 | 2 |
+
 - Phases completed: 0 / 11
-- Plans completed: 0 / 0 (no plans drafted yet)
-- v1.1 REQ-IDs satisfied: 0 / 47
+- Plans completed: 1 / 4
+- v1.1 REQ-IDs satisfied: 3 / 47 (DS-01, DS-02, DS-03)
+
+## Decisions
+
+- 01: `font-display` chosen over `font-manrope` — idiomatic Tailwind; decoupled from specific typeface so display font can swap without renaming utility classes
+- 01: `meridian.*` namespace isolates new tokens from `brand-*` and `kanan-*` — enables additive migration without touching existing pages
+- 01: Google Fonts CSS2 endpoint used without version pinning — Google manages versioning per CONTEXT.md recommendation
 
 ## Accumulated Context
 
@@ -30,10 +51,11 @@ See: `.planning/PROJECT.md` (updated 2026-05-01)
 - Action items shape locked: `{ _id, text, assignee, dueDate, status, createdBy, createdAt, history[] }`
 - Append-only `history[]` is a compliance requirement (carries from v1.0 policy work)
 - `home_visit` role hidden from Agent History surfaces; `accounts` is read-only
+- **01-01 COMPLETE:** Meridian Tailwind token layer live — 14 color tokens, font-display, shadow-meridian-card wired in tailwind.config.js; Google Fonts loaded app-wide from index.html
 
 ## Pending Todos
 
-(None — Phase 1 planning is the next action)
+(None)
 
 ## Blockers
 
@@ -41,6 +63,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-01)
 
 ## Session Continuity
 
-- Next command: `/gsd:plan-phase 1`
-- Files to load on resume: `.planning/ROADMAP.md`, `.planning/REQUIREMENTS.md`, `.planning/PROJECT.md`
+- Last session: 2026-05-02T09:41:59Z — Completed 01-01-PLAN.md
+- Next action: Execute 01-02-PLAN.md (tokens.js + icons.jsx)
+- Files to load on resume: `.planning/ROADMAP.md`, `.planning/REQUIREMENTS.md`, `.planning/PROJECT.md`, `.planning/phases/01-design-system-extraction-foundation/01-01-SUMMARY.md`
 - Reference for phase boundaries: `MERIDIAN_MILESTONE_PLAN.docx` (do not redesign — formalized only)

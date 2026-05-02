@@ -35,7 +35,11 @@
   2. Tailwind config exposes a `meridian.*` color, shadow, radius, and typography namespace usable from any component file
   3. Every primitive listed (Card, Btn, Input, Lbl, Avatar, StatusBadge, EmptyState, NotifBell, RolePill, SectionTitle, SparkArea, SparkBar, Icon) renders correctly at the dev-only `/design-system` route
   4. No primitive in `client/src/design/` reads inline styles or non-tokenized colors
-**Plans**: TBD
+**Plans**: 4 plans
+  - [x] 01-01-PLAN.md — Fonts (Inter + Manrope) loaded app-wide; Tailwind extended with `meridian.*` colors, `font-display`, `shadow-meridian-card`
+  - [ ] 01-02-PLAN.md — Design module scaffold: `client/src/design/{tokens.js, icons.jsx, index.js}` with M, status maps, ROLE_META, IC catalog (36 icons), Icon primitive
+  - [ ] 01-03-PLAN.md — 12 primitive components in `client/src/design/primitives/` (Card, Btn, Input, Lbl, Avatar, StatusBadge, EmptyState, NotifBell, RolePill, SectionTitle, SparkArea, SparkBar) + barrel update
+  - [ ] 01-04-PLAN.md — Dev-only `/design-system` route + gallery page rendering every primitive and icon
 **UI hint**: yes
 
 ### Phase 2: Action Item Tracker — Backend & Data Model
@@ -162,7 +166,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Design-System Extraction & Foundation | 0/0 | Not started | - |
+| 1. Design-System Extraction & Foundation | 1/4 | In Progress|  |
 | 2. Action Item Tracker — Backend & Data Model | 0/0 | Not started | - |
 | 3. Action Item Tracker — Frontend & FormConfig Field Type | 0/0 | Not started | - |
 | 4. Agent History — Backend Aggregation & API | 0/0 | Not started | - |

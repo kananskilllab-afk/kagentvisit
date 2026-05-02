@@ -10,9 +10,9 @@
 
 ### Design System (DS)
 
-- [ ] **DS-01**: Inter + Manrope fonts loaded application-wide via Google Fonts in `client/index.html`
-- [ ] **DS-02**: Meridian color palette (navy, blue, gold, green, red, sky, purple, bg, border, text, sub, muted, rowHov) registered in `client/tailwind.config.js` under `meridian.*` namespace
-- [ ] **DS-03**: Meridian shadow / radius / typography scale registered as Tailwind utilities
+- [x] **DS-01**: Inter + Manrope fonts loaded application-wide via Google Fonts in `client/index.html`
+- [x] **DS-02**: Meridian color palette (navy, blue, gold, green, red, sky, purple, bg, border, text, sub, muted, rowHov) registered in `client/tailwind.config.js` under `meridian.*` namespace
+- [x] **DS-03**: Meridian shadow / radius / typography scale registered as Tailwind utilities
 - [ ] **DS-04**: Reusable design primitives (`Card`, `Btn`, `Input`, `Lbl`, `Avatar`, `StatusBadge`, `EmptyState`, `NotifBell`, `RolePill`, `SectionTitle`, `SparkArea`, `SparkBar`, `Icon`) live in `client/src/design/` and consume only Tailwind tokens
 - [ ] **DS-05**: A dev-only `/design-system` route renders every primitive in isolation for visual review
 
@@ -119,9 +119,9 @@ Generated 2026-05-01 by gsd-roadmapper. Coverage: 47 / 47 REQ-IDs mapped, no orp
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DS-01 | Phase 1 | Pending |
-| DS-02 | Phase 1 | Pending |
-| DS-03 | Phase 1 | Pending |
+| DS-01 | Phase 1 | Complete |
+| DS-02 | Phase 1 | Complete |
+| DS-03 | Phase 1 | Complete |
 | DS-04 | Phase 1 | Pending |
 | DS-05 | Phase 1 | Pending |
 | AIT-01 | Phase 2 | Pending |
