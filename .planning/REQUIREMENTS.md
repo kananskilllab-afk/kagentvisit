@@ -2,7 +2,7 @@
 
 **Milestone:** Meridian UI + Action Items + Agent History
 **Started:** 2026-05-01
-**Status:** Defined — pending roadmap mapping
+**Status:** Mapped — see ROADMAP.md
 
 ---
 
@@ -115,6 +115,54 @@
 
 ## Traceability
 
-<!-- Filled by gsd-roadmapper after roadmap is created. Maps each REQ-ID to its phase. -->
+Generated 2026-05-01 by gsd-roadmapper. Coverage: 47 / 47 REQ-IDs mapped, no orphans, no duplicates.
 
-(Empty — pending roadmap creation)
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| DS-01 | Phase 1 | Pending |
+| DS-02 | Phase 1 | Pending |
+| DS-03 | Phase 1 | Pending |
+| DS-04 | Phase 1 | Pending |
+| DS-05 | Phase 1 | Pending |
+| AIT-01 | Phase 2 | Pending |
+| AIT-02 | Phase 2 | Pending |
+| AIT-03 | Phase 2 | Pending |
+| AIT-04 | Phase 2 | Pending |
+| AIT-05 | Phase 2 | Pending |
+| AIT-06 | Phase 2 | Pending |
+| AITUI-01 | Phase 3 | Pending |
+| AITUI-02 | Phase 3 | Pending |
+| AITUI-03 | Phase 3 | Pending |
+| AITUI-04 | Phase 3 | Pending |
+| AITUI-05 | Phase 3 | Pending |
+| AITUI-06 | Phase 3 | Pending |
+| AH-01 | Phase 4 | Pending |
+| AH-02 | Phase 4 | Pending |
+| AH-03 | Phase 4 | Pending |
+| AH-04 | Phase 5 | Pending |
+| AH-05 | Phase 5 | Pending |
+| AH-06 | Phase 5 | Pending |
+| AH-07 | Phase 5 | Pending |
+| AH-08 | Phase 5 | Pending |
+| AH-09 | Phase 5 | Pending |
+| UI-S-01 | Phase 6 | Pending |
+| UI-S-02 | Phase 6 | Pending |
+| UI-S-03 | Phase 6 | Pending |
+| UI-S-04 | Phase 6 | Pending |
+| UI-V-01 | Phase 7 | Pending |
+| UI-V-02 | Phase 7 | Pending |
+| UI-V-03 | Phase 7 | Pending |
+| UI-P-01 | Phase 8 | Pending |
+| UI-P-02 | Phase 8 | Pending |
+| UI-P-03 | Phase 8 | Pending |
+| UI-P-04 | Phase 8 | Pending |
+| UI-M-01 | Phase 9 | Pending |
+| UI-M-02 | Phase 9 | Pending |
+| UI-M-03 | Phase 9 | Pending |
+| UI-A-01 | Phase 10 | Pending |
+| UI-A-02 | Phase 10 | Pending |
+| UI-A-03 | Phase 10 | Pending |
+| UI-A-04 | Phase 10 | Pending |
+| UI-T-01 | Phase 11 | Pending |
+| UI-T-02 | Phase 11 | Pending |
+| UI-T-03 | Phase 11 | Pending |
