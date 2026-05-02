@@ -25,6 +25,7 @@ import PostDemoFeedback from './pages/PostDemoFeedback';
 import PostInPersonVisit from './pages/PostInPersonVisit';
 import FormsAdmin from './pages/FormsAdmin';
 import FormsHub from './pages/FormsHub';
+import DesignSystem from './pages/DesignSystem';
 
 const ProtectedRoute = ({ children, roles, formAccess }) => {
     const { user } = useAuth();
@@ -155,6 +156,10 @@ function App() {
                         </ProtectedRoute>
                     } />
                 </Route>
+
+                {import.meta.env.DEV && (
+                    <Route path="/design-system" element={<DesignSystem />} />
+                )}
 
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
