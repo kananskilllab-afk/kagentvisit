@@ -10,7 +10,7 @@
 
 ## Phases
 
-- [ ] **Phase 1: Design-System Extraction & Foundation** — Tailwind tokens + primitive library + dev-only `/design-system` route
+- [x] **Phase 1: Design-System Extraction & Foundation** — Tailwind tokens + primitive library + dev-only `/design-system` route (completed 2026-05-02)
 - [ ] **Phase 2: Action Item Tracker — Backend & Data Model** — `actionItems[]` schema, REST endpoints, append-only history, audit, overdue cron, indexes
 - [ ] **Phase 3: Action Item Tracker — Frontend & FormConfig Field Type** — `action_items` field type + NewVisit input + VisitsList review tab + FormBuilder block + dashboard widget + NotifBell
 - [ ] **Phase 4: Agent History — Backend Aggregation & API** — `/api/agents/:agentId/history` + paginated visits endpoint with role gating
@@ -39,7 +39,7 @@
   - [x] 01-01-PLAN.md — Fonts (Inter + Manrope) loaded app-wide; Tailwind extended with `meridian.*` colors, `font-display`, `shadow-meridian-card`
   - [x] 01-02-PLAN.md — Design module scaffold: `client/src/design/{tokens.js, icons.jsx, index.js}` with M, status maps, ROLE_META, IC catalog (36 icons), Icon primitive
   - [x] 01-03-PLAN.md — 12 primitive components in `client/src/design/primitives/` (Card, Btn, Input, Lbl, Avatar, StatusBadge, EmptyState, NotifBell, RolePill, SectionTitle, SparkArea, SparkBar) + barrel update
-  - [ ] 01-04-PLAN.md — Dev-only `/design-system` route + gallery page rendering every primitive and icon
+  - [x] 01-04-PLAN.md — Dev-only `/design-system` route + gallery page rendering every primitive and icon
 **UI hint**: yes
 
 ### Phase 2: Action Item Tracker — Backend & Data Model
@@ -166,7 +166,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Design-System Extraction & Foundation | 3/4 | In Progress|  |
+| 1. Design-System Extraction & Foundation | 4/4 | Complete   | 2026-05-02 |
 | 2. Action Item Tracker — Backend & Data Model | 0/0 | Not started | - |
 | 3. Action Item Tracker — Frontend & FormConfig Field Type | 0/0 | Not started | - |
 | 4. Agent History — Backend Aggregation & API | 0/0 | Not started | - |

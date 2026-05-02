@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: Ready to execute
-last_updated: "2026-05-02T09:54:56.821Z"
+status: Phase complete — ready for verification
+last_updated: "2026-05-02T10:04:12.147Z"
 progress:
   total_phases: 11
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
 ---
 
 # STATE
@@ -37,6 +37,7 @@ See: `.planning/PROJECT.md` (updated 2026-05-01)
 
 | Phase 01-design-system-extraction-foundation P02 | 4min | 3 tasks | 3 files |
 | Phase 01-design-system-extraction-foundation P03 | 8min | 3 tasks | 13 files |
+| Phase 01-design-system-extraction-foundation P04 | 15min | 3 tasks | 2 files |
 
 ## Decisions
 
@@ -47,6 +48,8 @@ See: `.planning/PROJECT.md` (updated 2026-05-01)
 - [Phase 01-design-system-extraction-foundation]: Icon color defaults to currentColor — icons inside buttons inherit text color without per-call color props
 - [Phase 01-design-system-extraction-foundation]: Btn + NotifBell use <button> (not <div>) for keyboard nav + a11y; Avatar single-word initials = first 2 chars per CONTEXT.md
 - [Phase 01-design-system-extraction-foundation]: text-meridian-muted on EmptyState icon parent div so SVG stroke inherits via currentColor without per-call color prop
+- [Phase 01-design-system-extraction-foundation]: DesignSystem.jsx has no Layout wrapper — gallery shows flat primitives without sidebar chrome (Layout is Phase 6 work); route is top-level outside ProtectedRoute for auth-free design review
+- [Phase 01-design-system-extraction-foundation]: import.meta.env.DEV gate chosen over lazy dynamic import — Vite statically replaces to false in prod builds, tree-shaking eliminates DesignSystem entirely; simpler than dynamic import with same result
 
 ## Accumulated Context
 
