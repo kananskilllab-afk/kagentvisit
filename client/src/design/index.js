@@ -8,16 +8,16 @@
 export * from './tokens';
 export * from './icons';
 
-// ─── primitives (added by plan 03) ────────────────────────────
-// export * from './primitives/Card';
-// export * from './primitives/Btn';
-// export * from './primitives/Input';
-// export * from './primitives/Lbl';
-// export * from './primitives/Avatar';
-// export * from './primitives/StatusBadge';
-// export * from './primitives/EmptyState';
-// export * from './primitives/NotifBell';
-// export * from './primitives/RolePill';
-// export * from './primitives/SectionTitle';
-// export * from './primitives/SparkArea';
-// export * from './primitives/SparkBar';
+// ─── primitives ──────────────────────────────────────────────
+export * from './primitives/Card';
+export * from './primitives/Btn';
+export * from './primitives/Input';
+export * from './primitives/Lbl';
+export * from './primitives/Avatar';
+export * from './primitives/StatusBadge';
+export * from './primitives/EmptyState';
+export * from './primitives/NotifBell';
+export * from './primitives/RolePill';
+export * from './primitives/SectionTitle';
+export * from './primitives/SparkArea';
+export * from './primitives/SparkBar';
