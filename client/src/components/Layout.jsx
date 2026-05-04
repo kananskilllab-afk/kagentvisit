@@ -63,7 +63,7 @@ const RolePill = ({ role }) => {
 // all color to black, then `invert(1)` lifts it to white — preserves the alpha channel
 // so the logo silhouette stays clean against the dark sidebar.
 const WHITE_LOGO_FILTER = { filter: 'brightness(0) invert(1)' };
-const KANAN_LOGO_SRC = '/Kanan%20New%20Logo.png';
+const KANAN_LOGO_SRC = '/kanan-logo.png';
 
 // Compact mark — used in the collapsed icon rail.
 const BrandMark = ({ onClick }) => (
