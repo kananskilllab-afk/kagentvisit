@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 import {
     Users,
     UserPlus,
@@ -40,7 +41,10 @@ const DEPT_BADGE = {
     B2C: 'bg-brand-gold/10 text-brand-gold border-brand-gold/20',
 };
 
+const USER_DELETE_OWNER_EMAIL = 'superadmin@kanan.co';
+
 const UserManagement = () => {
+    const { user: currentUser } = useAuth();
     const [users, setUsers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -53,6 +57,7 @@ const UserManagement = () => {
     const [assignSearch, setAssignSearch] = useState('');
     const [assignSaving, setAssignSaving] = useState(false);
     const [formAccess, setFormAccess] = useState([]);
+    const canDeleteUsers = currentUser?.email?.toLowerCase() === USER_DELETE_OWNER_EMAIL;
 
     useEffect(() => { fetchUsers(); }, []);
 
@@ -102,6 +107,11 @@ const UserManagement = () => {
 
     const handleDeleteUser = async () => {
         if (!userToDelete) return;
+        if (!canDeleteUsers) {
+            alert('Only superadmin@kanan.co can delete users');
+            setUserToDelete(null);
+            return;
+        }
         setIsSubmitting(true);
         try {
             await api.delete(`/users/${userToDelete._id}`);
@@ -266,6 +276,7 @@ const UserManagement = () => {
                                             </td>
                                             <td className="td">
                                                 <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide border ${ROLE_BADGE[user.role] || ROLE_BADGE.user}`}>
+                                                    {user._id === currentUser?._id && <span className="h-1.5 w-1.5 rounded-full bg-brand-green" title="Current session" />}
                                                     <Shield className="w-3 h-3" />
                                                     {displayRole}
                                                 </span>
@@ -310,13 +321,15 @@ const UserManagement = () => {
                                                     >
                                                         {user.isActive ? <UserX className="w-3.5 h-3.5" /> : <UserCheck className="w-3.5 h-3.5" />}
                                                     </button>
-                                                    <button
-                                                        onClick={() => setUserToDelete(user)}
-                                                        className="p-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-all"
-                                                        title="Delete"
-                                                    >
-                                                        <Trash2 className="w-3.5 h-3.5" />
-                                                    </button>
+                                                    {canDeleteUsers && (
+                                                        <button
+                                                            onClick={() => setUserToDelete(user)}
+                                                            className="p-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-all"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 className="w-3.5 h-3.5" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -350,7 +363,8 @@ const UserManagement = () => {
                                     </div>
                                     <div className="flex flex-wrap gap-2">
                                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border ${DEPT_BADGE[dept] || ''}`}>{dept}</span>
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${ROLE_BADGE[user.role] || ROLE_BADGE.user}`}>
+                                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${ROLE_BADGE[user.role] || ROLE_BADGE.user}`}>
+                                            {user._id === currentUser?._id && <span className="h-1.5 w-1.5 rounded-full bg-brand-green" title="Current session" />}
                                             {user.role === 'home_visit' ? 'user' : user.role}
                                         </span>
                                         {user.employeeId && (
@@ -369,9 +383,11 @@ const UserManagement = () => {
                                         <button onClick={() => toggleUserStatus(user)} className={`flex-1 py-2 rounded-xl border text-xs font-bold ${user.isActive ? 'border-brand-orange/20 text-brand-orange' : 'border-brand-green/20 text-brand-green'}`}>
                                             {user.isActive ? 'Deactivate' : 'Activate'}
                                         </button>
-                                        <button onClick={() => setUserToDelete(user)} className="flex-1 py-2 rounded-xl border border-red-200 text-red-500 text-xs font-bold hover:bg-red-50">
-                                            Delete
-                                        </button>
+                                        {canDeleteUsers && (
+                                            <button onClick={() => setUserToDelete(user)} className="flex-1 py-2 rounded-xl border border-red-200 text-red-500 text-xs font-bold hover:bg-red-50">
+                                                Delete
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             );
@@ -502,7 +518,7 @@ const UserManagement = () => {
             )}
 
             {/* Delete Confirm Modal */}
-            {userToDelete && (
+            {canDeleteUsers && userToDelete && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden animate-fade-in">
                         <div className="p-6 text-center">

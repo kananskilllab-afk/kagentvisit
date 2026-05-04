@@ -22,7 +22,7 @@ const auditLogSchema = new mongoose.Schema({
             'Visit', 'User', 'FormConfig', 'PinCode',
             'VisitPlan', 'VisitSchedule', 'VisitPlanBalance',
             'Expense', 'ExpenseClaim', 'ExpenseTemplate',
-            'Policy', 'Upload', 'Agent',
+            'Policy', 'Upload', 'Agent', 'ActionItem',
             null
         ],
         default: null

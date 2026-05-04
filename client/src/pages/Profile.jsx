@@ -66,28 +66,27 @@ const Profile = () => {
     return (
         <div className="max-w-4xl mx-auto space-y-8 page-enter">
             {/* Profile Header */}
-            <div className="glass bg-gradient-to-r from-brand-blue to-brand-sky text-white overflow-hidden relative rounded-[2rem] border-white/40 shadow-glow p-8 sm:p-10">
-                <div className="absolute top-0 right-0 w-80 h-80 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-3xl pointer-events-none" />
-                <div className="relative flex flex-col sm:flex-row sm:items-center gap-5">
-                    <div className="w-24 h-24 rounded-[2rem] bg-white text-brand-blue flex items-center justify-center text-4xl font-extrabold shadow-glass shrink-0 ring-4 ring-white/20">
+            <div className="card p-8 sm:p-10">
+                <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+                    <div className="w-24 h-24 rounded-lg bg-meridian-navy text-white flex items-center justify-center text-4xl font-extrabold shadow-meridian-card shrink-0">
                         {avatarLetter}
                     </div>
                     <div className="flex-1">
-                        <h1 className="text-2xl font-extrabold tracking-tight">{user.name}</h1>
-                        <p className="text-white/70 text-sm mt-0.5">{user.email}</p>
+                        <h1 className="text-2xl font-black tracking-normal text-meridian-text">{user.name}</h1>
+                        <p className="text-meridian-sub text-sm mt-0.5">{user.email}</p>
                         <div className="flex flex-wrap items-center gap-2 mt-3">
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border bg-white/10 text-white border-white/20`}>
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest border ${roleColorClass}`}>
                                 <Shield className="w-3 h-3" />
                                 {user.role.replace('_', ' ')}
                             </span>
                             {user.employeeId && (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-white/10 text-white border border-white/20">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-meridian-bg text-meridian-text border border-meridian-border">
                                     <BadgeCheck className="w-3 h-3" />
                                     {user.employeeId}
                                 </span>
                             )}
                             {user.department && (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-white/10 text-white border border-white/20">
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold bg-meridian-bg text-meridian-text border border-meridian-border">
                                     <Building2 className="w-3 h-3" />
                                     {user.department}
                                 </span>
@@ -99,7 +98,7 @@ const Profile = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Personal Info */}
-                <div className="lg:col-span-1 glass rounded-[2rem] p-6 shadow-glass border border-white/60">
+                <div className="lg:col-span-1 card p-6">
                     <h3 className="font-extrabold text-slate-800 mb-5 pb-4 border-b border-slate-100">Personal Details</h3>
                     <div className="space-y-4">
                         {[
@@ -124,7 +123,7 @@ const Profile = () => {
                 {/* Security Column */}
                 <div className="lg:col-span-2 space-y-6">
                     {/* Password Section */}
-                    <div className="glass rounded-[2rem] p-6 shadow-glass border border-white/60">
+                    <div className="card p-6">
                         <div className="flex items-center justify-between mb-5 pb-4 border-b border-slate-100">
                             <h3 className="font-bold text-slate-800 flex items-center gap-2">
                                 <Lock className="w-4 h-4 text-brand-gold" />
@@ -209,14 +208,14 @@ const Profile = () => {
                     </div>
 
                     {/* Sign Out */}
-                    <div className="glass rounded-[2rem] p-6 bg-red-50/50 border border-red-100 flex items-center justify-between shadow-sm">
+                    <div className="card p-6 bg-red-50/50 border-red-100 flex items-center justify-between">
                         <div>
                             <h4 className="font-bold text-slate-800">Sign Out</h4>
                             <p className="text-sm text-slate-500 mt-0.5">Securely end your current session.</p>
                         </div>
                         <button
                             onClick={logout}
-                            className="flex items-center gap-2 bg-red-600 text-white px-4 py-2.5 rounded-xl font-bold hover:bg-red-700 transition-all shadow-md shadow-red-200"
+                            className="flex items-center gap-2 bg-red-600 text-white px-4 py-2.5 rounded-lg font-bold hover:bg-red-700 transition-all shadow-md shadow-red-200"
                         >
                             <LogOut className="w-4 h-4" />
                             Sign Out

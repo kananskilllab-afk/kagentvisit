@@ -50,27 +50,23 @@ const StatusDot = ({ status, isExpense }) => {
 };
 
 const KPICard = ({ title, value, subtitle, icon: Icon, color, trend, trendIcon: TrendIcon }) => (
-    <div className="card-hover group relative overflow-visible bg-white/70 backdrop-blur-3xl border border-white p-6 rounded-[1.5rem] shadow-glass isolate flex flex-col justify-between">
-        <div
-            className="absolute -top-10 -right-10 w-32 h-32 rounded-full blur-[40px] opacity-10 pointer-events-none transition-all group-hover:scale-150 group-hover:opacity-30 -z-10"
-            style={{ backgroundColor: color }}
-        />
+    <div className="card-hover group flex min-h-[132px] flex-col justify-between p-5">
         <div className="flex items-start justify-between">
-            <div className="space-y-1 z-10">
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest">{title}</p>
+            <div className="min-w-0 space-y-1">
+                <p className="text-[11px] font-bold uppercase tracking-widest text-meridian-sub">{title}</p>
                 <div className="flex items-baseline gap-2">
-                    <p className="text-3xl font-extrabold tracking-tight text-slate-800">
+                    <p className="truncate text-2xl font-black tracking-normal text-meridian-text sm:text-3xl">
                         {value ?? '—'}
                     </p>
-                    {subtitle && <span className="text-sm font-semibold text-slate-400">{subtitle}</span>}
+                    {subtitle && <span className="text-sm font-semibold text-meridian-sub">{subtitle}</span>}
                 </div>
             </div>
-            <div className="p-3.5 rounded-2xl group-hover:scale-110 group-hover:-rotate-3 transition-transform duration-300 bg-white shadow-sm ring-1 ring-slate-100 z-10" style={{ color }}>
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-meridian-border bg-meridian-bg" style={{ color }}>
                 <Icon className="w-5 h-5" />
             </div>
         </div>
         {trend && (
-            <div className="mt-4 flex items-center gap-1.5 opacity-80 group-hover:opacity-100 transition-opacity">
+            <div className="mt-4 flex items-center gap-1.5">
                 {TrendIcon && <TrendIcon className="w-4 h-4" style={{ color }} />}
                 <p className="text-[11px] font-bold" style={{ color }}>{trend}</p>
             </div>
@@ -81,7 +77,7 @@ const KPICard = ({ title, value, subtitle, icon: Icon, color, trend, trendIcon: 
 const CustomTooltip = ({ active, payload, label }) => {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-white/90 backdrop-blur-md rounded-xl shadow-card-lg border border-slate-100 p-3 text-sm z-50">
+        <div className="z-50 rounded-lg border border-meridian-border bg-white p-3 text-sm shadow-meridian-card">
             <p className="font-bold text-slate-800 mb-1">{label}</p>
             {payload.map((p, i) => (
                 <p key={i} className="text-slate-600 flex justify-between gap-4">
@@ -102,6 +98,7 @@ const Dashboard = () => {
     const [visits, setVisits] = useState([]);
     const [unlockRequests, setUnlockRequests] = useState([]);
     const [expenseSummary, setExpenseSummary] = useState(null);
+    const [openActionItems, setOpenActionItems] = useState([]);
     const [loading, setLoading] = useState(true);
 
     const isAccountsRole = user?.role === 'accounts';
@@ -131,6 +128,10 @@ const Dashboard = () => {
                     setStats(results[0]?.data?.data);
                     setVisits(results[1]?.data?.data || []);
                     if (isAdmin && results[2]) setUnlockRequests(results[2]?.data?.data || []);
+                    try {
+                        const actionRes = await api.get('/visits/action-items/my-open');
+                        setOpenActionItems(actionRes.data.data || []);
+                    } catch { /* action item widget is non-blocking */ }
                 }
 
                 // Fetch expense summary for everyone
@@ -161,19 +162,20 @@ const Dashboard = () => {
 
     if (loading) return (
         <div className="space-y-6 animate-pulse p-4">
-            <div className="h-20 w-full bg-slate-200/50 rounded-3xl" />
+            <div className="h-20 w-full rounded-lg bg-slate-200/50" />
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                {[1,2,3,4].map(i => <div key={i} className="h-32 bg-slate-200/50 rounded-3xl" />)}
+                {[1,2,3,4].map(i => <div key={i} className="h-32 rounded-lg bg-slate-200/50" />)}
             </div>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2 h-80 bg-slate-200/50 rounded-3xl" />
-                <div className="h-80 bg-slate-200/50 rounded-3xl" />
+                <div className="lg:col-span-2 h-80 rounded-lg bg-slate-200/50" />
+                <div className="h-80 rounded-lg bg-slate-200/50" />
             </div>
         </div>
     );
 
     const trendData = (stats?.trends || []).map(t => ({ month: t._id, count: t.count }));
     const attentionNeeded = visits.filter(v => v.status === 'action_required');
+    const overdueActionItems = openActionItems.filter(item => item.isOverdue);
 
     // Expense computations
     const expClaimStats = expenseSummary?.claimStats || [];
@@ -185,19 +187,19 @@ const Dashboard = () => {
     return (
         <div className="space-y-8 page-enter pb-12">
             {/* Header Area */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white/60 backdrop-blur-xl p-6 sm:p-8 rounded-[2rem] shadow-glass border border-white">
+            <div className="flex flex-col justify-between gap-5 rounded-lg border border-meridian-border bg-white p-5 shadow-meridian-card md:flex-row md:items-center sm:p-6">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-800 tracking-tight">
+                    <h1 className="text-2xl font-black tracking-normal text-meridian-text sm:text-3xl">
                         Welcome back, <span className="text-transparent bg-clip-text bg-gradient-to-r from-brand-blue to-indigo-600">{user.name.split(' ')[0]}</span> 👋
                     </h1>
-                    <p className="text-sm text-slate-500 mt-2 font-medium flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-brand-blue/70" />
+                    <p className="mt-2 flex items-center gap-2 text-sm font-medium text-meridian-sub">
+                        <Calendar className="w-4 h-4 text-meridian-blue" />
                         {new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
                     </p>
                 </div>
                 <div className="flex flex-wrap gap-3">
                     {isUser && (
-                        <button onClick={() => navigate('/new-visit')} className="btn-primary shadow-glow shrink-0">
+                        <button onClick={() => navigate('/new-visit')} className="btn-primary shrink-0">
                             <PlusCircle className="w-4 h-4" /> New Visit
                         </button>
                     )}
@@ -254,10 +256,35 @@ const Dashboard = () => {
                         </div>
                     )}
 
+                    {openActionItems.length > 0 && (
+                        <div className="card border-green-200 bg-gradient-to-r from-green-50/70 to-white overflow-hidden p-0">
+                            <div className="px-5 py-3 border-b border-green-100 bg-green-100/60 flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-green-700 font-black text-xs uppercase tracking-widest">
+                                    <CheckCircle className="w-4 h-4" />
+                                    Open Action Items
+                                </div>
+                                <span className="text-[10px] font-bold text-white bg-green-600 px-2.5 py-1 rounded-full shadow-sm">
+                                    {overdueActionItems.length} overdue / {openActionItems.length} open
+                                </span>
+                            </div>
+                            <div className="p-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+                                {openActionItems.slice(0, 3).map(item => (
+                                    <button key={item._id} onClick={() => navigate(`/edit-visit/${item.visitId}`)} className="text-left p-4 bg-white rounded-2xl border border-green-100 shadow-sm hover:shadow-md transition-all">
+                                        <p className="text-sm font-black text-slate-800 line-clamp-2">{item.text}</p>
+                                        <p className="text-[11px] font-bold text-slate-400 mt-2 truncate">{item.visitTitle}</p>
+                                        <p className={`text-[10px] font-black uppercase tracking-wide mt-3 ${item.isOverdue ? 'text-red-600' : 'text-green-700'}`}>
+                                            {item.isOverdue ? 'Overdue' : item.dueDate ? `Due ${new Date(item.dueDate).toLocaleDateString('en-IN')}` : 'No due date'}
+                                        </p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Charts & Lists Row */}
                     <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
                         {/* Visit Trends */}
-                        <div className="xl:col-span-2 glass p-6 sm:p-8 rounded-[2rem] flex flex-col">
+                        <div className="card xl:col-span-2 p-6 sm:p-8 flex flex-col">
                             <div className="flex items-center justify-between mb-8">
                                 <div>
                                     <h3 className="font-extrabold text-lg text-slate-800 flex items-center gap-2">
@@ -388,6 +415,30 @@ const Dashboard = () => {
                         </div>
                     )}
 
+                    {openActionItems.length > 0 && (
+                        <div className="card border-green-200 bg-gradient-to-r from-green-50 to-white overflow-hidden p-0">
+                            <div className="px-5 py-3 border-b border-green-100 bg-green-100/50 flex items-center justify-between">
+                                <div className="flex items-center gap-2 text-green-700 font-black text-xs uppercase tracking-widest">
+                                    <CheckCircle className="w-4 h-4" /> My Open Action Items
+                                </div>
+                                <span className="text-[10px] font-bold text-white bg-green-600 px-2.5 py-1 rounded-full shadow-sm">
+                                    {overdueActionItems.length} overdue
+                                </span>
+                            </div>
+                            <div className="p-5 grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {openActionItems.slice(0, 3).map(item => (
+                                    <button key={item._id} onClick={() => navigate(`/edit-visit/${item.visitId}`)} className="p-4 bg-white rounded-2xl border border-green-100 shadow-sm hover:shadow-md hover:border-green-300 transition-all text-left">
+                                        <p className="text-sm font-black text-slate-800 line-clamp-2">{item.text}</p>
+                                        <p className="text-xs text-slate-500 font-bold mt-2 truncate">{item.visitTitle}</p>
+                                        <p className={`text-[10px] font-black uppercase tracking-wide mt-3 ${item.isOverdue ? 'text-red-600' : 'text-green-700'}`}>
+                                            {item.isOverdue ? 'Overdue' : item.dueDate ? `Due ${new Date(item.dueDate).toLocaleDateString('en-IN')}` : 'No due date'}
+                                        </p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Two Column Layout for User */}
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         {/* Upcoming Visits */}
@@ -480,7 +531,7 @@ const Dashboard = () => {
 
             {/* Shared Charts for Admin & Users (Status Overview) */}
             {!isAccountsRole && stats?.statusDist && stats.statusDist.length > 0 && (
-                <div className="glass p-6 sm:p-8 rounded-[2rem]">
+                <div className="card p-6 sm:p-8">
                     <h3 className="font-extrabold text-lg text-slate-800 mb-8 flex items-center gap-2">
                         <Activity className="w-5 h-5 text-brand-blue" /> Pipeline Status
                     </h3>

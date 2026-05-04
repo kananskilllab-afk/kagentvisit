@@ -47,12 +47,23 @@ function fmtTime(d) {
 function fmtAmount(n) {
     return (n || 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
 }
+function fmtLocations(plan) {
+    if (plan?.cities?.length) {
+        return plan.cities.map(c => [c.city, c.state].filter(Boolean).join(', ')).join(' | ');
+    }
+    return `${plan.city}${plan.state ? `, ${plan.state}` : ''}`;
+}
+function fmtPlanType(plan) {
+    if (plan.planType === 'multi_city_same_state') return 'Multi-city';
+    if (plan.planType === 'multi_same_city') return 'Multi-visit';
+    return 'Single visit';
+}
 
 // ── Balance Progress Card ─────────────────────────────────────────────────────
 function BalanceCard({ balance, claimCount }) {
     if (!balance) {
         return (
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-700">
+            <div className="rounded-lg border border-meridian-border bg-white p-4 text-sm text-meridian-text shadow-meridian-card">
                 <div className="font-medium mb-1">No advance approved yet</div>
                 <div className="text-xs text-blue-600">Create and submit an advance claim to get pre-approved funds.</div>
             </div>
@@ -64,17 +75,18 @@ function BalanceCard({ balance, claimCount }) {
     const isOver = remaining < 0;
 
     return (
-        <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+        <div className="rounded-lg border border-meridian-border bg-white p-4 space-y-3 shadow-meridian-card">
             <div className="flex justify-between items-center">
                 <span className="text-sm font-semibold text-gray-700">Advance Balance</span>
                 <span className={`text-sm font-bold ${isOver ? 'text-red-600' : 'text-green-700'}`}>
                     {isOver ? `Over by ${fmtAmount(Math.abs(remaining))}` : `${fmtAmount(remaining)} remaining`}
                 </span>
             </div>
-            <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                <div className={`h-full rounded-full transition-all ${pct > 100 ? 'bg-red-500' : pct > 70 ? 'bg-yellow-500' : 'bg-green-500'}`}
-                    style={{ width: `${pct}%` }} />
-            </div>
+            <progress
+                className={`h-2.5 w-full overflow-hidden rounded-full ${pct > 100 ? 'accent-red-500' : pct > 70 ? 'accent-yellow-500' : 'accent-green-500'}`}
+                value={Math.min(balance.spentAmount || 0, balance.grantedAmount || 1)}
+                max={balance.grantedAmount || 1}
+            />
             <div className="flex justify-between text-xs text-gray-500">
                 <span>Spent: {fmtAmount(balance.spentAmount)}</span>
                 <span>Granted: {fmtAmount(balance.grantedAmount)}</span>
@@ -267,21 +279,21 @@ export default function VisitPlanDetail() {
     ];
 
     return (
-        <div className="max-w-3xl mx-auto px-4 py-6 space-y-5">
+        <div className="max-w-5xl mx-auto px-4 py-6 space-y-5">
             {/* ── Header ── */}
-            <div className="flex items-start gap-3">
-                <button onClick={() => navigate('/calendar')} className="mt-0.5 text-gray-400 hover:text-gray-700">
+            <div className="card flex items-start gap-3">
+                <button onClick={() => navigate('/calendar')} className="mt-0.5 text-meridian-sub hover:text-meridian-text">
                     <ArrowLeft className="w-5 h-5" />
                 </button>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                        <h1 className="text-xl font-bold text-gray-900 truncate">{plan.title}</h1>
+                        <h1 className="text-xl font-black text-meridian-text truncate">{plan.title}</h1>
                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[plan.status]}`}>
                             {plan.status}
                         </span>
                     </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-xs text-gray-500">
-                        <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{plan.city}{plan.state ? `, ${plan.state}` : ''}</span>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-xs text-meridian-sub">
+                        <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{fmtLocations(plan)}</span>
                         <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{fmtDate(plan.plannedStartAt)} – {fmtDate(plan.plannedEndAt)}</span>
                         <span className="flex items-center gap-1"><Users className="w-3 h-3" />{plan.agents?.length || 0} agent{plan.agents?.length !== 1 ? 's' : ''}</span>
                     </div>
@@ -291,7 +303,7 @@ export default function VisitPlanDetail() {
                 {canManage && !['completed','closed','cancelled'].includes(plan.status) && (
                     <div className="flex items-center gap-2 flex-shrink-0">
                         <button onClick={() => navigate(`/expenses/claims/new?planId=${plan._id}&type=advance`)}
-                            className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors">
+                            className="btn-primary px-3 py-1.5 text-xs">
                             Create claim
                         </button>
                         <button onClick={handleCancel} disabled={cancelling}
@@ -306,12 +318,12 @@ export default function VisitPlanDetail() {
             <BalanceCard balance={balance} claimCount={claims?.length || 0} />
 
             {/* ── Tabs ── */}
-            <div className="border-b border-gray-200">
-                <div className="flex gap-0 overflow-x-auto">
+            <div className="rounded-lg border border-meridian-border bg-white p-1 shadow-meridian-card">
+                <div className="flex gap-1 overflow-x-auto">
                     {TABS.map(t => (
                         <button key={t.key} onClick={() => setTab(t.key)}
-                            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap
-                                ${tab === t.key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
+                            className={`rounded-md px-4 py-2 text-sm font-bold transition-colors whitespace-nowrap
+                                ${tab === t.key ? 'bg-meridian-navy text-white' : 'text-meridian-sub hover:bg-meridian-bg hover:text-meridian-text'}`}>
                             {t.label}
                         </button>
                     ))}
@@ -323,13 +335,13 @@ export default function VisitPlanDetail() {
                 <div className="space-y-4">
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                         {[
-                            { label: 'Plan type', value: plan.planType === 'multi_same_city' ? 'Multi-visit' : 'Single visit' },
+                            { label: 'Plan type', value: fmtPlanType(plan) },
                             { label: 'City tier', value: plan.cityTier?.replace('_', ' ') || '—' },
                             { label: 'Purpose', value: plan.purpose || '—' },
                         ].map(({ label, value }) => (
-                            <div key={label} className="bg-gray-50 rounded-lg p-3">
-                                <div className="text-xs text-gray-500 mb-0.5">{label}</div>
-                                <div className="text-sm font-medium text-gray-800">{value}</div>
+                            <div key={label} className="rounded-lg border border-meridian-border bg-white p-3 shadow-meridian-card">
+                                <div className="text-xs text-meridian-sub mb-0.5">{label}</div>
+                                <div className="text-sm font-bold text-meridian-text">{value}</div>
                             </div>
                         ))}
                     </div>

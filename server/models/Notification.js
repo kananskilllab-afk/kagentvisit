@@ -17,7 +17,8 @@ const notificationSchema = new mongoose.Schema({
             'claim_paid',            // Sent to user when paid
             'claim_under_review',    // Sent to user when review starts
             'expense_reminder',      // Generic expense reminder
-            'visit_reminder'         // Scheduled visit reminder
+            'visit_reminder',        // Scheduled visit reminder
+            'action_item_overdue'
         ]
     },
     title: {
@@ -37,6 +38,10 @@ const notificationSchema = new mongoose.Schema({
     visitScheduleRef: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'VisitSchedule'
+    },
+    visitRef: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Visit'
     },
     isRead: {
         type: Boolean,

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Mail, Lock, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { Mail, Lock, AlertCircle, ArrowRight, Eye, EyeOff, ShieldCheck, MapPinned, ClipboardCheck } from 'lucide-react';
 
 const schema = z.object({
     email:    z.string().email('Enter a valid email address'),
@@ -42,101 +42,123 @@ const Login = () => {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-slate-50">
-            {/* Ambient Background Mesh */}
-            <div className="absolute inset-0 z-0">
-                <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-brand-blue/10 blur-[100px]" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-brand-sky/20 blur-[120px]" />
-                <div className="absolute top-[20%] right-[10%] w-[40%] h-[40%] rounded-full bg-brand-purple/10 blur-[100px]" />
-            </div>
-
-            <div className="relative z-10 w-full max-w-md animate-fade-in">
-                {/* Header */}
-                <div className="text-center mb-10">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-white rounded-[2rem] shadow-glass mb-6">
-                        <img src="/logo.png" alt="Kanan" className="h-10 w-auto object-contain" />
+        <div className="min-h-screen bg-meridian-bg text-meridian-text lg:grid lg:grid-cols-[minmax(340px,42vw)_1fr]">
+            <aside className="relative flex min-h-[320px] flex-col justify-between overflow-hidden bg-meridian-navy px-6 py-6 text-white sm:px-10 lg:min-h-screen lg:px-12 lg:py-10">
+                <div className="relative z-10">
+                    <div className="inline-flex rounded bg-white px-3 py-2">
+                        <img src="/logo.png" alt="Kanan.co" className="h-10 w-[300px] max-w-[calc(100vw-4.5rem)] object-contain object-left" />
                     </div>
-                    <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight">Agent Portal</h1>
-                    <p className="text-slate-500 mt-2 text-sm font-medium">Sign in to manage your visit reports.</p>
                 </div>
 
-                {/* Card */}
-                <div className="bg-white/70 backdrop-blur-3xl rounded-[2rem] shadow-glass border border-white/60 overflow-hidden transition-all duration-300">
-                    <div className="h-1.5 w-full bg-gradient-to-r from-brand-blue to-brand-sky" />
+                <div className="relative z-10 max-w-xl py-10 lg:py-16">
+                    <p className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-brand-gold">
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        Secure Access
+                    </p>
+                    <h1 className="font-display text-4xl font-black leading-tight tracking-normal sm:text-5xl">
+                        Agent visit operations, in one workspace.
+                    </h1>
+                    <p className="mt-5 max-w-md text-sm font-medium leading-6 text-white/65">
+                        Sign in to manage visits, follow-ups, claims, and field activity with the Meridian interface.
+                    </p>
+                </div>
 
-                    <div className="p-8 sm:p-10">
-                        {/* Error */}
-                        {error && (
-                            <div className="mb-6 flex items-start gap-3 p-4 bg-red-50/80 backdrop-blur-sm border border-red-100 rounded-2xl text-red-700 animate-slide-down shadow-sm">
-                                <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-red-500" />
-                                <p className="text-sm font-semibold">{error}</p>
-                            </div>
-                        )}
+                <div className="relative z-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+                    <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                        <MapPinned className="mb-3 h-5 w-5 text-brand-gold" />
+                        <p className="text-sm font-black">Field visibility</p>
+                        <p className="mt-1 text-xs font-medium leading-5 text-white/55">Plans, visits, and assigned follow-ups stay connected.</p>
+                    </div>
+                    <div className="rounded-lg border border-white/10 bg-white/5 p-4">
+                        <ClipboardCheck className="mb-3 h-5 w-5 text-brand-green" />
+                        <p className="text-sm font-black">Review ready</p>
+                        <p className="mt-1 text-xs font-medium leading-5 text-white/55">Dashboards surface pending work as soon as you arrive.</p>
+                    </div>
+                </div>
+            </aside>
 
-                        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-                            {/* Email */}
-                            <div>
-                                <label className="label text-[10px] text-slate-400">Email Address</label>
-                                <div className="relative group">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-brand-blue transition-colors pointer-events-none" />
-                                    <input
-                                        {...register('email')}
-                                        type="email"
-                                        autoComplete="email"
-                                        className={`input-field pl-11 py-3.5 ${errors.email ? 'border-red-400 focus:ring-red-400/20' : ''}`}
-                                        placeholder="name@kanan.co"
-                                    />
-                                </div>
-                                {errors.email && <p className="mt-2 text-[11px] text-red-500 font-bold">{errors.email.message}</p>}
-                            </div>
+            <main className="flex min-h-[calc(100vh-320px)] items-center justify-center px-4 py-10 sm:px-6 lg:min-h-screen lg:px-12">
+                <section className="w-full max-w-[440px]">
+                    <div className="mb-8">
+                        <p className="text-[10px] font-black uppercase tracking-widest text-meridian-sub">Agent Portal</p>
+                        <h2 className="mt-2 font-display text-3xl font-black tracking-normal text-meridian-text">Sign in</h2>
+                    </div>
 
-                            {/* Password */}
-                            <div>
-                                <label className="label text-[10px] text-slate-400">Password</label>
-                                <div className="relative group">
-                                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-brand-blue transition-colors pointer-events-none" />
-                                    <input
-                                        {...register('password')}
-                                        type={showPass ? 'text' : 'password'}
-                                        autoComplete="current-password"
-                                        className={`input-field pl-11 pr-12 py-3.5 ${errors.password ? 'border-red-400 focus:ring-red-400/20' : ''}`}
-                                        placeholder="••••••••"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPass(v => !v)}
-                                        className="absolute right-4 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-brand-blue transition-colors"
-                                    >
-                                        {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                    </button>
-                                </div>
-                                {errors.password && <p className="mt-2 text-[11px] text-red-500 font-bold">{errors.password.message}</p>}
-                            </div>
-
-                            {/* Submit */}
-                            <button
-                                type="submit"
-                                disabled={isLoading}
-                                className="w-full mt-4 h-14 bg-gradient-to-r from-brand-blue to-brand-sky text-white rounded-2xl font-bold text-[15px] tracking-wide flex items-center justify-center gap-2.5 hover:shadow-glow hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
-                            >
-                                {isLoading ? (
-                                    <svg className="w-6 h-6 animate-spin text-white/50" viewBox="0 0 24 24" fill="none">
-                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/>
-                                    </svg>
-                                ) : (
-                                    <>Sign In <ArrowRight className="w-5 h-5" /></>
-                                )}
-                            </button>
-                        </form>
-
-                        <div className="mt-10 text-center space-y-1.5 opacity-60 hover:opacity-100 transition-opacity">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Secure Access</p>
-                            <p className="text-[10px] font-medium text-slate-500">© {new Date().getFullYear()} Kanan International.</p>
+                    {error && (
+                        <div className="mb-5 flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 p-4 text-red-700">
+                            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-500" />
+                            <p className="text-sm font-bold">{error}</p>
                         </div>
-                    </div>
-                </div>
-            </div>
+                    )}
+
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                        <div>
+                            <label className="mb-2 block text-xs font-black uppercase tracking-widest text-meridian-sub">Email Address</label>
+                            <div className="relative">
+                                <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-meridian-muted" />
+                                <input
+                                    {...register('email')}
+                                    type="email"
+                                    autoComplete="email"
+                                    className={`h-12 w-full rounded-lg border bg-white pl-11 pr-4 text-sm font-bold text-meridian-text outline-none transition focus:ring-4 ${
+                                        errors.email
+                                            ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
+                                            : 'border-meridian-border focus:border-meridian-blue focus:ring-blue-100'
+                                    }`}
+                                    placeholder="name@kanan.co"
+                                />
+                            </div>
+                            {errors.email && <p className="mt-2 text-xs font-bold text-red-500">{errors.email.message}</p>}
+                        </div>
+
+                        <div>
+                            <label className="mb-2 block text-xs font-black uppercase tracking-widest text-meridian-sub">Password</label>
+                            <div className="relative">
+                                <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-meridian-muted" />
+                                <input
+                                    {...register('password')}
+                                    type={showPass ? 'text' : 'password'}
+                                    autoComplete="current-password"
+                                    className={`h-12 w-full rounded-lg border bg-white pl-11 pr-12 text-sm font-bold text-meridian-text outline-none transition focus:ring-4 ${
+                                        errors.password
+                                            ? 'border-red-300 focus:border-red-500 focus:ring-red-100'
+                                            : 'border-meridian-border focus:border-meridian-blue focus:ring-blue-100'
+                                    }`}
+                                    placeholder="Password"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPass(v => !v)}
+                                    aria-label={showPass ? 'Hide password' : 'Show password'}
+                                    className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-meridian-sub transition hover:bg-meridian-bg hover:text-meridian-blue"
+                                >
+                                    {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </button>
+                            </div>
+                            {errors.password && <p className="mt-2 text-xs font-bold text-red-500">{errors.password.message}</p>}
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="mt-2 flex h-12 w-full items-center justify-center gap-2 rounded-lg bg-meridian-blue px-4 text-sm font-black text-white shadow-meridian-card transition hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {isLoading ? (
+                                <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/35 border-t-white" />
+                            ) : (
+                                <>
+                                    Sign In
+                                    <ArrowRight className="h-4 w-4" />
+                                </>
+                            )}
+                        </button>
+                    </form>
+
+                    <p className="mt-8 text-center text-xs font-bold text-meridian-muted">
+                        Copyright {new Date().getFullYear()} Kanan International.
+                    </p>
+                </section>
+            </main>
         </div>
     );
 };

@@ -16,7 +16,7 @@ import {
     AlertCircle
 } from 'lucide-react';
 
-const FIELD_TYPES = ['text', 'textarea', 'number', 'date', 'datetime', 'dropdown', 'multi-select', 'toggle', 'star-rating', 'file'];
+const FIELD_TYPES = ['text', 'textarea', 'number', 'date', 'datetime', 'dropdown', 'multi-select', 'toggle', 'star-rating', 'file', 'action_items'];
 
 const TYPE_COLORS = {
     text: 'bg-brand-sky/10 text-brand-sky',
@@ -29,6 +29,7 @@ const TYPE_COLORS = {
     toggle: 'bg-brand-lime/20 text-green-700',
     'star-rating': 'bg-brand-gold/10 text-brand-gold',
     file: 'bg-slate-100 text-slate-600',
+    action_items: 'bg-green-50 text-green-700',
 };
 
 const FormBuilder = () => {
@@ -319,10 +320,17 @@ const FormBuilder = () => {
                                     <select
                                         className="input-field"
                                         value={selectedField.type}
-                                        onChange={(e) => updateField(selectedField.id, { type: e.target.value, options: [] })}
+                                        onChange={(e) => {
+                                            const nextType = e.target.value;
+                                            updateField(selectedField.id, {
+                                                type: nextType,
+                                                options: [],
+                                                ...(nextType === 'action_items' ? { id: 'actionItems', label: selectedField.label === 'New Field' ? 'Action Items' : selectedField.label } : {})
+                                            });
+                                        }}
                                     >
                                         {FIELD_TYPES.map(t => (
-                                            <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1).replace('-', ' ')}</option>
+                                            <option key={t} value={t}>{t === 'action_items' ? 'Action Items' : t.charAt(0).toUpperCase() + t.slice(1).replace('-', ' ')}</option>
                                         ))}
                                     </select>
                                 </div>
@@ -341,6 +349,15 @@ const FormBuilder = () => {
                                     </label>
                                 </div>
                             </div>
+
+                            {selectedField.type === 'action_items' && (
+                                <div className="mt-5 p-4 bg-green-50 rounded-xl border border-green-100">
+                                    <p className="text-sm font-bold text-green-800">Action Items block</p>
+                                    <p className="text-xs font-semibold text-green-700/80 mt-1">
+                                        Renders the follow-up tracker with text, assignee, due date, status, and append-only history.
+                                    </p>
+                                </div>
+                            )}
 
                             {['dropdown', 'multi-select'].includes(selectedField.type) && (
                                 <div className="mt-5 p-4 bg-slate-50 rounded-xl border border-slate-100">

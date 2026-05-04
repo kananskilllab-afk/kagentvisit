@@ -28,7 +28,7 @@ const StepIndicator = ({ currentStep, steps = [], errorSteps = [] }) => {
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                         Step {currentStep + 1} of {totalSteps}
                     </span>
-                    <h3 className="text-sm sm:text-base font-extrabold text-brand-blue truncate max-w-[240px] sm:max-w-none">
+                    <h3 className="text-sm sm:text-base font-extrabold text-brand-gold truncate max-w-[240px] sm:max-w-none">
                         {steps[currentStep]}
                     </h3>
                 </div>
@@ -56,7 +56,7 @@ const StepIndicator = ({ currentStep, steps = [], errorSteps = [] }) => {
                                     : isDone
                                         ? '#22C55E'
                                         : isActive
-                                            ? '#E2E8F0'
+                                            ? '#FEF3C7'
                                             : '#F1F5F9'
                             }}
                         >
@@ -66,7 +66,7 @@ const StepIndicator = ({ currentStep, steps = [], errorSteps = [] }) => {
                                     className="absolute inset-y-0 left-0 rounded-full transition-all duration-700 ease-out"
                                     style={{
                                         width: '50%',
-                                        background: 'linear-gradient(90deg, #284695 0%, #00A0E3 100%)'
+                                        background: '#F59E0B'
                                     }}
                                 />
                             )}
@@ -100,7 +100,7 @@ const StepIndicator = ({ currentStep, steps = [], errorSteps = [] }) => {
                                 w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-xs sm:text-sm font-bold z-10
                                 transition-all duration-300 shadow-sm
                                 ${done ? 'bg-green-500 text-white shadow-green-500/20' : ''}
-                                ${active ? 'bg-brand-blue text-white ring-[3px] ring-brand-blue/15 scale-110 shadow-lg shadow-brand-blue/20' : ''}
+                                ${active ? 'bg-brand-gold text-white ring-[3px] ring-brand-gold/20 scale-110 shadow-lg shadow-brand-gold/20' : ''}
                                 ${!done && !active ? 'bg-white border-2 border-slate-200 text-slate-300' : ''}
                                 ${hasError ? 'ring-[3px] ring-red-500/20 !bg-red-500 !text-white' : ''}
                             `}>
@@ -115,7 +115,7 @@ const StepIndicator = ({ currentStep, steps = [], errorSteps = [] }) => {
 
                             {/* Label */}
                             <span className={`mt-2 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-center leading-tight px-1 transition-all duration-300 ${
-                                active ? 'text-brand-blue opacity-100' :
+                                active ? 'text-brand-gold opacity-100' :
                                 done ? 'text-green-600 opacity-70' :
                                 'text-slate-400 opacity-40'
                             }`}>

@@ -1,5 +1,7 @@
 const User = require('../models/User');
 
+const USER_DELETE_OWNER_EMAIL = 'superadmin@kanan.co';
+
 // @desc    Get users assignable for visit creation (admin: their assignedEmployees, superadmin: all)
 exports.getAssignableUsers = async (req, res) => {
     try {
@@ -103,6 +105,10 @@ exports.deleteUser = async (req, res) => {
 
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        if (req.user.email?.toLowerCase() !== USER_DELETE_OWNER_EMAIL) {
+            return res.status(403).json({ success: false, message: 'Only superadmin@kanan.co can delete users' });
         }
 
         // Prevent deleting self

@@ -6,6 +6,42 @@ let isSeeded = false;
 const withoutPostInPersonFields = (fields) =>
     fields.filter((field) => !String(field.id || '').startsWith('postInPerson.'));
 
+const actionItemsField = {
+    id: 'actionItems',
+    group: 'Final Summary',
+    label: 'Action Items',
+    type: 'action_items',
+    required: true
+};
+
+const normalizeB2BActionItemsField = (fields) => {
+    let hasActionItems = false;
+    const normalized = [];
+
+    fields.forEach((rawField) => {
+        const field = typeof rawField.toObject === 'function' ? rawField.toObject() : rawField;
+
+        if (String(field.id || '').startsWith('postInPerson.')) return;
+
+        if (field.id === 'postVisit.actionPoints' || field.id === 'actionItems') {
+            if (!hasActionItems) {
+                normalized.push({ ...actionItemsField, required: field.required !== false });
+                hasActionItems = true;
+            }
+            return;
+        }
+
+        if (field.id === 'postVisit.remarks' && !hasActionItems) {
+            normalized.push(actionItemsField);
+            hasActionItems = true;
+        }
+
+        normalized.push(field);
+    });
+
+    return normalized;
+};
+
 const seedData = async ({ genericFields, b2cFields }) => {
     if (isSeeded) return;
 
@@ -13,7 +49,7 @@ const seedData = async ({ genericFields, b2cFields }) => {
         const activeB2B = await FormConfig.findOne({ formType: 'generic', isActive: true });
         const hasB2C = await FormConfig.findOne({ formType: 'home_visit', isActive: true });
         const shouldReseedB2B = process.env.RESEED_DB === 'true';
-        const genericFieldsWithoutPostInPerson = withoutPostInPersonFields(genericFields);
+        const genericFieldsWithoutPostInPerson = normalizeB2BActionItemsField(withoutPostInPersonFields(genericFields));
 
         if (!activeB2B || shouldReseedB2B) {
             console.log('Seeding/Updating B2B form configuration...');
@@ -32,14 +68,15 @@ const seedData = async ({ genericFields, b2cFields }) => {
             const neverRequired = ['kananSpecific.onboardingDate', 'kananSpecific.appcomOnboardingDate'];
             const needsPatch = activeB2B.fields.some((field) =>
                 (neverRequired.includes(field.id) && field.required === true) ||
-                String(field.id || '').startsWith('postInPerson.')
-            );
+                String(field.id || '').startsWith('postInPerson.') ||
+                field.id === 'postVisit.actionPoints' ||
+                (field.id === 'actionItems' && field.type !== 'action_items')
+            ) || !activeB2B.fields.some((field) => field.id === 'actionItems');
             if (needsPatch) {
-                activeB2B.fields = activeB2B.fields
-                    .filter((field) => !String(field.id || '').startsWith('postInPerson.'))
-                    .map(field => neverRequired.includes(field.id) ? { ...field.toObject(), required: false } : field);
+                activeB2B.fields = normalizeB2BActionItemsField(activeB2B.fields)
+                    .map(field => neverRequired.includes(field.id) ? { ...field, required: false } : field);
                 await activeB2B.save();
-                console.log('Patched active B2B form: removed post in-person fields and fixed onboarding-date requirements.');
+                console.log('Patched active B2B form: action item tracker enabled and legacy fields cleaned.');
             }
         }
 

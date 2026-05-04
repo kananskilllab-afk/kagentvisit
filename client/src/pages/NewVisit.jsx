@@ -7,8 +7,78 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import StepIndicator from '../components/SurveyForm/StepIndicator';
 import DynamicField from '../components/FormBuilder/DynamicField';
+import AgentHistoryCard from '../components/AgentHistoryCard';
 import { buildVisitFormSchema, describeFormError } from '../utils/visitFormValidation';
 import { Save, ChevronLeft, ChevronRight, CheckCircle, Info, Loader2, MapPin, AlertCircle, Bell, ShieldAlert, FileText, User as UserIcon } from 'lucide-react';
+
+const actionItemsField = {
+    id: 'actionItems',
+    group: 'Final Summary',
+    label: 'Action Items',
+    type: 'action_items',
+    required: true
+};
+
+const normalizeVisitFormConfig = (formConfig) => {
+    if (!formConfig?.fields) return formConfig;
+
+    let hasActionItems = false;
+    const fields = [];
+
+    formConfig.fields.forEach(field => {
+        if (field.id === 'postVisit.actionPoints' || field.id === 'actionItems') {
+            if (!hasActionItems) {
+                fields.push({
+                    ...actionItemsField,
+                    group: field.group || actionItemsField.group,
+                    required: field.required !== false
+                });
+                hasActionItems = true;
+            }
+            return;
+        }
+
+        if (field.id === 'postVisit.remarks' && !hasActionItems) {
+            fields.push(actionItemsField);
+            hasActionItems = true;
+        }
+
+        fields.push(field);
+    });
+
+    return {
+        ...formConfig,
+        fields
+    };
+};
+
+const stripHtml = (value = '') => String(value)
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const hydrateLegacyActionItems = (visitData) => {
+    if (!visitData || (Array.isArray(visitData.actionItems) && visitData.actionItems.length > 0)) {
+        return visitData;
+    }
+
+    const legacyText = stripHtml(visitData.postVisit?.actionPoints);
+    if (!legacyText) return visitData;
+
+    return {
+        ...visitData,
+        actionItems: [{
+            _clientId: `legacy_${visitData._id || Date.now()}`,
+            text: legacyText,
+            assignee: '',
+            dueDate: '',
+            status: 'open',
+            history: []
+        }]
+    };
+};
 
 const NewVisit = () => {
     const [currentStep, setCurrentStep] = useState(0);
@@ -151,6 +221,10 @@ const NewVisit = () => {
     const waGroupValue = watch('checklist.waGroup');
     const studentNameValue = watch('studentInfo.name');
     const crmIdValue = watch('studentInfo.crmId');
+    const selectedAgentId = watch('meta.agentId');
+    const selectedAgentName = watch('meta.companyName');
+    const actionItemsValue = watch('actionItems');
+    const carryForwardAgentRef = useRef(null);
 
     // Auto-generate WhatsApp Group Name: CRMIDNAME@Kanan.Co
     useEffect(() => {
@@ -170,6 +244,21 @@ const NewVisit = () => {
             setValue('checklist.waGroupName', '');
         }
     }, [waGroupValue, studentNameValue, crmIdValue, setValue]);
+
+    const handleAgentOpenItems = useCallback((openItems = []) => {
+        if (id || !selectedAgentId || carryForwardAgentRef.current === selectedAgentId) return;
+        const existing = Array.isArray(actionItemsValue) ? actionItemsValue.filter(item => item?.text?.trim()) : [];
+        if (existing.length > 0 || openItems.length === 0) return;
+        setValue('actionItems', openItems.map(item => ({
+            _clientId: `carry_${item._id || Date.now()}_${Math.random().toString(36).slice(2)}`,
+            text: item.text,
+            assignee: item.assignee || '',
+            dueDate: item.dueDate || '',
+            status: 'open',
+            history: item.history || []
+        })), { shouldDirty: true, shouldValidate: true });
+        carryForwardAgentRef.current = selectedAgentId;
+    }, [actionItemsValue, id, selectedAgentId, setValue]);
 
     useEffect(() => {
         const loadForm = async () => {
@@ -196,7 +285,7 @@ const NewVisit = () => {
                 // 3. Fetch config for the derived formType
                 const cRes = await api.get(`/form-config?formType=${formType}`);
                 if (cRes.data?.success && cRes.data.data) {
-                    setConfig(cRes.data.data);
+                    setConfig(normalizeVisitFormConfig(cRes.data.data));
                 }
 
                 // 4. Populate form if visitData exists
@@ -225,7 +314,7 @@ const NewVisit = () => {
                         setCurrentStep(parseInt(stepParam));
                     }
 
-                    reset(visitData);
+                    reset(hydrateLegacyActionItems(visitData));
                 }
             } catch (err) {
                 console.error('Error loading form:', err);
@@ -250,12 +339,13 @@ const NewVisit = () => {
         const handleVisibility = async () => {
             if (document.visibilityState !== 'visible') return;
             try {
-                const formType = (user.department === 'B2C' || user.role === 'home_visit') ? 'home_visit' : 'generic';
+                const formType = urlFormType || ((user.department === 'B2C' || user.role === 'home_visit') ? 'home_visit' : 'generic');
                 const cRes = await api.get(`/form-config?formType=${formType}`);
                 if (cRes.data?.success && cRes.data.data) {
                     setConfig(prev => {
-                        if (prev?._id === cRes.data.data._id) return prev; // no change
-                        return cRes.data.data;
+                        const nextConfig = normalizeVisitFormConfig(cRes.data.data);
+                        if (prev?._id === nextConfig._id) return prev; // no change
+                        return nextConfig;
                     });
                 }
             } catch { /* silent */ }
@@ -466,10 +556,10 @@ const NewVisit = () => {
             <div className="flex flex-col gap-4 mb-8">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                        <h1 className="text-2xl sm:text-3xl font-black text-meridian-text tracking-normal">
                             {id ? 'Edit' : 'New'} {isHomeVisit ? 'Home Visit' : 'Visit'}
                         </h1>
-                        <p className="text-sm text-slate-500 mt-1 font-medium">Complete the field report below</p>
+                        <p className="text-sm text-meridian-sub mt-1 font-medium">Complete the field report below</p>
                     </div>
 
                     {/* Draft save button — always visible for drafts, hidden when locked */}
@@ -646,9 +736,20 @@ const NewVisit = () => {
                     </select>
                     {forUser && (
                         <p className="text-xs text-brand-blue font-bold sm:shrink-0">
-                            Visit will appear in this user's list
+                            Visit will appear in this user&apos;s list
                         </p>
                     )}
+                </div>
+            )}
+
+            {selectedAgentId && !isHomeVisit && (
+                <div className="mb-6 max-w-4xl mx-auto">
+                    <AgentHistoryCard
+                        agentId={selectedAgentId}
+                        agentName={selectedAgentName}
+                        compact
+                        onOpenItems={handleAgentOpenItems}
+                    />
                 </div>
             )}
 
@@ -661,24 +762,21 @@ const NewVisit = () => {
 
             {/* Form */}
             <form onSubmit={handleSubmit(onSubmit, onValidationError)} className="space-y-6 max-w-4xl mx-auto">
-                <div className="glass p-5 sm:p-10 lg:p-12 rounded-[2rem] border border-white/60 animate-fade-in relative overflow-hidden">
-                    {/* Subtle ambient light */}
-                    <div className="absolute top-0 right-0 w-64 h-64 bg-brand-blue/5 rounded-full blur-[80px] pointer-events-none -z-10" />
-
+                <div className="card animate-fade-in p-5 sm:p-8 lg:p-10">
                     {/* Section Header */}
-                    <div className="flex items-center gap-5 mb-10 pb-6 border-b border-slate-100/60 relative z-10">
-                        <div className="w-12 h-12 rounded-[1.25rem] bg-gradient-to-br from-brand-blue to-brand-sky flex items-center justify-center text-white font-black text-xl shadow-glass shrink-0">
+                    <div className="flex items-center gap-5 mb-8 pb-6 border-b border-meridian-border relative z-10">
+                        <div className="w-12 h-12 rounded-lg bg-brand-gold flex items-center justify-center text-white font-black text-xl shadow-meridian-card shrink-0">
                             {currentStep + 1}
                         </div>
                         <div className="min-w-0 flex-1">
-                            <h3 className="text-xl font-extrabold text-slate-800 tracking-tight leading-none mb-1.5 truncate">{groups[currentStep]}</h3>
-                            <p className="text-xs font-medium text-slate-500 tracking-tight">
+                            <h3 className="text-xl font-black text-meridian-text tracking-normal leading-none mb-1.5 truncate">{groups[currentStep]}</h3>
+                            <p className="text-xs font-medium text-meridian-sub tracking-normal">
                                 {isDraft ? 'Fill in the details — you can save as draft anytime' : 'Required details for this visit step'}
                             </p>
                         </div>
-                        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl shadow-sm border border-slate-100 shrink-0">
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Step</span>
-                            <span className="text-base font-black text-brand-blue">{currentStep + 1}</span>
+                        <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-lg shadow-sm border border-meridian-border shrink-0">
+                            <span className="text-[10px] font-black text-meridian-sub uppercase tracking-widest">Step</span>
+                            <span className="text-base font-black text-brand-gold">{currentStep + 1}</span>
                             <span className="text-sm font-bold text-slate-200">/</span>
                             <span className="text-sm font-bold text-slate-400">{groups.length}</span>
                         </div>
@@ -780,12 +878,12 @@ const NewVisit = () => {
 
                 {/* Bottom navigation bar */}
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[94%] max-w-4xl z-40">
-                    <div className="card glass flex items-center justify-between gap-2 p-2.5 sm:p-5 shadow-premium backdrop-blur-xl border-white/40 ring-1 ring-brand-blue/5">
+                    <div className="card flex items-center justify-between gap-2 p-2.5 sm:p-4">
                         <button
                             type="button"
                             onClick={prevStep}
                             disabled={currentStep === 0}
-                            className="btn-outline flex items-center justify-center gap-1.5 px-4 sm:px-6 py-2.5 rounded-2xl font-bold bg-white/80 hover:bg-white text-slate-700 hover:text-brand-blue shadow-sm border-white/60 transition-all active:scale-95 text-xs sm:text-sm disabled:opacity-30"
+                            className="btn-outline flex items-center justify-center gap-1.5 px-4 sm:px-6 py-2.5 text-xs sm:text-sm disabled:opacity-30"
                         >
                             <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
                             <span className="sm:inline hidden">Back</span>
@@ -797,7 +895,7 @@ const NewVisit = () => {
                                 <div
                                     key={i}
                                     className={`rounded-full transition-all duration-500 ${
-                                        i === currentStep ? 'w-6 sm:w-8 h-1.5 bg-brand-blue shadow-sm' :
+                                        i === currentStep ? 'w-6 sm:w-8 h-1.5 bg-brand-gold shadow-sm' :
                                         i < currentStep ? 'w-1.5 h-1.5 bg-green-500' :
                                         'w-1.5 h-1.5 bg-slate-200'
                                     }`}
@@ -810,7 +908,7 @@ const NewVisit = () => {
                                 type="button"
                                 onClick={handleSubmit(onSubmit, onValidationError)}
                                 disabled={isSaving || isLocked}
-                                className="btn-primary flex items-center justify-center gap-2 px-5 sm:px-8 py-3 rounded-2xl font-bold bg-brand-gradient text-white shadow-lg shadow-brand-blue/20 hover:shadow-brand-blue/30 transition-all active:scale-95 disabled:opacity-70 disabled:grayscale text-sm sm:text-base"
+                                className="btn-primary flex items-center justify-center gap-2 px-5 sm:px-8 py-3 text-sm sm:text-base disabled:opacity-70 disabled:grayscale"
                             >
                                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" /> Submit</>}
                             </button>
@@ -818,7 +916,7 @@ const NewVisit = () => {
                             <button
                                 type="button"
                                 onClick={nextStep}
-                                className="btn-primary flex items-center justify-center gap-2 px-5 sm:px-8 py-3 rounded-2xl font-bold bg-brand-gradient text-white shadow-lg shadow-brand-blue/20 hover:shadow-brand-blue/30 transition-all active:scale-95 text-sm sm:text-base"
+                                className="btn-primary flex items-center justify-center gap-2 px-5 sm:px-8 py-3 text-sm sm:text-base"
                             >
                                 <span>Next</span>
                                 <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />

@@ -20,7 +20,7 @@ export const Input = ({
       value={value}
       onChange={onChange}
       placeholder={placeholder}
-      className={`w-full h-10 border-[1.5px] border-meridian-border rounded-[7px] bg-white ${icon ? 'pl-[38px]' : 'pl-3'} pr-3 text-[13px] text-meridian-text outline-none font-sans focus:border-meridian-blue ${className}`}
+      className={`w-full h-10 border-[1.5px] border-meridian-border rounded-[7px] bg-white ${icon ? 'pl-[38px]' : 'pl-3'} pr-3 text-[13px] text-meridian-text outline-none font-sans shadow-sm transition-all duration-200 ease-out placeholder:text-meridian-muted focus:border-meridian-blue focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-70 ${className}`}
       {...rest}
     />
   </div>

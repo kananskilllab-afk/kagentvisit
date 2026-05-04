@@ -33,6 +33,23 @@ const followUpMeetingSchema = new mongoose.Schema({
     addedAt:      { type: Date, default: Date.now }
 }, { _id: true });
 
+const actionItemHistorySchema = new mongoose.Schema({
+    at:     { type: Date, default: Date.now },
+    by:     { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    change: { type: String, enum: ['created', 'edited', 'status_changed', 'deleted'], required: true },
+    note:   { type: String }
+}, { _id: true });
+
+const actionItemSchema = new mongoose.Schema({
+    text:      { type: String, required: true, trim: true },
+    assignee:  { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    dueDate:   { type: Date },
+    status:    { type: String, enum: ['open', 'done'], default: 'open' },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    createdAt: { type: Date, default: Date.now },
+    history:   [actionItemHistorySchema]
+}, { _id: true });
+
 // ─── Main Schema ─────────────────────────────────────────────────────────────
 
 const visitSchema = new mongoose.Schema({
@@ -352,7 +369,8 @@ const visitSchema = new mongoose.Schema({
     reviewedBy:     { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
     reviewedAt:     { type: Date, default: null },
     reviewComment:  { type: String, default: null },
-    statusHistory:  [statusHistorySchema]
+    statusHistory:  [statusHistorySchema],
+    actionItems: { type: [actionItemSchema], default: [] }
 
 }, {
     timestamps: true
@@ -361,5 +379,8 @@ const visitSchema = new mongoose.Schema({
 visitSchema.index({ createdAt: -1 });
 visitSchema.index({ formType: 1, status: 1 });
 visitSchema.index({ submittedBy: 1, createdAt: -1 });
+visitSchema.index({ 'actionItems.status': 1 });
+visitSchema.index({ 'actionItems.status': 1, 'actionItems.dueDate': 1 });
+visitSchema.index({ submittedBy: 1, 'actionItems.status': 1 });
 
 module.exports = mongoose.model('Visit', visitSchema);

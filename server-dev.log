@@ -1,0 +1,15 @@
+
+> avs-server@1.0.0 dev
+> nodemon server.js
+
+[33m[nodemon] 3.1.14[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): *.*[39m
+[33m[nodemon] watching extensions: js,mjs,cjs,json[39m
+[32m[nodemon] starting `node server.js`[39m
+[dotenv@17.3.1] injecting env (13) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+Connecting to MongoDB Atlas...
+Successfully connected to MongoDB Atlas
+MongoDB auto-connected successfully on startup.
+[Cron] overdueActionItems: scheduled for 09:00 IST daily
+[31m[nodemon] app crashed - waiting for file changes before starting...[39m

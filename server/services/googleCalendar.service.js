@@ -44,10 +44,10 @@ async function handleCallback(code, userId, redirectUri) {
 
     await User.findByIdAndUpdate(userId, {
         googleCalendar: {
-            connected:    true,
-            accessToken:  tokens.access_token,
+            connected: true,
+            accessToken: tokens.access_token,
             refreshToken: tokens.refresh_token,
-            expiryDate:   tokens.expiry_date,
+            expiryDate: tokens.expiry_date,
             email
         }
     });
@@ -65,9 +65,9 @@ async function getCalendarClient(user) {
 
     const client = getOAuth2Client();
     client.setCredentials({
-        access_token:  gc.accessToken,
+        access_token: gc.accessToken,
         refresh_token: gc.refreshToken,
-        expiry_date:   gc.expiryDate
+        expiry_date: gc.expiryDate
     });
 
     // Listen for automatic token refresh
@@ -84,11 +84,11 @@ async function getCalendarClient(user) {
 /**
  * Create a Google Calendar event and return the event ID.
  */
-async function createEvent(user, schedule) {
+async function createEvent(user, item) {
     const calendar = await getCalendarClient(user);
     if (!calendar) return null;
 
-    const event = buildEventResource(schedule);
+    const event = buildEventResource(item);
     const res = await calendar.events.insert({
         calendarId: 'primary',
         requestBody: event
@@ -99,11 +99,11 @@ async function createEvent(user, schedule) {
 /**
  * Update an existing Google Calendar event.
  */
-async function updateEvent(user, googleEventId, schedule) {
+async function updateEvent(user, googleEventId, item) {
     const calendar = await getCalendarClient(user);
     if (!calendar || !googleEventId) return;
 
-    const event = buildEventResource(schedule);
+    const event = buildEventResource(item);
     await calendar.events.update({
         calendarId: 'primary',
         eventId: googleEventId,
@@ -145,14 +145,14 @@ async function listEvents(user, timeMin, timeMax) {
         maxResults: 100
     });
     return (res.data.items || []).map(e => ({
-        id:          e.id,
-        title:       e.summary || '(No title)',
-        start:       e.start?.dateTime || e.start?.date,
-        end:         e.end?.dateTime || e.end?.date,
-        location:    e.location || '',
+        id: e.id,
+        title: e.summary || '(No title)',
+        start: e.start?.dateTime || e.start?.date,
+        end: e.end?.dateTime || e.end?.date,
+        location: e.location || '',
         description: e.description || '',
-        htmlLink:    e.htmlLink,
-        source:      'google'
+        htmlLink: e.htmlLink,
+        source: 'google'
     }));
 }
 
@@ -162,37 +162,59 @@ async function listEvents(user, timeMin, timeMax) {
 async function disconnect(userId) {
     await User.findByIdAndUpdate(userId, {
         googleCalendar: {
-            connected:    false,
-            accessToken:  null,
+            connected: false,
+            accessToken: null,
             refreshToken: null,
-            expiryDate:   null,
-            email:        null
+            expiryDate: null,
+            email: null
         }
     });
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function buildEventResource(schedule) {
-    const start = new Date(schedule.scheduledDate);
-    const end   = new Date(start.getTime() + 60 * 60 * 1000); // default 1 hour duration
+function buildEventResource(item) {
+    // Determine if this is a VisitPlan (trip) or a VisitSchedule (individual meeting)
+    const isPlan = !!item.plannedStartAt;
+    const start = new Date(isPlan ? item.plannedStartAt : item.scheduledDate);
+    const end = new Date(isPlan ? item.plannedEndAt : (item.scheduledEndDate || new Date(start.getTime() + 60 * 60 * 1000)));
 
     const event = {
-        summary:     schedule.title,
-        description: schedule.notes || '',
-        start:       { dateTime: start.toISOString() },
-        end:         { dateTime: end.toISOString() }
+        summary: item.title,
+        description: item.notes || '',
+        visibility: 'private' // Restricts visibility so only the specific user can see details, even on a shared company calendar
     };
 
-    if (schedule.location) {
-        event.location = schedule.location;
+    if (isPlan) {
+        // Visit Plans become All-Day events spanning the entire trip duration.
+        // This makes them appear at the top of the Google Calendar for those specific dates.
+        event.start = { date: start.toISOString().split('T')[0] };
+
+        // Google Calendar all-day event end dates are exclusive, so add 1 day
+        const endDate = new Date(end);
+        endDate.setDate(endDate.getDate() + 1);
+        event.end = { date: endDate.toISOString().split('T')[0] };
+    } else {
+        // Visit Schedules remain as timed events. They will visually appear "below" the all-day Visit Plan.
+        event.start = { dateTime: start.toISOString() };
+        event.end = { dateTime: end.toISOString() };
+
+        // Append the agent/company name to the event title for quick visibility
+        const agentName = item.customAgentName || item.agentNameForGcal;
+        if (agentName) {
+            event.summary = `${item.title} - ${agentName}`;
+        }
+    }
+
+    if (item.location) {
+        event.location = item.location;
     }
 
     // Add reminder if offset is set
-    if (schedule.reminderOffset && schedule.reminderOffset > 0) {
+    if (item.reminderOffset && item.reminderOffset > 0) {
         event.reminders = {
             useDefault: false,
-            overrides: [{ method: 'popup', minutes: schedule.reminderOffset }]
+            overrides: [{ method: 'popup', minutes: item.reminderOffset }]
         };
     }
 

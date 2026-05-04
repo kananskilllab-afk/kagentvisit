@@ -14,7 +14,7 @@ const visitPlanSchema = new mongoose.Schema({
     },
     planType: {
         type: String,
-        enum: ['single', 'multi_same_city'],
+        enum: ['single', 'multi_same_city', 'multi_city_same_state'],
         default: 'single',
         required: true
     },
@@ -22,6 +22,15 @@ const visitPlanSchema = new mongoose.Schema({
     city:    { type: String, trim: true, required: true, index: true },
     state:   { type: String, trim: true },
     pinCode: { type: String, trim: true },
+    cities: [{
+        city:     { type: String, trim: true, required: true },
+        state:    { type: String, trim: true },
+        cityTier: {
+            type: String,
+            enum: ['tier_1', 'tier_2', 'tier_3', 'na'],
+            default: 'na'
+        }
+    }],
     cityTier: {
         type: String,
         enum: ['tier_1', 'tier_2', 'tier_3', 'na'],

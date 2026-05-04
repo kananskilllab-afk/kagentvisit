@@ -48,41 +48,41 @@
 
 ### UI Rebuild — Shell & Home (UI-S)
 
-- [ ] **UI-S-01**: `Layout.jsx` rebuilt as Meridian sidebar (236px navy, gold active accent) + 58px top bar using design primitives only
-- [ ] **UI-S-02**: `Login.jsx` rebuilt with split-pane layout (navy left with stats, form right) matching `newui` mock
-- [ ] **UI-S-03**: `Dashboard.jsx` rebuilt with 4 KPI cards + visit-activity chart + status-breakdown card + recent visits table + "My Open Action Items" widget
-- [ ] **UI-S-04**: Sidebar collapses to icon-only at <1024px and to drawer at <768px
+- [x] **UI-S-01**: `Layout.jsx` rebuilt as Meridian sidebar (236px navy, gold active accent) + 58px top bar using design primitives only
+- [x] **UI-S-02**: `Login.jsx` rebuilt with split-pane layout (navy left with stats, form right) matching `newui` mock
+- [x] **UI-S-03**: `Dashboard.jsx` rebuilt with 4 KPI cards + visit-activity chart + status-breakdown card + recent visits table + "My Open Action Items" widget
+- [x] **UI-S-04**: Sidebar collapses to icon-only at <1024px and to drawer at <768px
 
 ### UI Rebuild — Visits (UI-V)
 
-- [ ] **UI-V-01**: `VisitsList.jsx` rebuilt with Meridian table, status pills, side detail drawer, search + status chip filter, Export / New Visit buttons
-- [ ] **UI-V-02**: `NewVisit.jsx` chrome restyled with Meridian; `StepIndicator` shows gold current / green completed
-- [ ] **UI-V-03**: `VisitDetailModal.jsx` rebuilt as Meridian full-screen modal with sticky header
+- [x] **UI-V-01**: `VisitsList.jsx` rebuilt with Meridian table, status pills, side detail drawer, search + status chip filter, Export / New Visit buttons
+- [x] **UI-V-02**: `NewVisit.jsx` chrome restyled with Meridian; `StepIndicator` shows gold current / green completed
+- [x] **UI-V-03**: `VisitDetailModal.jsx` rebuilt as Meridian full-screen modal with sticky header
 
 ### UI Rebuild — Planning (UI-P)
 
-- [ ] **UI-P-01**: `Calendar.jsx` Month / Week / Day / Agenda views restyled with Meridian event chips and toolbar
-- [ ] **UI-P-02**: `PlanModal.jsx` 4-step stepper restyled (gold current, navy completed)
-- [ ] **UI-P-03**: `VisitPlanDetail.jsx` overview KPI cards + balance bar + tabs in Meridian style
-- [ ] **UI-P-04**: `ScheduleModal.jsx` matches Meridian dialog pattern
+- [x] **UI-P-01**: `Calendar.jsx` Month / Week / Day / Agenda views restyled with Meridian event chips and toolbar
+- [x] **UI-P-02**: `PlanModal.jsx` 4-step stepper restyled (gold current, navy completed)
+- [x] **UI-P-03**: `VisitPlanDetail.jsx` overview KPI cards + balance bar + tabs in Meridian style
+- [x] **UI-P-04**: `ScheduleModal.jsx` matches Meridian dialog pattern
 
 ### UI Rebuild — Money (UI-M)
 
-- [ ] **UI-M-01**: `Expenses/*` list, `NewClaim` wizard, and `ClaimDetail` rebuilt in Meridian
-- [ ] **UI-M-02**: Policy violation banner uses Meridian red alert pattern; submit flow still triggers `policy.evaluateClaim()`
-- [ ] **UI-M-03**: Receipt upload zone and templates picker restyled
+- [x] **UI-M-01**: `Expenses/*` list, `NewClaim` wizard, and `ClaimDetail` rebuilt in Meridian
+- [x] **UI-M-02**: Policy violation banner uses Meridian red alert pattern; submit flow still triggers `policy.evaluateClaim()`
+- [x] **UI-M-03**: Receipt upload zone and templates picker restyled
 
 ### UI Rebuild — Admin (UI-A)
 
-- [ ] **UI-A-01**: `ManageAgent.jsx` table + detail drawer restyled (with History tab from AH-06)
-- [ ] **UI-A-02**: `SuperAdmin/UserManagement.jsx` restyled with role pills + active dot
-- [ ] **UI-A-03**: `FormBuilder.jsx` palette + canvas restyled; `action_items` block in palette
-- [ ] **UI-A-04**: `Analytics.jsx` rebuilt with Meridian KPI cards + sparklines + Export PDF
+- [x] **UI-A-01**: `ManageAgent.jsx` table + detail drawer restyled (with History tab from AH-06)
+- [x] **UI-A-02**: `SuperAdmin/UserManagement.jsx` restyled with role pills + active dot
+- [x] **UI-A-03**: `FormBuilder.jsx` palette + canvas restyled; `action_items` block in palette
+- [x] **UI-A-04**: `Analytics.jsx` rebuilt with Meridian KPI cards + sparklines + Export PDF
 
 ### UI Rebuild — Tail Pages (UI-T)
 
-- [ ] **UI-T-01**: `DailyReport.jsx`, `PostDemoFeedback.jsx`, `PostFieldDay.jsx`, `PostInPersonVisit.jsx`, `Profile.jsx`, `FormsHub.jsx`, `FormsAdmin.jsx` apply Meridian primitives
-- [ ] **UI-T-02**: Dead Tailwind classes and unused custom CSS removed from `client/src/index.css`
+- [x] **UI-T-01**: `DailyReport.jsx`, `PostDemoFeedback.jsx`, `PostFieldDay.jsx`, `PostInPersonVisit.jsx`, `Profile.jsx`, `FormsHub.jsx`, `FormsAdmin.jsx` apply Meridian primitives
+- [x] **UI-T-02**: Dead Tailwind classes and unused custom CSS removed from `client/src/index.css`
 - [ ] **UI-T-03**: Lighthouse a11y ≥ 90 on dashboard, visits, expenses
 
 ---
@@ -145,24 +145,24 @@ Generated 2026-05-01 by gsd-roadmapper. Coverage: 47 / 47 REQ-IDs mapped, no orp
 | AH-07 | Phase 5 | Pending |
 | AH-08 | Phase 5 | Pending |
 | AH-09 | Phase 5 | Pending |
-| UI-S-01 | Phase 6 | Pending |
-| UI-S-02 | Phase 6 | Pending |
-| UI-S-03 | Phase 6 | Pending |
-| UI-S-04 | Phase 6 | Pending |
-| UI-V-01 | Phase 7 | Pending |
-| UI-V-02 | Phase 7 | Pending |
-| UI-V-03 | Phase 7 | Pending |
-| UI-P-01 | Phase 8 | Pending |
-| UI-P-02 | Phase 8 | Pending |
-| UI-P-03 | Phase 8 | Pending |
-| UI-P-04 | Phase 8 | Pending |
-| UI-M-01 | Phase 9 | Pending |
-| UI-M-02 | Phase 9 | Pending |
-| UI-M-03 | Phase 9 | Pending |
-| UI-A-01 | Phase 10 | Pending |
-| UI-A-02 | Phase 10 | Pending |
-| UI-A-03 | Phase 10 | Pending |
-| UI-A-04 | Phase 10 | Pending |
-| UI-T-01 | Phase 11 | Pending |
-| UI-T-02 | Phase 11 | Pending |
-| UI-T-03 | Phase 11 | Pending |
+| UI-S-01 | Phase 6 | Complete |
+| UI-S-02 | Phase 6 | Complete |
+| UI-S-03 | Phase 6 | Complete |
+| UI-S-04 | Phase 6 | Complete |
+| UI-V-01 | Phase 7 | Complete |
+| UI-V-02 | Phase 7 | Complete |
+| UI-V-03 | Phase 7 | Complete |
+| UI-P-01 | Phase 8 | Complete |
+| UI-P-02 | Phase 8 | Complete |
+| UI-P-03 | Phase 8 | Complete |
+| UI-P-04 | Phase 8 | Complete |
+| UI-M-01 | Phase 9 | Complete |
+| UI-M-02 | Phase 9 | Complete |
+| UI-M-03 | Phase 9 | Complete |
+| UI-A-01 | Phase 10 | Complete |
+| UI-A-02 | Phase 10 | Complete |
+| UI-A-03 | Phase 10 | Complete |
+| UI-A-04 | Phase 10 | Complete |
+| UI-T-01 | Phase 11 | Complete |
+| UI-T-02 | Phase 11 | Complete |
+| UI-T-03 | Phase 11 | Blocked - Lighthouse/auth session unavailable |

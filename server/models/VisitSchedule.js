@@ -1,5 +1,23 @@
 const mongoose = require('mongoose');
 
+// Action item sub-schemas (mirrors Visit.js definitions — kept in sync)
+const actionItemHistorySchema = new mongoose.Schema({
+    at:     { type: Date, default: Date.now },
+    by:     { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    change: { type: String, enum: ['created', 'edited', 'status_changed', 'deleted'], required: true },
+    note:   { type: String }
+}, { _id: true });
+
+const actionItemSchema = new mongoose.Schema({
+    text:      { type: String, required: true, trim: true },
+    assignee:  { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    dueDate:   { type: Date },
+    status:    { type: String, enum: ['open', 'done'], default: 'open' },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    createdAt: { type: Date, default: Date.now },
+    history:   [actionItemHistorySchema]
+}, { _id: true });
+
 const visitScheduleSchema = new mongoose.Schema({
     user: {
         type: mongoose.Schema.Types.ObjectId,
@@ -96,7 +114,8 @@ const visitScheduleSchema = new mongoose.Schema({
     syncToGoogle: {
         type: Boolean,
         default: false
-    }
+    },
+    actionItems: { type: [actionItemSchema], default: [] }
 }, {
     timestamps: true
 });
@@ -104,5 +123,8 @@ const visitScheduleSchema = new mongoose.Schema({
 visitScheduleSchema.index({ user: 1, scheduledDate: 1 });
 visitScheduleSchema.index({ scheduledDate: 1, reminderSent: 1, reminderOffset: 1 });
 visitScheduleSchema.index({ visitPlanRef: 1, scheduledDate: 1 });
+visitScheduleSchema.index({ 'actionItems.status': 1 });
+visitScheduleSchema.index({ 'actionItems.status': 1, 'actionItems.dueDate': 1 });
+visitScheduleSchema.index({ user: 1, 'actionItems.status': 1 });
 
 module.exports = mongoose.model('VisitSchedule', visitScheduleSchema);

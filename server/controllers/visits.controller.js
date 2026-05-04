@@ -2,6 +2,32 @@ const Visit = require('../models/Visit');
 const Agent = require('../models/Agent');
 const aiService = require('../services/ai.service');
 
+const toObjectIdValue = (value, fallback = null) => {
+    if (!value) return fallback;
+    return value._id || value;
+};
+
+const normalizeSubmittedActionItems = (items, userId) => {
+    if (!Array.isArray(items)) return [];
+    return items
+        .filter(item => item?.text && String(item.text).trim())
+        .map(item => ({
+            ...(item._id ? { _id: item._id } : {}),
+            text: String(item.text).trim(),
+            assignee: toObjectIdValue(item.assignee, null),
+            dueDate: item.dueDate || null,
+            status: item.status === 'done' ? 'done' : 'open',
+            createdBy: toObjectIdValue(item.createdBy, userId),
+            createdAt: item.createdAt || new Date(),
+            history: Array.isArray(item.history) && item.history.length > 0
+                ? item.history.map(entry => ({
+                    ...entry,
+                    by: toObjectIdValue(entry.by, userId)
+                }))
+                : [{ at: new Date(), by: userId, change: 'created', note: 'created from visit form' }]
+        }));
+};
+
 // Fire-and-forget: generate both AI insights + audit and save to MongoDB
 const triggerBackgroundAI = (visitId) => {
     (async () => {
@@ -34,10 +60,12 @@ const triggerBackgroundAI = (visitId) => {
 exports.getVisits = async (req, res) => {
     try {
         let query = {};
+        const andConditions = [];
+        const isPrivileged = ['admin', 'superadmin'].includes(req.user.role);
 
         // Non-admins see only visits they submitted OR visits created for them
-        if (!['admin', 'superadmin'].includes(req.user.role)) {
-            query.$and = [{ $or: [{ submittedBy: req.user._id }, { forUser: req.user._id }] }];
+        if (!isPrivileged) {
+            andConditions.push({ $or: [{ submittedBy: req.user._id }, { forUser: req.user._id }] });
         }
 
         // Additional filters from query params
@@ -48,15 +76,15 @@ exports.getVisits = async (req, res) => {
         if (unlockRequestSent === 'true') query.unlockRequestSent = true;
 
         // Admin/superadmin can filter by specific user
-        if (submittedBy && (req.user.role === 'admin' || req.user.role === 'superadmin')) {
+        if (submittedBy && isPrivileged) {
             query.submittedBy = submittedBy;
         }
         
         if (companyName) {
-            query.$or = [
+            andConditions.push({ $or: [
                 { 'meta.companyName': { $regex: companyName, $options: 'i' } },
                 { 'studentInfo.name': { $regex: companyName, $options: 'i' } }
-            ];
+            ]});
         }
 
         // Apply formType filter from query or from Admin's department
@@ -64,12 +92,22 @@ exports.getVisits = async (req, res) => {
             query.formType = formType === 'home_visit' ? 'home_visit' : 'generic';
         }
 
-        // Admin department restriction (overrides or restricts query params)
+        // Admin visit access can come from department or explicit form assignment.
         if (req.user.role === 'admin') {
-            if (req.user.department === 'B2C') {
-                query.formType = 'home_visit';
-            } else if (req.user.department === 'B2B') {
-                query.formType = 'generic';
+            const allowedFormTypes = new Set();
+            if (req.user.department === 'B2B') allowedFormTypes.add('generic');
+            if (req.user.department === 'B2C') allowedFormTypes.add('home_visit');
+            if (req.user.formAccess?.includes('b2b_visit')) allowedFormTypes.add('generic');
+            if (req.user.formAccess?.includes('b2c_visit')) allowedFormTypes.add('home_visit');
+
+            if (formType) {
+                const requestedFormType = formType === 'home_visit' ? 'home_visit' : 'generic';
+                if (!allowedFormTypes.has(requestedFormType)) {
+                    return res.json({ success: true, count: 0, data: [] });
+                }
+                query.formType = requestedFormType;
+            } else if (allowedFormTypes.size > 0) {
+                query.formType = { $in: Array.from(allowedFormTypes) };
             }
         }
 
@@ -80,12 +118,15 @@ exports.getVisits = async (req, res) => {
         }
 
         if (city) {
-            if (!query.$or) query.$or = [];
-            query.$or.push(
+            andConditions.push({ $or: [
                 { 'agencyProfile.address': { $regex: city, $options: 'i' } },
                 { 'location.city': { $regex: city, $options: 'i' } },
                 { 'location.address': { $regex: city, $options: 'i' } }
-            );
+            ]});
+        }
+
+        if (andConditions.length > 0) {
+            query.$and = andConditions;
         }
 
         const visits = await Visit.find(query)
@@ -121,7 +162,8 @@ exports.createVisit = async (req, res) => {
         const visitData = {
             ...req.body,
             submittedBy: req.user._id,
-            status: req.body.status || 'draft'
+            status: req.body.status || 'draft',
+            actionItems: normalizeSubmittedActionItems(req.body.actionItems, req.user._id)
         };
 
         // Set submittedAt when creating directly as submitted
@@ -137,6 +179,40 @@ exports.createVisit = async (req, res) => {
                 $inc: { visitCount: 1 },
                 lastVisitDate: new Date()
             });
+        }
+
+        // Auto-register new company in Manage Agents if it's not already there
+        if (visit.status === 'submitted' && visit.meta?.companyName && !visit.meta?.agentId) {
+            const companyName = visit.meta.companyName.trim();
+            const existing = await Agent.findOne({
+                name: { $regex: new RegExp(`^${companyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+            });
+            if (!existing) {
+                try {
+                    await Agent.create({
+                        name: companyName,
+                        city: visit.location?.city || visit.agencyProfile?.address || '',
+                        emailId: visit.agencyProfile?.emailId || visit.meta?.email || '',
+                        mobile: String(visit.agencyProfile?.contactNumber || ''),
+                        bdmName: visit.meta?.bdmName || '',
+                        rmName: visit.meta?.rmName || '',
+                        isActive: true,
+                        visitCount: 1,
+                        lastVisitDate: new Date(),
+                        createdBy: req.user._id
+                    });
+                    console.log(`[Agent Auto-Register] Created new agent: ${companyName}`);
+                } catch (agentErr) {
+                    // Non-fatal: duplicate or validation error — log and continue
+                    console.warn(`[Agent Auto-Register] Skipped: ${agentErr.message}`);
+                }
+            } else {
+                // Company exists but was entered as custom name — bump visit count
+                await Agent.findByIdAndUpdate(existing._id, {
+                    $inc: { visitCount: 1 },
+                    lastVisitDate: new Date()
+                });
+            }
         }
 
         // Auto-generate AI analysis in background (non-blocking)
@@ -234,6 +310,9 @@ exports.updateVisit = async (req, res) => {
 
         // Prepare update data
         let updateData = { ...req.body };
+        if (Object.prototype.hasOwnProperty.call(req.body, 'actionItems')) {
+            updateData.actionItems = normalizeSubmittedActionItems(req.body.actionItems, req.user._id);
+        }
 
         // Handle Admin-specific notes
         if (isAdmin && (req.body.adminNote || req.body.adminNoteObj)) {
@@ -299,6 +378,38 @@ exports.updateVisit = async (req, res) => {
             if (wasSubmitted && agentChanged && oldAgentId) {
                 await Agent.findByIdAndUpdate(oldAgentId, {
                     $inc: { visitCount: -1 }
+                });
+            }
+        }
+
+        // Auto-register new company when transitioning to submitted and no agentId
+        if (!wasSubmitted && isNowSubmitted && updatedVisit.meta?.companyName && !newAgentId) {
+            const companyName = updatedVisit.meta.companyName.trim();
+            const existing = await Agent.findOne({
+                name: { $regex: new RegExp(`^${companyName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+            });
+            if (!existing) {
+                try {
+                    await Agent.create({
+                        name: companyName,
+                        city: updatedVisit.location?.city || updatedVisit.agencyProfile?.address || '',
+                        emailId: updatedVisit.agencyProfile?.emailId || updatedVisit.meta?.email || '',
+                        mobile: String(updatedVisit.agencyProfile?.contactNumber || ''),
+                        bdmName: updatedVisit.meta?.bdmName || '',
+                        rmName: updatedVisit.meta?.rmName || '',
+                        isActive: true,
+                        visitCount: 1,
+                        lastVisitDate: new Date(),
+                        createdBy: req.user._id
+                    });
+                    console.log(`[Agent Auto-Register] Created new agent on update: ${companyName}`);
+                } catch (agentErr) {
+                    console.warn(`[Agent Auto-Register] Skipped on update: ${agentErr.message}`);
+                }
+            } else {
+                await Agent.findByIdAndUpdate(existing._id, {
+                    $inc: { visitCount: 1 },
+                    lastVisitDate: new Date()
                 });
             }
         }

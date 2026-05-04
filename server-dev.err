@@ -1,0 +1,25 @@
+(node:23212) [MONGOOSE] Warning: mongoose: Duplicate schema index on {"visitPlanRef":1} for model "Expense". This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:23212) [MONGOOSE] Warning: mongoose: Duplicate schema index on {"claimNumber":1} for model "ExpenseClaim". This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
+node:events:497
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use :::5001
+    at Server.setupListenHandle [as _listen2] (node:net:1940:16)
+    at listenInCluster (node:net:1997:12)
+    at Server.listen (node:net:2102:7)
+    at Function.listen (C:\Users\Kanan\OneDrive\Desktop\Projects\kagent_visit\kagentvisit\server\node_modules\express\lib\application.js:635:24)
+    at C:\Users\Kanan\OneDrive\Desktop\Projects\kagent_visit\kagentvisit\server\server.js:330:17
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+Emitted 'error' event on Server instance at:
+    at emitErrorNT (node:net:1976:8)
+    at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+  code: 'EADDRINUSE',
+  errno: -4091,
+  syscall: 'listen',
+  address: '::',
+  port: 5001
+}
+
+Node.js v22.20.0

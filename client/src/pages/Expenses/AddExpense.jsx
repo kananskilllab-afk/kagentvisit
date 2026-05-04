@@ -144,10 +144,10 @@ const AddExpense = () => {
     const selectedTier = CITY_TIERS.find(t => t.value === form.cityTier);
 
     return (
-        <div className="space-y-6 page-enter max-w-3xl mx-auto">
+        <div className="space-y-6 page-enter max-w-4xl mx-auto">
             {/* Header */}
             <div className="flex items-center gap-4">
-                <button onClick={() => navigate('/expenses')} className="p-2 rounded-xl hover:bg-slate-100 transition-all">
+                <button onClick={() => navigate('/expenses')} className="p-2 rounded-lg hover:bg-meridian-bg transition-all">
                     <ArrowLeft className="w-5 h-5 text-slate-600" />
                 </button>
                 <div>
@@ -172,10 +172,10 @@ const AddExpense = () => {
                                     key={cat.value}
                                     type="button"
                                     onClick={() => handleChange('category', cat.value)}
-                                    className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all text-xs font-bold ${
+                                    className={`flex flex-col items-center gap-1.5 p-3 rounded-lg border transition-all text-xs font-bold ${
                                         active
-                                            ? 'border-brand-blue bg-brand-blue/5 text-brand-blue shadow-sm'
-                                            : 'border-slate-100 text-slate-500 hover:border-slate-200 hover:bg-slate-50'
+                                            ? 'border-meridian-blue bg-blue-50 text-meridian-blue shadow-sm'
+                                            : 'border-meridian-border text-meridian-sub hover:bg-meridian-row-hov'
                                     }`}
                                 >
                                     <Icon className="w-5 h-5" />
@@ -472,13 +472,15 @@ const AddExpense = () => {
                     </div>
                     <div>
                         <label className="label">Upload Receipts / Bills</label>
-                        <ImageUpload
-                            urls={uploadedUrls}
-                            onChange={handleUploadsChange}
-                            maxFiles={5}
-                            label="Upload receipts, bills or tickets"
-                            context="expense_receipt"
-                        />
+                        <div className="rounded-lg border border-dashed border-meridian-border bg-meridian-bg p-4">
+                            <ImageUpload
+                                urls={uploadedUrls}
+                                onChange={handleUploadsChange}
+                                maxFiles={5}
+                                label="Upload receipts, bills or tickets"
+                                context="expense_receipt"
+                            />
+                        </div>
                     </div>
                 </div>
 

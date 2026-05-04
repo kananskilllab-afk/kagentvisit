@@ -13,6 +13,9 @@ function getBaseUrl(req) {
 // ─── Public route (no auth cookie — Google redirects here directly) ───────────
 router.get('/callback', async (req, res) => {
     const baseUrl = getBaseUrl(req);
+    // Determine the client URL for the final redirect
+    const clientUrl = process.env.CLIENT_URL || (process.env.NODE_ENV === 'development' ? 'http://localhost:5173' : baseUrl);
+    
     try {
         const { code, state } = req.query;
         if (!code || !state) return res.status(400).json({ success: false, message: 'Missing code or state' });
@@ -20,10 +23,10 @@ router.get('/callback', async (req, res) => {
         const redirectUri = `${baseUrl}/api/google-calendar/callback`;
         await gcal.handleCallback(code, state, redirectUri);
 
-        res.redirect(`${baseUrl}/calendar?gcal=connected`);
+        res.redirect(`${clientUrl}/calendar?gcal=connected`);
     } catch (err) {
         console.error('Google Calendar callback error:', err.message);
-        res.redirect(`${baseUrl}/calendar?gcal=error`);
+        res.redirect(`${clientUrl}/calendar?gcal=error`);
     }
 });
 

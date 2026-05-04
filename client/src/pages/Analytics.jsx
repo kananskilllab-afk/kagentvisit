@@ -139,6 +139,51 @@ const exportVisitsToCSV = (visits, filename) => {
     URL.revokeObjectURL(url);
 };
 
+const escapePdfText = (value) => String(value ?? '').replace(/[\\()]/g, '\\$&');
+
+const exportAnalyticsPdf = (summary, filename = 'analytics-summary') => {
+    const stats = summary?.stats || {};
+    const lines = [
+        'Kanan.co Analytics Summary',
+        `Generated: ${new Date().toLocaleString('en-IN')}`,
+        '',
+        `Total Visits: ${stats.totalVisits ?? 0}`,
+        `Pending Review: ${stats.pendingReview ?? 0}`,
+        `Action Required: ${stats.actionRequired ?? 0}`,
+        `Closed / Resolved: ${stats.closedVisits ?? 0}`,
+        `Reviewed: ${stats.reviewedVisits ?? 0}`,
+        `Drafts: ${stats.draftVisits ?? 0}`,
+        `Active Surveyors: ${stats.activeUsers ?? 0}`,
+    ];
+    const text = lines.map((line, index) => `BT /F1 12 Tf 50 ${780 - index * 22} Td (${escapePdfText(line)}) Tj ET`).join('\n');
+    const objects = [
+        '1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj',
+        '2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj',
+        '3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >> endobj',
+        '4 0 obj << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >> endobj',
+        `5 0 obj << /Length ${text.length} >> stream\n${text}\nendstream endobj`,
+    ];
+    let pdf = '%PDF-1.4\n';
+    const offsets = [0];
+    objects.forEach(obj => {
+        offsets.push(pdf.length);
+        pdf += `${obj}\n`;
+    });
+    const xref = pdf.length;
+    pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+    offsets.slice(1).forEach(offset => {
+        pdf += `${String(offset).padStart(10, '0')} 00000 n \n`;
+    });
+    pdf += `trailer << /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+
+    const url = URL.createObjectURL(new Blob([pdf], { type: 'application/pdf' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${filename}.pdf`;
+    link.click();
+    URL.revokeObjectURL(url);
+};
+
 const Analytics = () => {
     const { user } = useAuth();
     const [summary, setSummary] = useState(null);
@@ -458,9 +503,18 @@ const Analytics = () => {
                 </div>
                 <div className="flex items-center gap-2">
                     <button
+                        onClick={() => exportAnalyticsPdf(summary, `Analytics_Summary_${new Date().toISOString().slice(0, 10)}`)}
+                        disabled={!summary}
+                        className="btn-secondary px-4 py-2.5"
+                        title="Export summary as PDF"
+                    >
+                        <Download className="w-4 h-4" />
+                        PDF
+                    </button>
+                    <button
                         onClick={fetchAnalytics}
                         disabled={loading}
-                        className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 hover:text-brand-blue hover:border-brand-sky transition-all disabled:opacity-50"
+                        className="p-2.5 rounded-lg border border-meridian-border bg-white text-slate-600 hover:text-brand-blue hover:border-brand-sky transition-all disabled:opacity-50"
                         title="Refresh data"
                     >
                         <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin opacity-50' : ''}`} />

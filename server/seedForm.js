@@ -141,7 +141,7 @@ const b2bFields = [
     { id: 'postInPerson.nextFollowUpDate', group: 'Post In-Person Visit', label: 'Next Follow Up Date', type: 'date', required: false },
 
     // Step 11 – Final Summary
-    { id: 'postVisit.actionPoints', group: 'Final Summary', label: 'Action Points', type: 'richtext', required: true },
+    { id: 'actionItems', group: 'Final Summary', label: 'Action Items', type: 'action_items', required: true },
     { id: 'postVisit.remarks', group: 'Final Summary', label: 'Your Remarks', type: 'richtext', required: false }
 ];
 

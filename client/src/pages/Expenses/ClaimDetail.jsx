@@ -9,7 +9,7 @@ import {
     Hotel, UtensilsCrossed, Users, Wifi, ParkingCircle, Stamp,
     Package, PenLine, Navigation, Receipt,
     ShieldCheck, ShieldAlert, ShieldX, Brain, Sparkles, RefreshCw,
-    Info
+    Info, Building2, ExternalLink
 } from 'lucide-react';
 
 const STATUS_CFG = {
@@ -43,6 +43,19 @@ const AUDIT_STATUS_CFG = {
     warning:   { icon: ShieldAlert, color: 'text-amber-600', bg: 'bg-amber-50', ring: 'ring-amber-200', label: 'Warning',   gradient: 'from-amber-400 to-yellow-400' },
     violation: { icon: ShieldX,     color: 'text-red-600',   bg: 'bg-red-50',   ring: 'ring-red-200',   label: 'Violation', gradient: 'from-red-500 to-rose-400' },
 };
+
+function formatDate(date) {
+    if (!date) return '-';
+    return new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatPlanLocations(plan) {
+    if (!plan) return '-';
+    if (plan.cities?.length) {
+        return plan.cities.map(c => [c.city, c.state].filter(Boolean).join(', ')).join(' | ');
+    }
+    return [plan.city, plan.state].filter(Boolean).join(', ') || '-';
+}
 
 const ClaimDetail = () => {
     const { id } = useParams();
@@ -142,9 +155,10 @@ const ClaimDetail = () => {
     const StatusIcon = statusCfg.icon;
     const audit = claim.aiAudit;
     const auditCfg = audit?.overallStatus ? AUDIT_STATUS_CFG[audit.overallStatus] : null;
+    const plan = claim.visitPlanRef;
 
     return (
-        <div className="space-y-6 page-enter max-w-4xl mx-auto">
+        <div className="space-y-6 page-enter max-w-5xl mx-auto">
             {/* Header */}
             <div className="flex items-start gap-4">
                 <button onClick={() => navigate('/expenses/claims')} className="p-2 rounded-xl hover:bg-slate-100 transition-all mt-1">
@@ -189,6 +203,42 @@ const ClaimDetail = () => {
                     </div>
                 </div>
             </div>
+
+            {plan && (
+                <div className="card p-5 border border-blue-100 bg-blue-50/30">
+                    <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div className="min-w-0">
+                            <p className="text-[10px] font-bold uppercase tracking-widest text-blue-500 mb-1">Planned Visit</p>
+                            <h2 className="text-base font-extrabold text-slate-800 flex items-center gap-2">
+                                <Building2 className="w-4 h-4 text-blue-600" />
+                                {plan.title}
+                            </h2>
+                            <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                                <span className="flex items-center gap-1">
+                                    <MapPin className="w-3 h-3" />
+                                    {formatPlanLocations(plan)}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <Calendar className="w-3 h-3" />
+                                    {formatDate(plan.plannedStartAt)} - {formatDate(plan.plannedEndAt)}
+                                </span>
+                                <span className="capitalize">{plan.status?.replace('_', ' ')}</span>
+                                <span className="capitalize">{claim.claimType}</span>
+                            </div>
+                            {plan.purpose && <p className="text-xs text-slate-500 mt-2">{plan.purpose}</p>}
+                        </div>
+                        {isPrivileged && (
+                            <button
+                                onClick={() => navigate(`/visit-plans/${plan._id}`)}
+                                className="btn-outline flex items-center gap-2 text-xs"
+                            >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                Open Plan
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
 
             {/* Needs Justification notice for owner */}
             {isOwner && claim.status === 'needs_justification' && (
@@ -313,12 +363,13 @@ const ClaimDetail = () => {
                                     </div>
                                 </div>
                                 <div className="flex-1 min-w-[200px]">
-                                    <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                                        <div
-                                            className={`h-full bg-gradient-to-r ${auditCfg.gradient} rounded-full transition-all duration-700`}
-                                            style={{ width: `${audit.complianceScore}%` }}
-                                        />
-                                    </div>
+                                    <progress
+                                        className={`h-3 w-full overflow-hidden rounded-full ${
+                                            audit.complianceScore >= 80 ? 'accent-green-500' : audit.complianceScore >= 50 ? 'accent-amber-500' : 'accent-red-500'
+                                        }`}
+                                        value={audit.complianceScore}
+                                        max="100"
+                                    />
                                 </div>
                             </div>
 
@@ -503,6 +554,23 @@ const ClaimDetail = () => {
                                                 <span className="capitalize">{exp.bookingMode.replace('_', ' ')}</span>
                                             )}
                                         </div>
+                                        {(exp.visitScheduleRef || exp.visitPlanRef) && (
+                                            <div className="mt-1 flex flex-wrap gap-1.5 text-[10px] text-blue-700">
+                                                {exp.visitScheduleRef && (
+                                                    <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-100 rounded-full px-2 py-0.5">
+                                                        <Calendar className="w-3 h-3" />
+                                                        {exp.visitScheduleRef.title}
+                                                        {exp.visitScheduleRef.location ? ` - ${exp.visitScheduleRef.location}` : ''}
+                                                    </span>
+                                                )}
+                                                {!exp.visitScheduleRef && exp.visitPlanRef && (
+                                                    <span className="inline-flex items-center gap-1 bg-blue-50 border border-blue-100 rounded-full px-2 py-0.5">
+                                                        <Building2 className="w-3 h-3" />
+                                                        {exp.visitPlanRef.title}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
                                         {exp.description && <p className="text-xs text-slate-400 mt-0.5 truncate">{exp.description}</p>}
                                         {expFlags.length > 0 && (
                                             <div className="flex flex-wrap gap-1 mt-1">
@@ -572,7 +640,7 @@ const ClaimDetail = () => {
             {/* Status Update Modal */}
             {showStatusModal && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-end sm:items-center justify-center p-0 sm:p-4">
-                    <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full sm:max-w-lg shadow-2xl animate-fade-in">
+                    <div className="bg-white rounded-t-lg sm:rounded-lg w-full sm:max-w-lg shadow-2xl animate-fade-in border border-meridian-border">
                         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
                             <h3 className="text-lg font-bold text-slate-800">
                                 Update Claim Status

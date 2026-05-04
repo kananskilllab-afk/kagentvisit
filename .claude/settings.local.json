@@ -23,7 +23,17 @@
       "Read(//c/Users/Kanan/AppData/Roaming/com.vercel.cli/**)",
       "Read(//c/Users/Kanan/AppData/Roaming//**)",
       "Bash(curl -s -H \"Authorization: Bearer vca_0r0vHVVfGYIfAGZwjaElR4HjRwcCfvt6ql0al289WTL43CdrZB4ZxmkO\" \"https://api.vercel.com/v9/projects/kagentvisit?teamId=team_2e0eFeUAioofn6XLPR2tofzl\")",
-      "Bash(python -m json.tool)"
+      "Bash(python -m json.tool)",
+      "Bash(python -c \"import docx; print\\(docx.__version__\\)\")",
+      "Bash(python -m pip install python-docx --quiet)",
+      "Bash(python scripts/generate_meridian_plan_doc.py)",
+      "Skill(gsd:new-milestone)",
+      "Bash(git commit *)",
+      "Skill(gsd:plan-phase)",
+      "Skill(gsd:progress)",
+      "Skill(gsd:execute-phase)",
+      "Bash(git -C \"C:\\\\Users\\\\Kanan\\\\OneDrive\\\\Desktop\\\\Projects\\\\kagent_visit\\\\kagentvisit\" log --oneline -5)",
+      "Bash(npm view *)"
     ]
   }
 }

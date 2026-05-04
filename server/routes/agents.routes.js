@@ -14,8 +14,13 @@ router.use(protect);
 router.post('/import', authorize('admin', 'superadmin'), upload.single('file'), agentsController.importAgents);
 router.delete('/delete-all', authorize('superadmin'), agentsController.deleteAllAgents);
 
+// Backfill: auto-create Agent records from visit history company names
+router.post('/backfill-from-visits', authorize('superadmin'), agentsController.backfillAgentsFromVisits);
+
 // General CRUD
 router.get('/', agentsController.getAgents);
+router.get('/:id/history', agentsController.getAgentHistory);
+router.get('/:id/visits', agentsController.getAgentVisits);
 router.get('/:id', agentsController.getAgentById);
 router.post('/', authorize('admin', 'superadmin'), agentsController.createAgent);
 router.put('/:id', authorize('admin', 'superadmin'), agentsController.updateAgent);

@@ -77,10 +77,10 @@ const UserClaimCard = ({ group, isSelected, onClick }) => {
     return (
         <button
             onClick={onClick}
-            className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
+            className={`w-full text-left p-4 rounded-lg border transition-all ${
                 isSelected
-                    ? 'border-brand-blue bg-brand-blue/5 shadow-sm'
-                    : 'border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm'
+                    ? 'border-meridian-blue bg-blue-50 shadow-sm'
+                    : 'border-meridian-border bg-white hover:bg-meridian-row-hov'
             }`}
         >
             <div className="flex items-center gap-3">
@@ -287,12 +287,11 @@ const ClaimsList = () => {
                             <span className="text-green-600">{stats.compliant}</span> / {stats.audited} audited claims compliant
                         </p>
                     </div>
-                    <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                            className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all"
-                            style={{ width: `${stats.audited > 0 ? (stats.compliant / stats.audited * 100) : 0}%` }}
-                        />
-                    </div>
+                    <progress
+                        className="h-2 flex-1 overflow-hidden rounded-full accent-green-500"
+                        value={stats.compliant}
+                        max={stats.audited || 1}
+                    />
                     <p className="text-xs font-bold text-slate-500">
                         {stats.audited > 0 ? Math.round(stats.compliant / stats.audited * 100) : 0}%
                     </p>

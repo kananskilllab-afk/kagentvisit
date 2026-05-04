@@ -4,6 +4,7 @@ import StarRating from '../shared/StarRating';
 import PhotoUpload from './PhotoUpload';
 import AgentAutocomplete from './AgentAutocomplete';
 import RichTextEditor from '../shared/RichTextEditor';
+import ActionItemTracker from '../ActionItemTracker';
 import { Copy, Check, Plus, X } from 'lucide-react';
 
 const DynamicField = ({ field, register, control, errors, watch, setValue, Controller, disabled, showCopy }) => {
@@ -183,6 +184,22 @@ const DynamicField = ({ field, register, control, errors, watch, setValue, Contr
                             )}
                         />
                     );
+                case 'action_items':
+                    return (
+                        <Controller
+                            name={name}
+                            control={control}
+                            render={({ field: { value, onChange } }) => (
+                                <ActionItemTracker
+                                    value={value || []}
+                                    onChange={onChange}
+                                    readOnly={disabled}
+                                    compact
+                                    title={label || 'Action Items'}
+                                />
+                            )}
+                        />
+                    );
                 case 'dynamic-list':
                     return (
                         <Controller
@@ -308,7 +325,7 @@ const DynamicField = ({ field, register, control, errors, watch, setValue, Contr
         return inputElement;
     };
 
-    const isFullWidth = ['textarea', 'richtext', 'multi-select', 'photo-upload', 'dynamic-list', 'dynamic-contacts'].includes(type);
+    const isFullWidth = ['textarea', 'richtext', 'multi-select', 'photo-upload', 'dynamic-list', 'dynamic-contacts', 'action_items'].includes(type);
 
     return (
         <div className={`${isFullWidth ? 'md:col-span-2' : ''} space-y-1.5`}>

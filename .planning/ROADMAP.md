@@ -11,16 +11,16 @@
 ## Phases
 
 - [x] **Phase 1: Design-System Extraction & Foundation** — Tailwind tokens + primitive library + dev-only `/design-system` route (completed 2026-05-02)
-- [ ] **Phase 2: Action Item Tracker — Backend & Data Model** — `actionItems[]` schema, REST endpoints, append-only history, audit, overdue cron, indexes
-- [ ] **Phase 3: Action Item Tracker — Frontend & FormConfig Field Type** — `action_items` field type + NewVisit input + VisitsList review tab + FormBuilder block + dashboard widget + NotifBell
-- [ ] **Phase 4: Agent History — Backend Aggregation & API** — `/api/agents/:agentId/history` + paginated visits endpoint with role gating
-- [ ] **Phase 5: Agent History — UI in PlanModal & ManageAgent** — `AgentHistoryCard` embedded in PlanModal, NewVisit, ManageAgent, plus carry-forward pre-fill of open items
-- [ ] **Phase 6: Layout + Login + Dashboard — Meridian Rebuild** — Sidebar/topbar shell, split-pane Login, KPI Dashboard, responsive collapse
-- [ ] **Phase 7: Visits Module — VisitsList + NewVisit + VisitDetailModal** — Meridian table/drawer, restyled stepper, full-screen detail modal
-- [ ] **Phase 8: Calendar + PlanModal + VisitPlanDetail** — Meridian Calendar views, plan stepper, plan detail tabs, ScheduleModal
-- [ ] **Phase 9: Expenses + Claims + ClaimDetail** — Meridian list/wizard/detail; policy violation banner; receipt upload restyle
-- [ ] **Phase 10: ManageAgent + Users + FormBuilder + Analytics** — Admin surfaces restyled with role pills, sparklines, palette
-- [ ] **Phase 11: Tail Pages + Cleanup + Regression Sweep** — Remaining pages, dead-CSS purge, Lighthouse a11y ≥ 90
+- [x] **Phase 2: Action Item Tracker — Backend & Data Model** — `actionItems[]` schema, REST endpoints, append-only history, audit, overdue cron, indexes (completed 2026-05-02)
+- [x] **Phase 3: Action Item Tracker — Frontend & FormConfig Field Type** — `action_items` field type + NewVisit input + VisitsList review tab + FormBuilder block + dashboard widget + NotifBell foundation (completed 2026-05-02)
+- [x] **Phase 4: Agent History — Backend Aggregation & API** — `/api/agents/:agentId/history` + paginated visits endpoint with role gating (completed 2026-05-02)
+- [x] **Phase 5: Agent History — UI in PlanModal & ManageAgent** — `AgentHistoryCard` embedded in PlanModal, NewVisit, ManageAgent, plus carry-forward pre-fill of open items (completed 2026-05-02)
+- [x] **Phase 6: Layout + Login + Dashboard — Meridian Rebuild** — Sidebar/topbar shell, split-pane Login, KPI Dashboard, responsive collapse (completed 2026-05-02)
+- [x] **Phase 7: Visits Module — VisitsList + NewVisit + VisitDetailModal** — Meridian table/drawer, restyled stepper, full-screen detail modal (completed 2026-05-02)
+- [x] **Phase 8: Calendar + PlanModal + VisitPlanDetail** — Meridian Calendar views, plan stepper, plan detail tabs, ScheduleModal (completed 2026-05-02)
+- [x] **Phase 9: Expenses + Claims + ClaimDetail** — Meridian list/wizard/detail; policy violation banner; receipt upload restyle (completed 2026-05-02)
+- [x] **Phase 10: ManageAgent + Users + FormBuilder + Analytics** — Admin surfaces restyled with role pills, sparklines, palette (completed 2026-05-02)
+- [ ] **Phase 11: Tail Pages + Cleanup + Regression Sweep** — Remaining pages, dead-CSS purge, Lighthouse a11y ≥ 90 (implementation complete; Lighthouse verification pending)
 
 ---
 
@@ -53,9 +53,9 @@
   4. The 09:00 server-time cron emits one `action_item_overdue` digest notification per user with overdue items
   5. Overdue and per-agent open-items queries return in <100ms against a realistic dataset
 **Plans**: 3 plans
-  - [ ] 02-01-PLAN.md — Schema extensions: actionItems[] on Visit + VisitSchedule; AuditLog + Notification enum extensions; compound indexes
-  - [ ] 02-02-PLAN.md — REST API: actionItems.controller.js (5 handlers + canMutateActionItem + auditActionItem); visits.routes.js sub-resource wiring
-  - [ ] 02-03-PLAN.md — Cron + indexes: node-cron install; overdueActionItems.job.js; server.js registration; index coverage verification
+  - [x] 02-01-PLAN.md — Schema extensions: actionItems[] on Visit + VisitSchedule; AuditLog + Notification enum extensions; compound indexes
+  - [x] 02-02-PLAN.md — REST API: actionItems.controller.js (5 handlers + canMutateActionItem + auditActionItem); visits.routes.js sub-resource wiring
+  - [x] 02-03-PLAN.md — Cron + indexes: node-cron install; overdueActionItems.job.js; server.js registration; index coverage verification
 
 ### Phase 3: Action Item Tracker — Frontend & FormConfig Field Type
 **Goal**: Agents and reviewers interact with action items through the visit form, the review drawer, and the dashboard.
@@ -67,7 +67,8 @@
   3. A reviewer in VisitsList sees an "Action Items" tab where marking done/undone or adding a note appends an entry to `history[]` visibly disclosed under each item
   4. Every role except `accounts` sees a "My Open Action Items" widget on the dashboard with top-3, count, and a link to the filtered list
   5. Items that the cron flagged as overdue appear in `NotifBell` within one minute of cron firing
-**Plans**: TBD
+**Plans**: 1 plan
+  - [x] 03-01-PLAN.md — Reusable ActionItemTracker, FormBuilder/DynamicField support, dashboard widget, visit detail review integration, form submit normalization
 **UI hint**: yes
 
 ### Phase 4: Agent History — Backend Aggregation & API
@@ -78,7 +79,8 @@
   1. `GET /api/agents/:agentId/history` returns the agreed payload (KPIs + last-5 visits + open items) in <200ms for an agent with 50 visits
   2. `GET /api/agents/:agentId/visits?limit=N&offset=M` paginates the full visit history correctly across page boundaries
   3. `home_visit` callers receive 403 on both endpoints, `accounts` receives 200 read-only, and other roles receive 200
-**Plans**: TBD
+**Plans**: 1 plan
+  - [x] 04-01-PLAN.md — Agent history summary API, paginated visits API, role gating, read-only accounts response
 
 ### Phase 5: Agent History — UI in PlanModal & ManageAgent
 **Goal**: Anyone planning or reviewing a visit sees prior context for that agent before committing, and can carry forward unfinished work.
@@ -91,7 +93,8 @@
   4. `NewVisit` shows a compact `AgentHistoryCard` inline once an agent is chosen on the institution step
   5. Opening NewVisit for an agent with prior open items pre-fills those items into the form for review (user can keep, edit, or remove before save) — never auto-added silently
   6. "View all" opens `AgentVisitsDrawer` with paginated full history and status filter working end-to-end
-**Plans**: TBD
+**Plans**: 1 plan
+  - [x] 05-01-PLAN.md — AgentHistoryCard, AgentVisitsDrawer, PlanModal embed, ManageAgent history action, NewVisit compact card, open-item carry-forward
 **UI hint**: yes
 
 ### Phase 6: Layout + Login + Dashboard — Meridian Rebuild
@@ -103,7 +106,8 @@
   2. `Login.jsx` displays the navy-left/form-right split-pane layout matching the `newui` mock
   3. `Dashboard.jsx` shows 4 KPI cards, a visit-activity chart, a status-breakdown card, a recent-visits table, and the "My Open Action Items" widget
   4. Sidebar collapses to icon-only below 1024px and to a drawer below 768px without layout shift on the main content
-**Plans**: TBD
+**Plans**:
+  - [x] 06-01-PLAN.md — Meridian shell, split-pane login, dashboard entry polish, responsive sidebar/tablet rail/drawer behavior
 **UI hint**: yes
 
 ### Phase 7: Visits Module — VisitsList + NewVisit + VisitDetailModal
@@ -114,7 +118,8 @@
   1. `VisitsList.jsx` shows a Meridian table with status pills, a side detail drawer, search + status chip filters, and Export / New Visit buttons that all work
   2. `NewVisit.jsx` chrome is restyled in Meridian and `StepIndicator` shows gold for current step and green for completed
   3. `VisitDetailModal.jsx` renders as a Meridian full-screen modal with a sticky header that stays visible while scrolling
-**Plans**: TBD
+**Plans**:
+  - [x] 07-01-PLAN.md — VisitsList export/table/cards, NewVisit Meridian chrome, gold/green stepper, full-screen sticky VisitDetailModal
 **UI hint**: yes
 
 ### Phase 8: Calendar + PlanModal + VisitPlanDetail
@@ -126,7 +131,8 @@
   2. `PlanModal.jsx` 4-step stepper shows gold for current and navy for completed
   3. `VisitPlanDetail.jsx` overview shows KPI cards, a balance bar, and tabs all in Meridian style with no inline styles left
   4. `ScheduleModal.jsx` matches the Meridian dialog pattern (header, body, footer rhythm)
-**Plans**: TBD
+**Plans**:
+  - [x] 08-01-PLAN.md — Calendar toolbar/chips/drawer, PlanModal dialog/step strip, VisitPlanDetail cards/tabs/balance progress
 **UI hint**: yes
 
 ### Phase 9: Expenses + Claims + ClaimDetail
@@ -137,7 +143,8 @@
   1. `Expenses/*` list, `NewClaim` wizard, and `ClaimDetail` all render Meridian primitives end-to-end
   2. Policy violations show via the Meridian red alert banner; submit still calls `policy.evaluateClaim()` and the result still gates submission
   3. Receipt upload zone and templates picker are restyled and remain functional with Cloudinary uploads
-**Plans**: TBD
+**Plans**:
+  - [x] 09-01-PLAN.md — Money-flow Meridian cards, policy banners, template picker, receipt upload zone, progress bars
 **UI hint**: yes
 
 ### Phase 10: ManageAgent + Users + FormBuilder + Analytics
@@ -149,7 +156,8 @@
   2. `SuperAdmin/UserManagement.jsx` renders role pills with an active dot for the current session
   3. `FormBuilder.jsx` palette and canvas are restyled and the `action_items` block is selectable in the palette
   4. `Analytics.jsx` shows Meridian KPI cards with sparklines and an Export PDF action that produces a valid PDF
-**Plans**: TBD
+**Plans**:
+  - [x] 10-01-PLAN.md — User role active dots, Analytics valid PDF export, ManageAgent/FormBuilder wiring confirmation
 **UI hint**: yes
 
 ### Phase 11: Tail Pages + Cleanup + Regression Sweep
@@ -160,7 +168,9 @@
   1. `DailyReport.jsx`, `PostDemoFeedback.jsx`, `PostFieldDay.jsx`, `PostInPersonVisit.jsx`, `Profile.jsx`, `FormsHub.jsx`, and `FormsAdmin.jsx` use Meridian primitives only
   2. Unused Tailwind classes and unused custom CSS are removed from `client/src/index.css` (verified by grep + bundle diff)
   3. Lighthouse accessibility score is ≥ 90 on Dashboard, Visits, and Expenses pages
-**Plans**: TBD
+**Plans**:
+  - [x] 11-01-PLAN.md — Tail page Meridian cleanup, dead CSS cleanup, build/server regression
+  - [ ] 11-02-PLAN.md — Lighthouse accessibility verification on Dashboard, Visits, Expenses (blocked: Lighthouse/auth session unavailable)
 **UI hint**: yes
 
 ---
@@ -170,16 +180,16 @@
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Design-System Extraction & Foundation | 4/4 | Complete   | 2026-05-02 |
-| 2. Action Item Tracker — Backend & Data Model | 0/3 | Not started | - |
-| 3. Action Item Tracker — Frontend & FormConfig Field Type | 0/0 | Not started | - |
-| 4. Agent History — Backend Aggregation & API | 0/0 | Not started | - |
-| 5. Agent History — UI in PlanModal & ManageAgent | 0/0 | Not started | - |
-| 6. Layout + Login + Dashboard — Meridian Rebuild | 0/0 | Not started | - |
-| 7. Visits Module — VisitsList + NewVisit + VisitDetailModal | 0/0 | Not started | - |
-| 8. Calendar + PlanModal + VisitPlanDetail | 0/0 | Not started | - |
-| 9. Expenses + Claims + ClaimDetail | 0/0 | Not started | - |
-| 10. ManageAgent + Users + FormBuilder + Analytics | 0/0 | Not started | - |
-| 11. Tail Pages + Cleanup + Regression Sweep | 0/0 | Not started | - |
+| 2. Action Item Tracker — Backend & Data Model | 4/4 | Complete   | 2026-05-02 |
+| 3. Action Item Tracker — Frontend & FormConfig Field Type | 1/1 | Complete   | 2026-05-02 |
+| 4. Agent History — Backend Aggregation & API | 1/1 | Complete   | 2026-05-02 |
+| 5. Agent History — UI in PlanModal & ManageAgent | 1/1 | Complete   | 2026-05-02 |
+| 6. Layout + Login + Dashboard — Meridian Rebuild | 1/1 | Complete   | 2026-05-02 |
+| 7. Visits Module — VisitsList + NewVisit + VisitDetailModal | 1/1 | Complete   | 2026-05-02 |
+| 8. Calendar + PlanModal + VisitPlanDetail | 1/1 | Complete   | 2026-05-02 |
+| 9. Expenses + Claims + ClaimDetail | 1/1 | Complete   | 2026-05-02 |
+| 10. ManageAgent + Users + FormBuilder + Analytics | 1/1 | Complete   | 2026-05-02 |
+| 11. Tail Pages + Cleanup + Regression Sweep | 1/2 | Blocked on Lighthouse | - |
 
 ---
 

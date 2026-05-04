@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import ActionItemTracker from './ActionItemTracker';
 
 const STATUS_CFG = {
     submitted:       { label: 'Pending Review',  bg: 'bg-orange-50',  text: 'text-brand-orange', dot: 'bg-brand-orange', ring: 'ring-brand-orange/20' },
@@ -239,24 +240,24 @@ const VisitDetailModal = ({ visit: initialVisit, onClose, onEdit, onVisitUpdated
 
     return (
         <div
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-start justify-center p-4 pt-8 sm:pt-12 overflow-y-auto"
+            className="fixed inset-0 z-[100] bg-slate-900/60"
             onClick={onClose}
         >
             <div
-                className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl overflow-hidden animate-fade-in mb-8"
+                className="flex h-screen w-full flex-col overflow-hidden bg-white animate-fade-in"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* ── Header ──────────────────────────────────────── */}
-                <div className="relative bg-gradient-to-br from-brand-blue to-brand-sky p-6 pb-5 text-white">
+                <div className="sticky top-0 z-20 border-b border-white/10 bg-meridian-navy p-4 text-white sm:p-6">
                     <button
                         onClick={onClose}
-                        className="absolute top-4 right-4 p-2 rounded-xl bg-white/20 hover:bg-white/30 transition-all"
+                        className="absolute top-4 right-4 p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-all"
                     >
                         <X className="w-5 h-5" />
                     </button>
 
                     <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center shrink-0">
+                        <div className="w-14 h-14 rounded-lg bg-white/10 flex items-center justify-center shrink-0">
                             {isB2C
                                 ? <Home className="w-7 h-7 text-white" />
                                 : <Building2 className="w-7 h-7 text-white" />
@@ -290,7 +291,7 @@ const VisitDetailModal = ({ visit: initialVisit, onClose, onEdit, onVisitUpdated
                 </div>
 
                 {/* ── Body ────────────────────────────────────────── */}
-                <div className="p-6 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-4 sm:p-6">
 
                     {/* ═══ Admin Review Panel ═══ */}
                     {isAdmin && visit.status !== 'draft' && (
@@ -824,6 +825,14 @@ const VisitDetailModal = ({ visit: initialVisit, onClose, onEdit, onVisitUpdated
                         </div>
                     )}
 
+                    <div className="mb-5">
+                        <ActionItemTracker
+                            visitId={visit._id}
+                            title="Action Item Tracker"
+                            readOnly={user?.role === 'accounts'}
+                        />
+                    </div>
+
                     {/* ═══ Follow-up Visits Thread ═══ */}
                     <div className="mb-5">
                         <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
@@ -937,7 +946,7 @@ const VisitDetailModal = ({ visit: initialVisit, onClose, onEdit, onVisitUpdated
                 </div>
 
                 {/* ── Footer ──────────────────────────────────────── */}
-                <div className="p-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-3">
+                <div className="sticky bottom-0 z-20 p-4 bg-white border-t border-meridian-border flex items-center justify-between gap-3">
                     <button onClick={onClose} className="btn-outline py-2.5 px-6 text-sm">
                         Close
                     </button>

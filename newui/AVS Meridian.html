@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>AVS — Meridian UI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Manrope:wght@500;600;700;800;900&display=swap" rel="stylesheet"/>
+  <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script type="text/babel" src="meridian/shared.jsx"></script>
+  <script type="text/babel" src="meridian/layout.jsx"></script>
+  <script type="text/babel" src="meridian/screens1.jsx"></script>
+  <script type="text/babel" src="meridian/screens2.jsx"></script>
+  <script type="text/babel" src="meridian/screens3.jsx"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { width: 100%; height: 100%; overflow: hidden; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #F1F5F9; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes slideIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    .page-enter { animation: slideIn 0.22s cubic-bezier(0.16,1,0.3,1); }
+    input, select, textarea, button { font-family: inherit; }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 99px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+    * { scrollbar-width: thin; scrollbar-color: #CBD5E1 transparent; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const PAGE_TITLES = {
+  login:         { title: 'Sign In' },
+  dashboard:     { title: 'Dashboard',      subtitle: 'Wednesday, April 30 · 2026' },
+  visits:        { title: 'Visit History',  subtitle: 'All field agent visits' },
+  'new-visit':   { title: 'New Visit',      subtitle: 'Multi-step visit report' },
+  calendar:      { title: 'Calendar',       subtitle: 'April 2026' },
+  analytics:     { title: 'Analytics',      subtitle: 'Performance insights' },
+  expenses:      { title: 'Expenses',       subtitle: 'All expense records' },
+  claims:        { title: 'Claims',         subtitle: 'Expense claim management' },
+  agents:        { title: 'Manage Agents',  subtitle: 'Agent database' },
+  users:         { title: 'Users',          subtitle: 'Access & permissions' },
+  'form-builder':{ title: 'Form Builder',   subtitle: 'Configure visit forms' },
+};
+
+// ── Page action bars ──────────────────────────────────────────
+const PAGE_ACTIONS = {
+  dashboard:     <NotifBell count={3}/>,
+  visits:        null,
+  analytics:     <><Btn variant="secondary" size="sm" icon={<Icon path={IC.download} size={12} color={M.sub}/>}>Export PDF</Btn><NotifBell count={3}/></>,
+  expenses:      <NotifBell count={1}/>,
+  claims:        null,
+  agents:        null,
+  users:         null,
+  'form-builder':null,
+};
+
+const MOCK_USER = {
+  name: 'Priya Sharma',
+  email: 'priya@kanan.co',
+  role: 'superadmin',
+};
+
+// ── Main App ──────────────────────────────────────────────────
+const App = () => {
+  const [page, setPage] = useState('login');
+  const [user, setUser] = useState(null);
+  const [prevPage, setPrevPage] = useState(null);
+
+  // Persist page across reloads
+  useEffect(() => {
+    const saved = localStorage.getItem('avs_page');
+    const savedUser = localStorage.getItem('avs_user');
+    if (savedUser) { setUser(JSON.parse(savedUser)); setPage(saved || 'dashboard'); }
+  }, []);
+
+  const navigate = (p) => {
+    setPrevPage(page);
+    setPage(p);
+    localStorage.setItem('avs_page', p);
+  };
+
+  const handleLogin = () => {
+    setUser(MOCK_USER);
+    localStorage.setItem('avs_user', JSON.stringify(MOCK_USER));
+    navigate('dashboard');
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    setPage('login');
+    localStorage.removeItem('avs_page');
+    localStorage.removeItem('avs_user');
+  };
+
+  if (page === 'login' || !user) {
+    return (
+      <div style={{width:'100%',height:'100%'}}>
+        <LoginScreen onLogin={handleLogin}/>
+      </div>
+    );
+  }
+
+  const meta = PAGE_TITLES[page] || { title: page };
+
+  const renderScreen = () => {
+    switch(page) {
+      case 'dashboard':     return <DashboardScreen onNav={navigate}/>;
+      case 'visits':        return <VisitListScreen onNav={navigate}/>;
+      case 'new-visit':     return <NewVisitScreen onNav={navigate}/>;
+      case 'calendar':      return <CalendarScreen onNav={navigate}/>;
+      case 'analytics':     return <AnalyticsScreen onNav={navigate}/>;
+      case 'expenses':      return <ExpensesScreen onNav={navigate}/>;
+      case 'claims':        return <ClaimsScreen onNav={navigate}/>;
+      case 'agents':        return <AgentsScreen onNav={navigate}/>;
+      case 'users':         return <UsersScreen onNav={navigate}/>;
+      case 'form-builder':  return <FormBuilderScreen onNav={navigate}/>;
+      default:              return (
+        <div style={{flex:1,display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <EmptyState icon={IC.info} title={`${page} screen`} sub="This screen is coming soon"/>
+        </div>
+      );
+    }
+  };
+
+  return (
+    <AppShell currentPage={page} onNav={navigate} user={user} onLogout={handleLogout}>
+      <TopBar
+        title={meta.title}
+        subtitle={meta.subtitle}
+        actions={PAGE_ACTIONS[page]}
+      />
+      <div key={page} className="page-enter" style={{flex:1,display:'flex',
+        flexDirection:'column',overflow:'hidden',minHeight:0}}>
+        {renderScreen()}
+      </div>
+    </AppShell>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>

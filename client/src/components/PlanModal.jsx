@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, ChevronRight, ChevronLeft, Plus, Trash2, Loader2, MapPin, Users, Calendar, Check, Search } from 'lucide-react';
+import { X, ChevronLeft, Plus, Trash2, Loader2, MapPin, Users, Calendar, Check, Search } from 'lucide-react';
 import CityAutocomplete from './shared/CityAutocomplete';
+import AgentHistoryCard from './AgentHistoryCard';
 import { getCityTier } from '../utils/indianCities';
 
 const API = import.meta.env.VITE_API_URL || '/api';
-
-const STEPS = ['Plan details', 'Assign agents', 'Add visits', 'Review'];
 
 const CITY_TIERS = [
     { value: 'tier_1', label: 'Tier 1' },
@@ -30,39 +29,41 @@ function toInputDatetime(date) {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function StepIndicator({ current }) {
-    return (
-        <div className="flex items-center justify-center gap-2 mb-6">
-            {STEPS.map((label, i) => (
-                <React.Fragment key={label}>
-                    <div className="flex flex-col items-center gap-1">
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold transition-colors
-                            ${i < current ? 'bg-green-500 text-white' :
-                              i === current ? 'bg-blue-600 text-white' :
-                              'bg-gray-200 text-gray-500'}`}>
-                            {i < current ? <Check className="w-3.5 h-3.5" /> : i + 1}
-                        </div>
-                        <span className={`text-[10px] hidden sm:block ${i === current ? 'text-blue-600 font-medium' : 'text-gray-400'}`}>
-                            {label}
-                        </span>
-                    </div>
-                    {i < STEPS.length - 1 && (
-                        <div className={`flex-1 h-0.5 mx-1 rounded ${i < current ? 'bg-green-500' : 'bg-gray-200'}`} />
-                    )}
-                </React.Fragment>
-            ))}
-        </div>
-    );
+function addHours(date, hours) {
+    const d = new Date(date);
+    d.setHours(d.getHours() + hours);
+    return d;
+}
+
+function formatLocation(city, state) {
+    return [city, state].filter(Boolean).join(', ');
+}
+
+function normalizeCities(cities) {
+    const seen = new Set();
+    return (cities || []).filter(c => c?.city).reduce((acc, c) => {
+        const item = {
+            city: c.city.trim(),
+            state: (c.state || '').trim(),
+            cityTier: c.cityTier || getCityTier(c.city) || 'na',
+        };
+        const key = `${item.city.toLowerCase()}|${item.state.toLowerCase()}`;
+        if (!seen.has(key)) {
+            seen.add(key);
+            acc.push(item);
+        }
+        return acc;
+    }, []);
 }
 
 export default function PlanModal({ defaultDate, editPlan = null, onClose, onSaved }) {
-    const [step, setStep] = useState(0);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [agentSearch, setAgentSearch] = useState('');
     const [agentResults, setAgentResults] = useState([]);
     const [searchingAgents, setSearchingAgents] = useState(false);
     const [searchFocused, setSearchFocused] = useState(false);
+    const [cityDraft, setCityDraft] = useState({ city: '', state: '' });
     const searchContainerRef = useRef(null);
 
     const defaultStart = defaultDate ? new Date(defaultDate) : new Date();
@@ -83,6 +84,11 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
         purpose: editPlan?.purpose || '',
         notes: editPlan?.notes || '',
     });
+    const [planCities, setPlanCities] = useState(() => normalizeCities(
+        editPlan?.cities?.length
+            ? editPlan.cities
+            : (editPlan?.city ? [{ city: editPlan.city, state: editPlan.state, cityTier: editPlan.cityTier }] : [])
+    ));
 
     // Step 2 — Agents: DB agents have { _id, name }, custom-only ones have { _id: null, name }
     const [selectedAgents, setSelectedAgents] = useState(
@@ -94,15 +100,7 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
     const [customInput, setCustomInput] = useState('');
 
     // Step 3 — Visits
-    const [visits, setVisits] = useState([{
-        title: '',
-        agentId: '',
-        customAgentName: '',
-        scheduledDate: toInputDatetime(defaultStart),
-        reminderOffset: 60,
-        location: '',
-        notes: '',
-    }]);
+    const [visits, setVisits] = useState([]);
 
     // Search agents with debounce
     useEffect(() => {
@@ -130,21 +128,101 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    const activePlanCities = () => normalizeCities(planCities.length
+        ? planCities
+        : (details.city ? [{ city: details.city, state: details.state, cityTier: details.cityTier }] : []));
+
+    const locationForAssignment = (assignment, index = 0) => {
+        if (assignment?.agent?.city) {
+            return formatLocation(assignment.agent.city, assignment.agent.state || details.state);
+        }
+        const cities = activePlanCities();
+        const city = cities[index % Math.max(cities.length, 1)];
+        return city ? formatLocation(city.city, city.state || details.state) : formatLocation(details.city, details.state);
+    };
+
+    const visitForAssignment = (assignment, index) => {
+        const name = assignment.agent?.name || assignment.customAgentName;
+        return {
+            title: `${name} visit`,
+            agentId: assignment.agent?._id || '',
+            customAgentName: assignment.customAgentName || '',
+            scheduledDate: toInputDatetime(addHours(defaultStart, index)),
+            reminderOffset: 60,
+            location: locationForAssignment(assignment, index),
+            notes: '',
+        };
+    };
+
+    const autoAddVisit = (assignment) => {
+        setVisits(prev => {
+            const nextVisit = visitForAssignment(assignment, prev.length);
+            const emptyIndex = prev.findIndex(v => !v.agentId && !v.customAgentName && !v.title);
+            if (emptyIndex >= 0) {
+                return prev.map((v, idx) => idx === emptyIndex ? { ...v, ...nextVisit } : v);
+            }
+            return [...prev, nextVisit];
+        });
+    };
+
+    const addPlanCity = (city, state) => {
+        const cleanCity = (city || '').trim();
+        const cleanState = (state || '').trim();
+        if (!cleanCity || !cleanState) return;
+        const baseState = details.state || cleanState;
+        if (baseState && cleanState.toLowerCase() !== baseState.toLowerCase()) {
+            setError(`Select cities from ${baseState} only for this plan.`);
+            return;
+        }
+        const nextCity = { city: cleanCity, state: cleanState, cityTier: getCityTier(cleanCity) || 'na' };
+        setPlanCities(prev => normalizeCities([...prev, nextCity]));
+        setDetails(d => ({
+            ...d,
+            state: baseState,
+            planType: 'multi_city_same_state',
+            city: d.city || cleanCity,
+            cityTier: d.city ? d.cityTier : nextCity.cityTier,
+        }));
+        setCityDraft({ city: '', state: '' });
+        setError('');
+    };
+
+    const removePlanCity = (city, state) => {
+        setPlanCities(prev => {
+            const next = prev.filter(c => c.city !== city || c.state !== state);
+            if (next.length <= 1) {
+                setDetails(d => ({ ...d, planType: d.planType === 'multi_city_same_state' ? 'multi_same_city' : d.planType }));
+            }
+            return next;
+        });
+    };
+
     const addAgent = (agent) => {
         if (selectedAgents.some(a => a._id === agent._id)) return;
         setSelectedAgents(prev => [...prev, agent]);
+        if (selectedAgents.length + customAgentNames.length >= 1 && details.planType === 'single') {
+            setDetails(d => ({ ...d, planType: activePlanCities().length > 1 ? 'multi_city_same_state' : 'multi_same_city' }));
+        }
+        autoAddVisit({ agent });
         setAgentSearch('');
         setAgentResults([]);
         setSearchFocused(false);
     };
 
-    const removeAgent = (id) => setSelectedAgents(prev => prev.filter(a => a._id !== id));
+    const removeAgent = (id) => {
+        setSelectedAgents(prev => prev.filter(a => a._id !== id));
+        setVisits(prev => prev.filter(v => v.agentId !== id));
+    };
 
     const addCustomName = () => {
         const name = customInput.trim();
         if (!name) return;
         if (customAgentNames.includes(name)) { setCustomInput(''); return; }
         setCustomAgentNames(prev => [...prev, name]);
+        if (selectedAgents.length + customAgentNames.length >= 1 && details.planType === 'single') {
+            setDetails(d => ({ ...d, planType: activePlanCities().length > 1 ? 'multi_city_same_state' : 'multi_same_city' }));
+        }
+        autoAddVisit({ customAgentName: name });
         setCustomInput('');
         setAgentSearch('');
         setAgentResults([]);
@@ -152,45 +230,53 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
 
     const removeCustomName = (name) => {
         setCustomAgentNames(prev => prev.filter(n => n !== name));
-        // Remove any visits assigned to this custom agent
-        setVisits(prev => prev.map(v => v.customAgentName === name ? { ...v, customAgentName: '' } : v));
+        setVisits(prev => prev.filter(v => v.customAgentName !== name));
     };
-
-    // All agent options for visit step: DB agents + custom names
-    const allAgentOptions = [
-        ...selectedAgents.map(a => ({ type: 'db', id: a._id, label: a.name })),
-        ...customAgentNames.map(n => ({ type: 'custom', id: n, label: `${n} (custom)` })),
-    ];
 
     const addVisit = () => {
         const firstAgent = selectedAgents[0]?._id || '';
         const firstCustom = !firstAgent && customAgentNames[0] ? customAgentNames[0] : '';
+        const agent = selectedAgents[0] || null;
+        const label = agent?.name || firstCustom || '';
         setVisits(prev => [...prev, {
-            title: '', agentId: firstAgent, customAgentName: firstCustom,
-            scheduledDate: toInputDatetime(defaultStart), reminderOffset: 60, location: '', notes: ''
+            title: label ? `${label} visit` : '',
+            agentId: firstAgent,
+            customAgentName: firstCustom,
+            scheduledDate: toInputDatetime(addHours(defaultStart, prev.length)),
+            reminderOffset: 60,
+            location: locationForAssignment(agent ? { agent } : { customAgentName: firstCustom }, prev.length),
+            notes: ''
         }]);
     };
 
     const removeVisit = (i) => setVisits(prev => prev.filter((_, idx) => idx !== i));
 
     const updateVisit = (i, key, val) => setVisits(prev => prev.map((v, idx) => idx === i ? { ...v, [key]: val } : v));
+    const updateVisitFields = (i, fields) => setVisits(prev => prev.map((v, idx) => idx === i ? { ...v, ...fields } : v));
 
     // Validation per step
-    const canProceed = () => {
-        if (step === 0) return details.title && details.city && details.plannedStartAt && details.plannedEndAt;
-        if (step === 1) return selectedAgents.length > 0 || customAgentNames.length > 0;
-        if (step === 2) return visits.length > 0 && visits.every(v =>
-            v.title && v.scheduledDate && (v.agentId || v.customAgentName)
+    const canSubmitPlan = () => {
+        const cities = activePlanCities();
+        if (details.planType === 'multi_city_same_state' && cities.length < 2) return false;
+        return details.title && details.city && details.plannedStartAt && details.plannedEndAt &&
+            (selectedAgents.length > 0 || customAgentNames.length > 0) &&
+            visits.length > 0 && visits.every(v =>
+            v.title && v.scheduledDate && (v.agentId || v.customAgentName) && v.location
         );
-        return true;
     };
 
     const handleSubmit = async () => {
         setSaving(true); setError('');
         try {
+            const cities = activePlanCities();
+            const inferredPlanType = cities.length > 1
+                ? 'multi_city_same_state'
+                : (visits.length > 1 ? 'multi_same_city' : details.planType);
             // 1. Create / update the plan
             const planPayload = {
                 ...details,
+                planType: inferredPlanType,
+                cities,
                 agents: selectedAgents.map(a => a._id),
                 customAgentNames,
                 plannedStartAt: new Date(details.plannedStartAt).toISOString(),
@@ -252,33 +338,44 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-0 sm:p-4">
+            <div className="bg-white rounded-t-lg sm:rounded-lg shadow-2xl w-full max-w-6xl max-h-[95vh] flex flex-col border border-meridian-border">
                 {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-                    <h2 className="font-semibold text-gray-800">{editPlan ? 'Edit Visit Plan' : 'Create Visit Plan'}</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 p-1">
+                <div className="px-5 sm:px-6 py-4 border-b border-meridian-border">
+                    <div className="flex items-center justify-between gap-4">
+                    <h2 className="font-black text-meridian-text">{editPlan ? 'Edit Visit Plan' : 'Create Visit Plan'}</h2>
+                    <button onClick={onClose} className="text-meridian-sub hover:text-meridian-text p-1 shrink-0">
                         <X className="w-5 h-5" />
                     </button>
-                </div>
-
-                {/* Step indicator */}
-                <div className="px-6 pt-4">
-                    <StepIndicator current={step} />
+                    </div>
+                    <div className="mt-4 grid grid-cols-4 gap-2">
+                        {['Plan details', 'Agents', 'Visits', 'Review'].map((label, index) => (
+                            <div
+                                key={label}
+                                className={`rounded-lg border px-3 py-2 text-center text-[10px] font-black uppercase tracking-widest ${
+                                    index === 0
+                                        ? 'border-brand-gold bg-amber-50 text-brand-gold'
+                                        : 'border-meridian-navy/20 bg-meridian-navy text-white'
+                                }`}
+                            >
+                                {label}
+                            </div>
+                        ))}
+                    </div>
                 </div>
 
                 {/* Content */}
-                <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-4">
+                <div className="flex-1 overflow-y-auto p-5 sm:p-6 grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
                     {/* ── Step 0: Plan details ── */}
-                    {step === 0 && (
-                        <>
+                    <section className="rounded-lg border border-meridian-border bg-meridian-bg p-4 space-y-4">
+                        <h3 className="text-sm font-black text-meridian-text">Plan details</h3>
                             <div>
                                 <label className="block text-xs font-medium text-gray-600 mb-1">Plan title *</label>
                                 <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                                     placeholder="e.g. Mumbai B2B Visit — April 2026"
                                     value={details.title} onChange={e => setDetails(d => ({ ...d, title: e.target.value }))} />
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1">City *</label>
                                     <CityAutocomplete
@@ -287,7 +384,10 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
                                         placeholder="Type to search city"
                                         onSelect={(city, state) => {
                                             const tier = city ? getCityTier(city) : null;
+                                            const nextCity = { city, state: state || details.state, cityTier: tier || details.cityTier };
                                             setDetails(d => ({ ...d, city, state: state || d.state, ...(tier ? { cityTier: tier } : {}) }));
+                                            if (!city) setPlanCities([]);
+                                            if (city && state && tier) setPlanCities(normalizeCities([nextCity]));
                                         }}
                                     />
                                 </div>
@@ -298,7 +398,7 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
                                         value={details.state} onChange={e => setDetails(d => ({ ...d, state: e.target.value }))} />
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1">City tier</label>
                                     <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -312,10 +412,39 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
                                         value={details.planType} onChange={e => setDetails(d => ({ ...d, planType: e.target.value }))}>
                                         <option value="single">Single visit</option>
                                         <option value="multi_same_city">Multiple visits (same city)</option>
+                                        <option value="multi_city_same_state">Multiple cities (same state)</option>
                                     </select>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-3">
+                            {details.planType === 'multi_city_same_state' && (
+                                <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-3 space-y-3">
+                                    <div>
+                                        <label className="block text-xs font-medium text-blue-700 mb-1">Add cities in {details.state || 'the same state'}</label>
+                                        <CityAutocomplete
+                                            city={cityDraft.city}
+                                            state={cityDraft.state}
+                                            placeholder="Search another city"
+                                            onSelect={(city, state) => {
+                                                setCityDraft({ city, state });
+                                                if (city && state) addPlanCity(city, state);
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        {activePlanCities().map(c => (
+                                            <span key={`${c.city}-${c.state}`} className="inline-flex items-center gap-1 text-xs bg-white text-blue-700 border border-blue-200 rounded-full px-2.5 py-1">
+                                                {formatLocation(c.city, c.state)}
+                                                {activePlanCities().length > 1 && (
+                                                    <button type="button" onClick={() => removePlanCity(c.city, c.state)} className="hover:text-red-600">
+                                                        <X className="w-3 h-3" />
+                                                    </button>
+                                                )}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1">Start date/time *</label>
                                     <input type="datetime-local"
@@ -335,13 +464,11 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
                                     placeholder="B2B agent visits"
                                     value={details.purpose} onChange={e => setDetails(d => ({ ...d, purpose: e.target.value }))} />
                             </div>
-                        </>
-                    )}
+                    </section>
 
                     {/* ── Step 1: Agents ── */}
-                    {step === 1 && (
-                        <>
-                            <p className="text-xs text-gray-500">Search and add agents from the Manage Agent directory. At least one required.</p>
+                    <section className="rounded-lg border border-meridian-border bg-white p-4 space-y-4">
+                        <h3 className="text-sm font-black text-meridian-text">Assign agents</h3>
                             <div className="relative" ref={searchContainerRef}>
                                 <div className="relative">
                                     <Search className="absolute left-3 top-2.5 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
@@ -429,29 +556,26 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
                             ) : (
                                 <div className="space-y-2">
                                     {selectedAgents.map(a => (
-                                        <div key={a._id} className="flex items-center justify-between p-2.5 border border-gray-200 rounded-lg bg-blue-50/40">
-                                            <div>
-                                                <div className="text-sm font-medium text-gray-800">{a.name}</div>
-                                                {a.city && <div className="text-xs text-gray-500">{a.city}</div>}
+                                        <div key={a._id} className="space-y-2 rounded-xl border border-gray-200 bg-blue-50/40 p-2.5">
+                                            <div className="flex items-center justify-between gap-3">
+                                                <div>
+                                                    <div className="text-sm font-medium text-gray-800">{a.name}</div>
+                                                    {a.city && <div className="text-xs text-gray-500">{a.city}</div>}
+                                                </div>
+                                                <button type="button" onClick={() => removeAgent(a._id)} className="text-gray-400 hover:text-red-500">
+                                                    <X className="w-4 h-4" />
+                                                </button>
                                             </div>
-                                            <button type="button" onClick={() => removeAgent(a._id)} className="text-gray-400 hover:text-red-500">
-                                                <X className="w-4 h-4" />
-                                            </button>
+                                            <AgentHistoryCard agentId={a._id} agentName={a.name} compact />
                                         </div>
                                     ))}
                                 </div>
                             )}
-                        </>
-                    )}
+                    </section>
 
                     {/* ── Step 2: Visits ── */}
-                    {step === 2 && (
-                        <>
-                            <p className="text-xs text-gray-500">
-                                {details.planType === 'single'
-                                    ? 'Add the single visit schedule.'
-                                    : 'Add all visit schedules for this city trip. Each must have an assigned agent.'}
-                            </p>
+                    <section className="rounded-lg border border-meridian-border bg-white p-4 space-y-4">
+                        <h3 className="text-sm font-black text-meridian-text">Visit schedule</h3>
                             {visits.map((v, i) => (
                                 <div key={i} className="border border-gray-200 rounded-xl p-3 space-y-2.5 bg-gray-50/50">
                                     <div className="flex items-center justify-between">
@@ -468,7 +592,7 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
                                             placeholder="Agent meeting title"
                                             value={v.title} onChange={e => updateVisit(i, 'title', e.target.value)} />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                         <div>
                                             <label className="text-xs text-gray-500">Agent / Company *</label>
                                             <select
@@ -477,11 +601,21 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
                                                 onChange={e => {
                                                     const val = e.target.value;
                                                     if (val.startsWith('custom:')) {
-                                                        updateVisit(i, 'agentId', '');
-                                                        updateVisit(i, 'customAgentName', val.replace('custom:', ''));
+                                                        const customAgentName = val.replace('custom:', '');
+                                                        updateVisitFields(i, {
+                                                            agentId: '',
+                                                            customAgentName,
+                                                            title: v.title || `${customAgentName} visit`,
+                                                            location: v.location || locationForAssignment({ customAgentName }, i),
+                                                        });
                                                     } else {
-                                                        updateVisit(i, 'agentId', val);
-                                                        updateVisit(i, 'customAgentName', '');
+                                                        const agent = selectedAgents.find(a => a._id === val);
+                                                        updateVisitFields(i, {
+                                                            agentId: val,
+                                                            customAgentName: '',
+                                                            title: v.title || (agent ? `${agent.name} visit` : ''),
+                                                            location: v.location || locationForAssignment({ agent }, i),
+                                                        });
                                                     }
                                                 }}>
                                                 <option value="">Select agent / company</option>
@@ -513,31 +647,54 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
                                     </div>
                                     <div>
                                         <label className="text-xs text-gray-500">Location</label>
-                                        <input className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm mt-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                            placeholder={`${details.city || 'Location'}`}
-                                            value={v.location} onChange={e => updateVisit(i, 'location', e.target.value)} />
+                                        {activePlanCities().length > 1 ? (
+                                            <select className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm mt-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                                value={v.location}
+                                                onChange={e => updateVisit(i, 'location', e.target.value)}>
+                                                {!activePlanCities().some(c => formatLocation(c.city, c.state) === v.location) && v.location && (
+                                                    <option value={v.location}>{v.location}</option>
+                                                )}
+                                                {activePlanCities().map(c => {
+                                                    const loc = formatLocation(c.city, c.state);
+                                                    return <option key={loc} value={loc}>{loc}</option>;
+                                                })}
+                                            </select>
+                                        ) : (
+                                            <input className="w-full border border-gray-200 rounded-lg px-3 py-1.5 text-sm mt-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                                                placeholder={`${details.city || 'Location'}`}
+                                                value={v.location} onChange={e => updateVisit(i, 'location', e.target.value)} />
+                                        )}
                                     </div>
                                 </div>
                             ))}
 
-                            {(details.planType === 'multi_same_city' || visits.length === 0) && (
+                            {(details.planType === 'multi_same_city' || details.planType === 'multi_city_same_state' || visits.length === 0) && (
                                 <button onClick={addVisit}
                                     className="w-full flex items-center justify-center gap-2 py-2 border-2 border-dashed border-gray-300 rounded-xl text-sm text-gray-500 hover:border-blue-400 hover:text-blue-600 transition-colors">
                                     <Plus className="w-4 h-4" /> Add visit
                                 </button>
                             )}
-                        </>
-                    )}
+                    </section>
 
                     {/* ── Step 3: Review ── */}
-                    {step === 3 && (
-                        <div className="space-y-4">
+                    <section className="rounded-lg border border-meridian-border bg-meridian-bg p-4 space-y-4 lg:col-span-2">
+                        <h3 className="text-sm font-black text-meridian-text">Review</h3>
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                             <div className="rounded-xl border border-gray-200 p-4 space-y-2">
                                 <div className="flex items-center gap-2 text-sm font-medium text-gray-800">
                                     <MapPin className="w-4 h-4 text-blue-500" />
                                     {details.city}{details.state ? `, ${details.state}` : ''} ·
-                                    <span className="text-gray-500 font-normal">{details.planType === 'multi_same_city' ? 'Multi-visit' : 'Single visit'}</span>
+                                    <span className="text-gray-500 font-normal">{details.planType === 'multi_city_same_state' ? 'Multi-city' : details.planType === 'multi_same_city' ? 'Multi-visit' : 'Single visit'}</span>
                                 </div>
+                                {details.planType === 'multi_city_same_state' && activePlanCities().length > 0 && (
+                                    <div className="flex flex-wrap gap-1">
+                                        {activePlanCities().map(c => (
+                                            <span key={`${c.city}-${c.state}`} className="text-[10px] bg-blue-50 text-blue-700 rounded-full px-2 py-0.5">
+                                                {formatLocation(c.city, c.state)}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
                                 <div className="text-xs text-gray-500">
                                     {new Date(details.plannedStartAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                                     {' → '}
@@ -578,40 +735,28 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
                                     })}
                                 </div>
                             </div>
-                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-700">
-                                After creating this plan, you can create an <strong>advance claim</strong> to get pre-approved funds.
-                            </div>
                         </div>
-                    )}
+                    </section>
 
                     {error && (
-                        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
+                        <div className="lg:col-span-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
                     )}
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-between px-6 py-4 border-t border-gray-100">
-                    <button onClick={() => step === 0 ? onClose() : setStep(s => s - 1)}
+                <div className="flex items-center justify-between gap-3 px-5 sm:px-6 py-4 border-t border-meridian-border">
+                    <button onClick={onClose}
                         className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
                         <ChevronLeft className="w-4 h-4" />
-                        {step === 0 ? 'Cancel' : 'Back'}
+                        Cancel
                     </button>
-                    {step < STEPS.length - 1 ? (
-                        <button
-                            onClick={() => setStep(s => s + 1)}
-                            disabled={!canProceed()}
-                            className="flex items-center gap-1 text-sm bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-                            Next <ChevronRight className="w-4 h-4" />
-                        </button>
-                    ) : (
-                        <button
-                            onClick={handleSubmit}
-                            disabled={saving}
-                            className="flex items-center gap-1.5 text-sm bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors">
-                            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                            {saving ? 'Creating...' : 'Create plan'}
-                        </button>
-                    )}
+                    <button
+                        onClick={handleSubmit}
+                        disabled={saving || !canSubmitPlan()}
+                        className="btn-primary bg-brand-green hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                        {saving ? 'Creating...' : (editPlan ? 'Update plan' : 'Create plan')}
+                    </button>
                 </div>
             </div>
         </div>

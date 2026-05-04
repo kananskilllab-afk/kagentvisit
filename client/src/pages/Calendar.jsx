@@ -78,7 +78,7 @@ function EventPill({ schedule, compact = false, onClick }) {
 
     return (
         <div
-            className={`flex items-stretch rounded-md overflow-hidden border cursor-pointer hover:shadow-md transition-all group ${cfg.pill}`}
+            className={`flex items-stretch rounded-lg overflow-hidden border cursor-pointer hover:shadow-meridian-card transition-all group ${cfg.pill}`}
             onClick={e => { e.stopPropagation(); onClick(schedule); }}
             title={`${schedule.title}${agent ? ' · ' + agent.name : ''}`}
         >
@@ -240,7 +240,7 @@ function DayView({ date, schedules, onEventClick, onAddClick }) {
                         <p className="text-xs text-slate-400 mt-0.5">{dayS.length} visit{dayS.length !== 1 ? 's' : ''} scheduled</p>
                     </div>
                     <button onClick={() => onAddClick(date)}
-                        className="flex items-center gap-1.5 text-sm bg-blue-600 text-white px-3 py-2 rounded-xl hover:bg-blue-700 transition-colors shadow-sm">
+                    className="btn-primary px-3 py-2 text-sm">
                         <Plus className="w-4 h-4" /> New Plan
                     </button>
                 </div>
@@ -263,7 +263,7 @@ function DayView({ date, schedules, onEventClick, onAddClick }) {
                             const cfg = STATUS_CFG[s.status || 'pending'] || STATUS_CFG.pending;
                             return (
                                 <div key={s._id} onClick={() => onEventClick(s)}
-                                    className="flex items-stretch gap-0 rounded-2xl border border-slate-200 overflow-hidden hover:shadow-md cursor-pointer transition-all bg-white group">
+                                    className="flex items-stretch gap-0 rounded-lg border border-meridian-border overflow-hidden hover:shadow-meridian-card cursor-pointer transition-all bg-white group">
                                     <div className={`w-1.5 flex-shrink-0 ${cfg.bar}`} />
                                     <div className="flex-1 p-4 min-w-0">
                                         <div className="flex items-start justify-between gap-2 mb-2">
@@ -361,7 +361,7 @@ function AgendaView({ schedules, onEventClick, onAddClick }) {
                                 const cfg = STATUS_CFG[s.status || 'pending'] || STATUS_CFG.pending;
                                 return (
                                     <div key={s._id} onClick={() => onEventClick(s)}
-                                        className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 hover:shadow-md hover:border-slate-300 cursor-pointer transition-all bg-white group">
+                                        className="flex items-center gap-3 p-3 rounded-lg border border-meridian-border hover:shadow-meridian-card hover:border-meridian-blue/30 cursor-pointer transition-all bg-white group">
                                         <div className={`w-1 self-stretch rounded-full flex-shrink-0 ${cfg.bar}`} />
                                         <div className="flex-shrink-0 text-xs text-slate-400 font-medium w-16">
                                             {fmtTime(s.scheduledDate)}
@@ -397,9 +397,9 @@ function ScheduleDrawer({ schedule, balance, onClose, onEdit, onDelete }) {
     const pct     = granted > 0 ? Math.min(100, (spent / granted) * 100) : 0;
 
     return (
-        <div className="w-80 border-l border-slate-200 bg-white overflow-y-auto flex flex-col shadow-xl">
+        <div className="w-80 border-l border-meridian-border bg-white overflow-y-auto flex flex-col shadow-xl">
             {/* Header */}
-            <div className="relative bg-gradient-to-br from-slate-800 to-slate-700 p-5 pb-4">
+            <div className="relative bg-meridian-navy p-5 pb-4">
                 <button onClick={onClose}
                     className="absolute top-3 right-3 p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors">
                     <X className="w-3.5 h-3.5" />
@@ -535,9 +535,9 @@ function ScheduleDrawer({ schedule, balance, onClose, onEdit, onDelete }) {
 
 // ── Filter Bar ────────────────────────────────────────────────────────────────
 function FilterBar({ filters, onChange, agents }) {
-    const sel = 'text-xs border border-slate-200 rounded-lg px-2.5 py-1.5 bg-white focus:ring-1 focus:ring-blue-300 focus:border-blue-300 text-slate-700 outline-none cursor-pointer';
+    const sel = 'text-xs border border-meridian-border rounded-lg px-2.5 py-1.5 bg-white focus:ring-1 focus:ring-blue-300 focus:border-meridian-blue text-meridian-text outline-none cursor-pointer';
     return (
-        <div className="flex items-center gap-2 flex-wrap bg-white border-b border-slate-200 px-4 py-2.5 shadow-sm">
+        <div className="flex items-center gap-2 flex-wrap bg-white border-b border-meridian-border px-4 py-2.5 shadow-sm">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">Filters</span>
             <div className="w-px h-4 bg-slate-200" />
             <select className={sel} value={filters.agent || ''}
@@ -776,9 +776,9 @@ export default function Calendar() {
     const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
     return (
-        <div className="h-screen flex flex-col bg-slate-50">
+        <div className="h-screen flex flex-col bg-meridian-bg">
             {/* ── Toolbar ─────────────────────────────────────────────── */}
-            <div className="flex items-center gap-2 px-4 py-3 bg-white border-b border-slate-200 shadow-sm flex-shrink-0">
+            <div className="flex items-center gap-2 px-4 py-3 bg-white border-b border-meridian-border shadow-meridian-card flex-shrink-0">
                 {/* Nav */}
                 <div className="flex items-center gap-0.5">
                     <button onClick={() => navigate_cal(-1)}
@@ -811,7 +811,7 @@ export default function Calendar() {
                             <button key={key} onClick={() => setView(key)}
                                 className={`flex items-center gap-1 px-2.5 py-1.5 transition-all font-medium
                                     ${view === key
-                                        ? 'bg-blue-600 text-white shadow-inner'
+                                        ? 'bg-meridian-navy text-white shadow-inner'
                                         : 'text-slate-600 hover:bg-white hover:text-slate-800'}`}>
                                 <Icon className="w-3.5 h-3.5" />
                                 <span className="hidden md:inline">{label}</span>
@@ -823,8 +823,8 @@ export default function Calendar() {
                     <button onClick={() => setShowFilters(f => !f)}
                         className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border font-semibold transition-all
                             ${activeFilterCount > 0
-                                ? 'border-blue-400 bg-blue-600 text-white shadow-sm'
-                                : 'border-slate-200 text-slate-600 hover:bg-slate-50 bg-white'}`}>
+                                ? 'border-brand-gold bg-brand-gold text-white shadow-sm'
+                                : 'border-meridian-border text-meridian-sub hover:bg-meridian-bg bg-white'}`}>
                         <Filter className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">Filter</span>
                         {activeFilterCount > 0 && (
@@ -849,7 +849,7 @@ export default function Calendar() {
 
                     {/* New Plan */}
                     <button onClick={() => setPlanModal({ open: true, defaultDate: curDate })}
-                        className="flex items-center gap-1 text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg hover:bg-blue-700 transition-colors shadow-sm font-semibold">
+                        className="btn-primary px-3 py-1.5 text-xs">
                         <Plus className="w-3.5 h-3.5" />
                         <span className="hidden sm:inline">New Plan</span>
                     </button>
@@ -890,12 +890,12 @@ export default function Calendar() {
 
             {/* ── Main content + drawer ──────────────────────────────── */}
             <div className="flex flex-1 overflow-hidden">
-                <div className="flex-1 flex flex-col overflow-hidden bg-white">
+                <div className="flex-1 flex flex-col overflow-hidden bg-white border-t border-meridian-border">
                     {view === 'month' && (
                         <MonthView
                             year={viewYear} month={viewMonth}
                             schedules={schedules} today={today}
-                            onDayClick={d => { setCurDate(d); setView('day'); }}
+                            onDayClick={d => setPlanModal({ open: true, defaultDate: d })}
                             onEventClick={s => setDrawerSchedule(s)}
                         />
                     )}

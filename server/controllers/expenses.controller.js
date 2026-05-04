@@ -43,6 +43,8 @@ exports.getExpenses = async (req, res) => {
         }
         if (req.query.claimRef) query.claimRef = req.query.claimRef;
         if (req.query.unclaimed === 'true') query.claimRef = { $exists: false };
+        if (req.query.visitPlanRef) query.visitPlanRef = req.query.visitPlanRef;
+        if (req.query.visitScheduleRef) query.visitScheduleRef = req.query.visitScheduleRef;
         // Enhanced filters
         if (req.query.minAmount || req.query.maxAmount) {
             query.amount = {};
@@ -217,7 +219,7 @@ exports.getClaims = async (req, res) => {
             .populate('submittedBy', 'name employeeId email role')
             .populate('reviewedBy', 'name employeeId')
             .populate('expenses')
-            .populate('visitPlanRef', 'title city plannedStartAt plannedEndAt status')
+            .populate('visitPlanRef', 'title planType city state cities plannedStartAt plannedEndAt status purpose')
             .sort({ createdAt: -1 });
 
         res.json({ success: true, data: claims });
@@ -234,8 +236,13 @@ exports.getClaimById = async (req, res) => {
             .populate('reviewedBy', 'name employeeId email')
             .populate({
                 path: 'expenses',
-                populate: { path: 'createdBy', select: 'name employeeId' }
+                populate: [
+                    { path: 'createdBy', select: 'name employeeId' },
+                    { path: 'visitPlanRef', select: 'title city state cities plannedStartAt plannedEndAt status' },
+                    { path: 'visitScheduleRef', select: 'title scheduledDate location status agentId customAgentName', populate: { path: 'agentId', select: 'name city state' } }
+                ]
             })
+            .populate('visitPlanRef', 'title planType city state cities plannedStartAt plannedEndAt status purpose owner')
             .populate('statusHistory.changedBy', 'name employeeId');
 
         if (!claim) {

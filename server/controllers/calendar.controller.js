@@ -49,7 +49,7 @@ exports.getScheduledVisits = async (req, res) => {
             .populate('agentId', 'name city state')
             .populate({
                 path: 'visitPlanRef',
-                select: 'title planType city status plannedStartAt plannedEndAt cityTier',
+                select: 'title planType city state cities status plannedStartAt plannedEndAt cityTier',
                 populate: { path: 'agents', select: 'name city' }
             })
             .populate('clientPhoto.uploadRef', 'url')

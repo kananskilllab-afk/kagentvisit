@@ -209,7 +209,7 @@ const SubmissionCard = ({ record, tabKey, apiPath, onUpdate }) => {
     );
 
     return (
-        <div className="border border-slate-100 rounded-2xl bg-white overflow-hidden">
+        <div className="border border-meridian-border rounded-lg bg-white overflow-hidden">
             <button
                 onClick={() => setExpanded(e => !e)}
                 className="w-full flex items-center gap-3 p-4 text-left hover:bg-slate-50/50 transition-colors"
@@ -250,10 +250,10 @@ const SubmissionCard = ({ record, tabKey, apiPath, onUpdate }) => {
 const UserCard = ({ group, isSelected, onClick }) => (
     <button
         onClick={onClick}
-        className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
+        className={`w-full text-left p-4 rounded-lg border transition-all ${
             isSelected
-                ? 'border-brand-blue bg-brand-blue/5 shadow-sm'
-                : 'border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm'
+                ? 'border-meridian-blue bg-blue-50 shadow-sm'
+                : 'border-meridian-border bg-white hover:bg-meridian-row-hov'
         }`}
     >
         <div className="flex items-center gap-3">

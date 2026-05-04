@@ -9,6 +9,7 @@ const { globalLimiter } = require('./middleware/rateLimiter');
 const auditLogger = require('./middleware/auditLogger');
 const { connectDB } = require('./config/db');
 const { seedData } = require('./services/bootstrapSeed.service');
+const { scheduleOverdueDigest } = require('./jobs/overdueActionItems.job');
 
 // Load environment variables
 dotenv.config();
@@ -153,7 +154,7 @@ const genericFields = [
     { id: 'postInPerson.nextFollowUpDate', group: 'Post In-Person Visit', label: 'Next Follow Up Date', type: 'date', required: false },
 
     // Step 11 – Final Summary
-    { id: 'postVisit.actionPoints', group: 'Final Summary', label: 'Action Points', type: 'richtext', required: true },
+    { id: 'actionItems', group: 'Final Summary', label: 'Action Items', type: 'action_items', required: true },
     { id: 'postVisit.remarks', group: 'Final Summary', label: 'Your Remarks', type: 'richtext', required: false }
 ];
 
@@ -322,6 +323,10 @@ if (process.env.NODE_ENV !== 'production' || require.main === module) {
             return seedData({ genericFields, b2cFields }); // Ensure B2B/B2C configurations are synced
         })
         .then(() => {
+            scheduleOverdueDigest();
+            // AIT-06: actionItems.status + actionItems.dueDate compound index covers
+            // the $elemMatch overdue query. Per-agent query covered by { submittedBy, 'actionItems.status' }.
+            // Validate with: Visit.find({actionItems:{$elemMatch:{status:'open',dueDate:{$lt:new Date()}}}}).explain()
             app.listen(PORT, () => {
                 console.log(`Server running on port ${PORT}`);
             });

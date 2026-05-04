@@ -73,9 +73,9 @@ const FormsHub = () => {
                             <button
                                 key={form.key}
                                 onClick={() => navigate(form.path)}
-                                className={`card text-left flex flex-col gap-4 hover:shadow-md border-2 border-transparent transition-all group ${form.border}`}
+                                className={`card text-left flex flex-col gap-4 transition-all group ${form.border}`}
                             >
-                                <div className={`w-12 h-12 rounded-2xl ${form.iconBg} flex items-center justify-center shrink-0`}>
+                                <div className={`w-12 h-12 rounded-lg ${form.iconBg} flex items-center justify-center shrink-0`}>
                                     <Icon className={`w-6 h-6 ${form.iconColor}`} />
                                 </div>
                                 <div className="flex-1">
@@ -92,9 +92,9 @@ const FormsHub = () => {
             )}
 
             {isAdmin && (
-                <div className="card border-2 border-dashed border-slate-200 bg-slate-50/50">
+                <div className="card border-dashed border-meridian-border bg-meridian-bg">
                     <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-slate-200 flex items-center justify-center shrink-0">
+                        <div className="w-10 h-10 rounded-lg bg-slate-200 flex items-center justify-center shrink-0">
                             <BarChart2 className="w-5 h-5 text-slate-500" />
                         </div>
                         <div className="flex-1 min-w-0">

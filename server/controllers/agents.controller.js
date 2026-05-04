@@ -1,14 +1,40 @@
 const Agent = require('../models/Agent');
+const Visit = require('../models/Visit');
 const ExcelJS = require('exceljs');
 const mongoose = require('mongoose');
 
 // Helper to validate ObjectId
 const isValidId = (id) => mongoose.Types.ObjectId.isValid(id);
 
-// @desc    Get all agents (supports ?search=, ?active=true)
+const canViewAgentHistory = (user) => user?.role && user.role !== 'home_visit';
+
+const visitTitle = (visit) => visit?.meta?.companyName || visit?.studentInfo?.name || 'Untitled visit';
+
+const getAgentVisitQuery = (agentId) => ({
+    'meta.agentId': agentId,
+    status: { $ne: 'draft' }
+});
+
+const serializeVisitHistoryRow = (visit) => ({
+    _id: visit._id,
+    title: visitTitle(visit),
+    status: visit.status,
+    formType: visit.formType,
+    city: visit.location?.city || visit.agencyProfile?.city || null,
+    createdAt: visit.createdAt,
+    submittedAt: visit.submittedAt,
+    submittedBy: visit.submittedBy,
+    reviewedAt: visit.reviewedAt,
+    reviewComment: visit.reviewComment,
+    actionItemsOpen: (visit.actionItems || []).filter(item => item.status === 'open').length,
+    actionItemsDone: (visit.actionItems || []).filter(item => item.status === 'done').length,
+    rating: visit.agencyProfile?.infraRating || visit.kananTools?.trainerRating || visit.kananTools?.counsellorRating || null
+});
+
+// @desc    Get all agents (supports ?search=, ?active=true, ?limit=N)
 exports.getAgents = async (req, res) => {
     try {
-        const { search, active } = req.query;
+        const { search, active, limit } = req.query;
         const filter = {};
 
         if (active === 'true') filter.isActive = true;
@@ -18,7 +44,8 @@ exports.getAgents = async (req, res) => {
             filter.name = { $regex: search.trim(), $options: 'i' };
         }
 
-        const agents = await Agent.find(filter).select('-__v').sort({ name: 1 });
+        const limitNum = limit ? Math.min(parseInt(limit, 10) || 50, 100) : 50;
+        const agents = await Agent.find(filter).select('-__v').sort({ name: 1 }).limit(limitNum);
 
         // When searching, bubble exact prefix matches to the top
         if (search && search.trim()) {
@@ -48,6 +75,119 @@ exports.getAgentById = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Agent not found' });
         }
         res.json({ success: true, data: agent });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// @desc    Get rolled-up history for an agent
+exports.getAgentHistory = async (req, res) => {
+    try {
+        if (!canViewAgentHistory(req.user)) {
+            return res.status(403).json({ success: false, message: 'Agent history is not available for this role' });
+        }
+        if (!isValidId(req.params.id)) {
+            return res.status(400).json({ success: false, message: 'Invalid agent ID format' });
+        }
+
+        const agent = await Agent.findById(req.params.id).select('-__v');
+        if (!agent) return res.status(404).json({ success: false, message: 'Agent not found' });
+
+        const query = getAgentVisitQuery(req.params.id);
+        const [visits, totalVisits] = await Promise.all([
+            Visit.find(query)
+                .select('meta studentInfo agencyProfile kananTools location status formType submittedBy reviewedAt reviewComment submittedAt createdAt actionItems')
+                .populate('submittedBy', 'name employeeId role')
+                .sort({ submittedAt: -1, createdAt: -1 })
+                .limit(5)
+                .lean(),
+            Visit.countDocuments(query)
+        ]);
+
+        const allForStats = await Visit.find(query)
+            .select('agencyProfile.infraRating kananTools.trainerRating kananTools.counsellorRating actionItems submittedAt createdAt')
+            .lean();
+
+        const openItems = allForStats.flatMap(visit =>
+            (visit.actionItems || [])
+                .filter(item => item.status === 'open')
+                .map(item => ({
+                    _id: item._id,
+                    text: item.text,
+                    assignee: item.assignee,
+                    dueDate: item.dueDate,
+                    visitId: visit._id
+                }))
+        );
+
+        const ratings = allForStats
+            .map(visit => visit.agencyProfile?.infraRating || visit.kananTools?.trainerRating || visit.kananTools?.counsellorRating)
+            .filter(value => typeof value === 'number' && value > 0);
+
+        const latestVisit = allForStats
+            .slice()
+            .sort((a, b) => new Date(b.submittedAt || b.createdAt) - new Date(a.submittedAt || a.createdAt))[0];
+
+        return res.json({
+            success: true,
+            data: {
+                agent,
+                readOnly: req.user.role === 'accounts',
+                kpis: {
+                    totalVisits,
+                    lastVisitDate: latestVisit?.submittedAt || latestVisit?.createdAt || null,
+                    openActionItems: openItems.length,
+                    avgRating: ratings.length ? Number((ratings.reduce((sum, value) => sum + value, 0) / ratings.length).toFixed(1)) : null
+                },
+                openItems,
+                visits: visits.map(serializeVisitHistoryRow)
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// @desc    Get paginated visit history for an agent
+exports.getAgentVisits = async (req, res) => {
+    try {
+        if (!canViewAgentHistory(req.user)) {
+            return res.status(403).json({ success: false, message: 'Agent history is not available for this role' });
+        }
+        if (!isValidId(req.params.id)) {
+            return res.status(400).json({ success: false, message: 'Invalid agent ID format' });
+        }
+
+        const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 10, 1), 50);
+        const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+        const status = req.query.status;
+        const query = {
+            ...getAgentVisitQuery(req.params.id),
+            ...(status ? { status } : {})
+        };
+
+        const [visits, total] = await Promise.all([
+            Visit.find(query)
+                .select('meta studentInfo agencyProfile kananTools location status formType submittedBy reviewedAt reviewComment submittedAt createdAt actionItems')
+                .populate('submittedBy', 'name employeeId role')
+                .sort({ submittedAt: -1, createdAt: -1 })
+                .skip(offset)
+                .limit(limit)
+                .lean(),
+            Visit.countDocuments(query)
+        ]);
+
+        return res.json({
+            success: true,
+            data: visits.map(serializeVisitHistoryRow),
+            pagination: {
+                total,
+                limit,
+                offset,
+                hasMore: offset + visits.length < total
+            },
+            readOnly: req.user.role === 'accounts'
+        });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
@@ -274,6 +414,78 @@ exports.importAgents = async (req, res) => {
         });
     } catch (error) {
         console.error('Import Error:', error);
+        res.status(500).json({ success: false, message: error.message });
+    }
+};
+
+// @desc    Backfill: create Agent records for any visit-history companyNames not yet in Agents
+// @route   POST /api/agents/backfill-from-visits
+// @access  superadmin only
+exports.backfillAgentsFromVisits = async (req, res) => {
+    try {
+        const companiesInVisits = await Visit.distinct('meta.companyName', {
+            'meta.companyName': { $exists: true, $ne: null },
+            status: { $ne: 'draft' }
+        });
+
+        const validCompanies = companiesInVisits.filter(n => n && n.trim());
+
+        if (validCompanies.length === 0) {
+            return res.json({ success: true, message: 'No company names found in visit history.', created: 0, skipped: 0 });
+        }
+
+        const existingAgents = await Agent.find({
+            name: { $in: validCompanies.map(n => new RegExp('^' + n.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i')) }
+        }).select('name');
+
+        const existingNamesLower = new Set(existingAgents.map(a => a.name.toLowerCase()));
+        const toCreate = validCompanies.filter(n => !existingNamesLower.has(n.trim().toLowerCase()));
+
+        let created = 0;
+        let skipped = validCompanies.length - toCreate.length;
+
+        for (const companyName of toCreate) {
+            try {
+                const safeRx = new RegExp('^' + companyName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$', 'i');
+                const latestVisit = await Visit.findOne({
+                    'meta.companyName': { $regex: safeRx },
+                    status: { $ne: 'draft' }
+                }).sort({ createdAt: -1 }).lean();
+
+                const visitCount = await Visit.countDocuments({
+                    'meta.companyName': { $regex: safeRx },
+                    status: { $ne: 'draft' }
+                });
+
+                await Agent.create({
+                    name: companyName.trim(),
+                    city: latestVisit?.location?.city || '',
+                    state: latestVisit?.location?.state || '',
+                    pinCode: latestVisit?.agencyProfile?.pinCode || latestVisit?.location?.pinCode || '',
+                    emailId: latestVisit?.agencyProfile?.emailId || latestVisit?.meta?.email || '',
+                    mobile: String(latestVisit?.agencyProfile?.contactNumber || ''),
+                    bdmName: String(latestVisit?.meta?.bdmName || ''),
+                    rmName: String(latestVisit?.meta?.rmName || ''),
+                    isActive: true,
+                    visitCount,
+                    lastVisitDate: latestVisit?.submittedAt || latestVisit?.createdAt || null,
+                    createdBy: req.user._id
+                });
+                created++;
+            } catch (err) {
+                console.warn('[Backfill] Skipped "' + companyName + '": ' + err.message);
+                skipped++;
+            }
+        }
+
+        res.json({
+            success: true,
+            message: `Backfill complete. ${created} new agents created, ${skipped} already existed or skipped.`,
+            created,
+            skipped,
+            total: validCompanies.length
+        });
+    } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }
 };

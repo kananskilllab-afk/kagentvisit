@@ -93,27 +93,32 @@ const starRatingSchema = (field) => {
 };
 
 const multiSelectSchema = (field) => {
+    const arraySchema = field.required
+        ? z.array(z.string()).min(1, `Select at least one option for ${field.label}`)
+        : z.array(z.string());
     const schema = z.preprocess(
         value => Array.isArray(value) ? value : [],
-        z.array(z.string())
+        arraySchema
     );
 
     if (!field.required) return schema.optional();
 
-    return schema.min(1, `Select at least one option for ${field.label}`);
+    return schema;
 };
 
 const dynamicListSchema = (field) => {
+    const arraySchema = field.required
+        ? z.array(z.string()).min(1, `${field.label} requires at least one entry`)
+        : z.array(z.string());
     const schema = z.preprocess(
         value => Array.isArray(value) ? value : [],
-        z.array(z.string())
+        arraySchema
     );
 
     if (!field.required) return schema.optional();
 
     return schema
-        .min(1, `${field.label} requires at least one entry`)
-        .refine(values => values.some(value => !isEmptyText(value)), {
+        .refine(values => values.length === 0 || values.some(value => !isEmptyText(value)), {
             message: `${field.label} cannot be empty`
         });
 };
@@ -124,20 +129,44 @@ const dynamicContactsSchema = (field) => {
         designation: z.string().optional().or(z.literal('')),
         number: z.string().optional().or(z.literal(''))
     });
+    const arraySchema = field.required
+        ? z.array(contactObjSchema).min(1, `${field.label} requires at least one contact`)
+        : z.array(contactObjSchema);
     const schema = z.preprocess(
         value => Array.isArray(value) ? value : [],
-        z.array(contactObjSchema)
+        arraySchema
     );
 
     if (!field.required) return schema.optional();
 
     return schema
-        .min(1, `${field.label} requires at least one contact`)
-        .refine(values => values.some(value =>
+        .refine(values => values.length === 0 || values.some(value =>
             !isEmptyText(value.name) || !isEmptyText(value.designation) || !isEmptyText(value.number)
         ), {
             message: `Enter at least one contact for ${field.label}`
         });
+};
+
+const actionItemsSchema = (field) => {
+    const itemSchema = z.object({
+        _id: z.any().optional(),
+        _clientId: z.string().optional(),
+        text: z.string().optional().or(z.literal('')),
+        assignee: z.any().optional().nullable(),
+        dueDate: z.string().optional().or(z.literal('')).nullable(),
+        status: z.enum(['open', 'done']).optional(),
+        history: z.array(z.any()).optional()
+    });
+    const schema = z.preprocess(
+        value => Array.isArray(value) ? value.filter(item => !isEmptyText(item?.text)) : [],
+        z.array(itemSchema)
+    );
+
+    if (!field.required) return schema.optional();
+
+    return schema.refine(values => values.length > 0, {
+        message: `${field.label} requires at least one action item`
+    });
 };
 
 const fieldSchemaFor = (field) => {
@@ -163,6 +192,8 @@ const fieldSchemaFor = (field) => {
             return dynamicListSchema(field);
         case 'dynamic-contacts':
             return dynamicContactsSchema(field);
+        case 'action_items':
+            return actionItemsSchema(field);
         case 'office-area-combo':
             return textSchema(field);
         default:

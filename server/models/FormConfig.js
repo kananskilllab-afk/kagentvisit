@@ -10,7 +10,8 @@ const fieldSchema = new mongoose.Schema({
             'text', 'textarea', 'richtext', 'number', 'date', 'datetime',
             'dropdown', 'multi-select', 'toggle', 'star-rating', 'file',
             'photo-upload', 'autocomplete-agent',
-            'dynamic-list', 'dynamic-contacts', 'office-area-combo'
+            'dynamic-list', 'dynamic-contacts', 'office-area-combo',
+            'action_items'
         ],
         required: true
     },

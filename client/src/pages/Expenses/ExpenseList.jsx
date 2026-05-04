@@ -45,10 +45,10 @@ function getInitials(name = '') {
 const UserCard = ({ group, isSelected, onClick }) => (
     <button
         onClick={onClick}
-        className={`w-full text-left p-4 rounded-2xl border-2 transition-all ${
+        className={`w-full text-left p-4 rounded-lg border transition-all ${
             isSelected
-                ? 'border-brand-blue bg-brand-blue/5 shadow-sm'
-                : 'border-slate-100 bg-white hover:border-slate-200 hover:shadow-sm'
+                ? 'border-meridian-blue bg-blue-50 shadow-sm'
+                : 'border-meridian-border bg-white hover:bg-meridian-row-hov'
         }`}
     >
         <div className="flex items-center gap-3">
@@ -421,7 +421,7 @@ const ExpenseList = () => {
             {/* Delete Confirm */}
             {deleteTarget && (
                 <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden animate-fade-in">
+                    <div className="bg-white rounded-lg w-full max-w-sm shadow-2xl overflow-hidden animate-fade-in border border-meridian-border">
                         <div className="p-6 text-center">
                             <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
                                 <Trash2 className="w-7 h-7 text-red-600" />

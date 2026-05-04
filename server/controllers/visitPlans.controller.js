@@ -27,6 +27,14 @@ async function scopedPlanQuery(user) {
     return q;
 }
 
+// Resolve which user's Google Calendar to sync to. We always sync to the plan
+// owner's calendar — managers/accounts editing someone else's plan should not
+// push events into their own calendar.
+async function getTargetUserForGcal(actor, ownerId) {
+    if (actor && String(actor._id) === String(ownerId)) return actor;
+    return await User.findById(ownerId).select('googleCalendar email name');
+}
+
 async function canAccessPlan(user, plan) {
     if (!plan) return false;
     if (user.role === 'accounts' || user.role === 'superadmin') return true;
@@ -65,6 +73,37 @@ function hasAtLeastOneAgent(agents, customAgentNames) {
     return (agents && agents.length > 0) || (customAgentNames && customAgentNames.length > 0);
 }
 
+function normalizePlanCities(primaryCity, primaryState, primaryTier, cities = []) {
+    const list = [];
+    const seen = new Set();
+    const add = (entry = {}) => {
+        const city = (entry.city || '').trim();
+        const state = (entry.state || primaryState || '').trim();
+        const cityTier = entry.cityTier || primaryTier || 'na';
+        if (!city) return;
+        const key = `${city.toLowerCase()}|${state.toLowerCase()}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        list.push({ city, state, cityTier });
+    };
+
+    add({ city: primaryCity, state: primaryState, cityTier: primaryTier });
+    if (Array.isArray(cities)) cities.forEach(add);
+    return list;
+}
+
+function validatePlanCities(planType, cities) {
+    if (planType !== 'multi_city_same_state') return null;
+    if (!cities || cities.length < 2) {
+        return 'Select at least two cities for a multi-city same-state plan.';
+    }
+    const states = [...new Set(cities.map(c => (c.state || '').trim().toLowerCase()).filter(Boolean))];
+    if (states.length > 1) {
+        return 'All selected cities must be in the same state.';
+    }
+    return null;
+}
+
 function audit(req, action, plan, extra = {}) {
     AuditLog.create({
         userId: req.user._id,
@@ -86,9 +125,12 @@ exports.createPlan = async (req, res) => {
     try {
         const {
             title, planType, city, state, pinCode, cityTier,
-            agents = [], customAgentNames = [],
+            cities = [], agents = [], customAgentNames = [],
             plannedStartAt, plannedEndAt, purpose, notes, timezone
         } = req.body;
+        const finalPlanType = planType || 'single';
+        const cleanCities = normalizePlanCities(city, state, cityTier, cities);
+        const citiesError = validatePlanCities(finalPlanType, cleanCities);
 
         // Controller-level validation (replaces removed pre-validate hook)
         if (!title || !title.trim()) {
@@ -96,6 +138,9 @@ exports.createPlan = async (req, res) => {
         }
         if (!city || !city.trim()) {
             return res.status(400).json({ success: false, message: 'City is required.' });
+        }
+        if (citiesError) {
+            return res.status(400).json({ success: false, message: citiesError, errorCode: 'INVALID_PLAN_CITIES' });
         }
         if (!plannedStartAt || !plannedEndAt) {
             return res.status(400).json({ success: false, message: 'plannedStartAt and plannedEndAt are required.' });
@@ -125,9 +170,12 @@ exports.createPlan = async (req, res) => {
             owner: req.user._id,
             ownerRoleSnapshot: req.user.role,
             title: title.trim(),
-            planType: planType || 'single',
-            city: city.trim(), state, pinCode,
-            cityTier: cityTier || 'na',
+            planType: finalPlanType,
+            city: cleanCities[0]?.city || city.trim(),
+            state: cleanCities[0]?.state || state,
+            pinCode,
+            cities: cleanCities,
+            cityTier: cleanCities[0]?.cityTier || cityTier || 'na',
             agents: agents || [],
             customAgentNames: cleanCustomNames,
             plannedStartAt,
@@ -135,8 +183,19 @@ exports.createPlan = async (req, res) => {
             purpose,
             notes,
             timezone,
-            status: 'scheduled'
+            status: 'scheduled',
+            syncToGoogle: !!req.body.syncToGoogle
         });
+
+        if (plan.syncToGoogle && req.user.googleCalendar?.connected) {
+            try {
+                const eventId = await gcal.createEvent(req.user, plan);
+                if (eventId) {
+                    plan.googleCalendarEventId = eventId;
+                    await plan.save();
+                }
+            } catch (e) { /* non-fatal */ }
+        }
 
         audit(req, 'CREATE_VISIT_PLAN', plan);
         res.status(201).json({ success: true, data: plan });
@@ -150,7 +209,12 @@ exports.listPlans = async (req, res) => {
     try {
         const q = await scopedPlanQuery(req.user);
         if (req.query.status) q.status = req.query.status;
-        if (req.query.city) q.city = req.query.city;
+        if (req.query.city) {
+            q.$or = [
+                { city: req.query.city },
+                { 'cities.city': req.query.city }
+            ];
+        }
         if (req.query.owner && ACCOUNTS_ROLES.includes(req.user.role)) q.owner = req.query.owner;
         if (req.query.hasOpenClaim === 'true') {
             const claims = await ExpenseClaim.find({ status: { $in: ['draft', 'submitted', 'under_review', 'needs_justification'] } })
@@ -192,7 +256,7 @@ exports.getPlan = async (req, res) => {
             .populate('clientPhoto.uploadRef')
             .sort({ scheduledDate: 1 })
             .lean();
-        
+
         const scheduleIds = schedules.map(s => s._id);
 
         const [balance, claims, uploads] = await Promise.all([
@@ -224,23 +288,40 @@ exports.updatePlan = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Cannot edit a plan that is completed, closed, or cancelled' });
         }
 
-        const editable = ['title', 'planType', 'city', 'state', 'pinCode', 'cityTier',
-            'plannedStartAt', 'plannedEndAt', 'purpose', 'notes', 'timezone'];
+        const editable = ['title', 'pinCode',
+            'plannedStartAt', 'plannedEndAt', 'purpose', 'notes', 'timezone', 'syncToGoogle'];
+        const nextPlanType = req.body.planType || plan.planType;
+        const destinationTouched = req.body.city !== undefined || req.body.state !== undefined ||
+            req.body.cityTier !== undefined || req.body.cities !== undefined || req.body.planType !== undefined;
 
         // Date range validation
         const newStart = req.body.plannedStartAt ? new Date(req.body.plannedStartAt) : plan.plannedStartAt;
-        const newEnd   = req.body.plannedEndAt   ? new Date(req.body.plannedEndAt)   : plan.plannedEndAt;
+        const newEnd = req.body.plannedEndAt ? new Date(req.body.plannedEndAt) : plan.plannedEndAt;
         if (newEnd < newStart) {
             return res.status(400).json({ success: false, message: 'plannedEndAt must be on or after plannedStartAt.' });
         }
 
-        // Block city change if there are child schedules
-        if (req.body.city && req.body.city !== plan.city) {
+        const cleanCities = destinationTouched
+            ? normalizePlanCities(
+                req.body.city ?? plan.city,
+                req.body.state ?? plan.state,
+                req.body.cityTier ?? plan.cityTier,
+                req.body.cities ?? plan.cities
+            )
+            : plan.cities;
+        const citiesError = destinationTouched ? validatePlanCities(nextPlanType, cleanCities) : null;
+        if (citiesError) {
+            return res.status(400).json({ success: false, message: citiesError, errorCode: 'INVALID_PLAN_CITIES' });
+        }
+
+        // Block destination changes if there are child schedules
+        const currentCities = normalizePlanCities(plan.city, plan.state, plan.cityTier, plan.cities);
+        if (destinationTouched && JSON.stringify(cleanCities || []) !== JSON.stringify(currentCities || [])) {
             const count = await VisitSchedule.countDocuments({ visitPlanRef: plan._id });
             if (count > 0) {
                 return res.status(400).json({
                     success: false,
-                    message: 'Cannot change city while schedules exist. Remove schedules first.'
+                    message: 'Cannot change destination cities while schedules exist. Remove schedules first.'
                 });
             }
         }
@@ -295,8 +376,35 @@ exports.updatePlan = async (req, res) => {
         editable.forEach(f => {
             if (req.body[f] !== undefined) plan[f] = req.body[f];
         });
+        if (destinationTouched) {
+            plan.planType = nextPlanType;
+            plan.cities = cleanCities;
+            plan.city = cleanCities[0]?.city || plan.city;
+            plan.state = cleanCities[0]?.state || plan.state;
+            plan.cityTier = cleanCities[0]?.cityTier || plan.cityTier || 'na';
+        }
 
         await plan.save();
+
+        // Google sync
+        const targetUser = await getTargetUserForGcal(req.user, plan.owner);
+        if (req.body.syncToGoogle === false && plan.googleCalendarEventId) {
+            try {
+                await gcal.deleteEvent(targetUser, plan.googleCalendarEventId);
+                plan.googleCalendarEventId = null;
+                await plan.save();
+            } catch (e) { /* non-fatal */ }
+        } else if (plan.syncToGoogle && targetUser?.googleCalendar?.connected) {
+            try {
+                if (plan.googleCalendarEventId) {
+                    await gcal.updateEvent(targetUser, plan.googleCalendarEventId, plan);
+                } else {
+                    const id = await gcal.createEvent(targetUser, plan);
+                    if (id) { plan.googleCalendarEventId = id; await plan.save(); }
+                }
+            } catch (e) { /* non-fatal */ }
+        }
+
         audit(req, 'UPDATE_VISIT_PLAN', plan);
         res.json({ success: true, data: plan });
     } catch (err) {
@@ -323,6 +431,10 @@ exports.deletePlan = async (req, res) => {
             return res.status(400).json({ success: false, message: 'Plan has schedules or claims — cancel instead of deleting.' });
         }
         await plan.deleteOne();
+        const targetUser = await getTargetUserForGcal(req.user, plan.owner);
+        if (plan.googleCalendarEventId && targetUser?.googleCalendar?.connected) {
+            try { await gcal.deleteEvent(targetUser, plan.googleCalendarEventId); } catch (_) { }
+        }
         audit(req, 'DELETE_VISIT_PLAN', plan);
         res.json({ success: true, message: 'Plan deleted' });
     } catch (err) {
@@ -344,6 +456,16 @@ exports.cancelPlan = async (req, res) => {
 
         plan.status = 'cancelled';
         await plan.save();
+
+        const targetUser = await getTargetUserForGcal(req.user, plan.owner);
+        if (plan.googleCalendarEventId && targetUser?.googleCalendar?.connected) {
+            try {
+                await gcal.deleteEvent(targetUser, plan.googleCalendarEventId);
+                plan.googleCalendarEventId = null;
+                plan.syncToGoogle = false;
+                await plan.save();
+            } catch (_) { }
+        }
 
         await VisitSchedule.updateMany(
             { visitPlanRef: plan._id, status: 'pending' },
@@ -411,6 +533,7 @@ exports.duplicatePlan = async (req, res) => {
             city: plan.city,
             state: plan.state,
             pinCode: plan.pinCode,
+            cities: plan.cities || normalizePlanCities(plan.city, plan.state, plan.cityTier),
             cityTier: plan.cityTier,
             agents: plan.agents,
             customAgentNames: plan.customAgentNames || [],
@@ -481,7 +604,7 @@ exports.addSchedule = async (req, res) => {
         if (plan.planType === 'single' && existingCount >= 1) {
             return res.status(400).json({
                 success: false,
-                message: 'This is a single-visit plan. Convert to multi_same_city to add more schedules.',
+                message: 'This is a single-visit plan. Convert to a multi-visit plan to add more schedules.',
                 errorCode: 'SINGLE_PLAN_LIMIT'
             });
         }
@@ -501,9 +624,17 @@ exports.addSchedule = async (req, res) => {
             syncToGoogle: !!syncToGoogle
         });
 
-        if (syncToGoogle && req.user.googleCalendar?.connected) {
+        const targetUser = await getTargetUserForGcal(req.user, plan.owner);
+        if (syncToGoogle && targetUser?.googleCalendar?.connected) {
             try {
-                const eventId = await gcal.createEvent(req.user, schedule);
+                let agentNameForGcal = customAgentName?.trim() || null;
+                if (agentId && !agentNameForGcal) {
+                    const agentDoc = await Agent.findById(agentId).select('name');
+                    if (agentDoc) agentNameForGcal = agentDoc.name;
+                }
+                schedule.agentNameForGcal = agentNameForGcal;
+
+                const eventId = await gcal.createEvent(targetUser, schedule);
                 if (eventId) {
                     schedule.googleCalendarEventId = eventId;
                     await schedule.save();
@@ -576,12 +707,20 @@ exports.updateSchedule = async (req, res) => {
         await schedule.save();
 
         // Google sync
-        if (schedule.syncToGoogle && req.user.googleCalendar?.connected) {
+        const targetUser = await getTargetUserForGcal(req.user, plan.owner);
+        if (schedule.syncToGoogle && targetUser?.googleCalendar?.connected) {
             try {
+                let agentNameForGcal = schedule.customAgentName;
+                if (schedule.agentId && !agentNameForGcal) {
+                    const agentDoc = await Agent.findById(schedule.agentId).select('name');
+                    if (agentDoc) agentNameForGcal = agentDoc.name;
+                }
+                schedule.agentNameForGcal = agentNameForGcal;
+
                 if (schedule.googleCalendarEventId) {
-                    await gcal.updateEvent(req.user, schedule.googleCalendarEventId, schedule);
+                    await gcal.updateEvent(targetUser, schedule.googleCalendarEventId, schedule);
                 } else {
-                    const id = await gcal.createEvent(req.user, schedule);
+                    const id = await gcal.createEvent(targetUser, schedule);
                     if (id) { schedule.googleCalendarEventId = id; await schedule.save(); }
                 }
             } catch (e) { /* non-fatal */ }
@@ -611,8 +750,9 @@ exports.deleteSchedule = async (req, res) => {
         const schedule = await VisitSchedule.findOneAndDelete({ _id: req.params.sid, visitPlanRef: plan._id });
         if (!schedule) return res.status(404).json({ success: false, message: 'Schedule not found' });
 
-        if (schedule.googleCalendarEventId && req.user.googleCalendar?.connected) {
-            try { await gcal.deleteEvent(req.user, schedule.googleCalendarEventId); } catch (_) {}
+        const targetUser = await getTargetUserForGcal(req.user, plan.owner);
+        if (schedule.googleCalendarEventId && targetUser?.googleCalendar?.connected) {
+            try { await gcal.deleteEvent(targetUser, schedule.googleCalendarEventId); } catch (_) { }
         }
         res.json({ success: true, message: 'Schedule deleted' });
     } catch (err) {
@@ -794,7 +934,7 @@ exports.verifyClientPhoto = async (req, res) => {
             targetId: schedule._id,
             targetModel: 'VisitSchedule',
             details: { status, reason }
-        }).catch(() => {});
+        }).catch(() => { });
 
         res.json({ success: true, data: schedule });
     } catch (err) {

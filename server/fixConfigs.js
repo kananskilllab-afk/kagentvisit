@@ -114,7 +114,7 @@ async function run() {
             { id: 'support.solutions', group: 'Support Needs', label: 'Solution provided ?(enter respectively to the problems)', type: 'dynamic-list', required: true },
 
             // Step 11 – Final Summary
-            { id: 'postVisit.actionPoints', group: 'Final Summary', label: 'Action Points', type: 'textarea', required: true },
+            { id: 'actionItems', group: 'Final Summary', label: 'Action Items', type: 'action_items', required: true },
             { id: 'postVisit.remarks', group: 'Final Summary', label: 'Your Remarks', type: 'textarea', required: false }
         ];
 

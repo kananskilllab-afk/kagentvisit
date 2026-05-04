@@ -4,7 +4,7 @@ import api from '../utils/api';
 import {
     FileText, Search, MapPin, Calendar, Building2, Trash2, Edit, PlusCircle,
     Filter, X, Lock, Bell, Eye, SlidersHorizontal, ChevronDown, ChevronUp,
-    User as UserIcon
+    User as UserIcon, Download
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import VisitDetailModal from '../components/VisitDetailModal';
@@ -60,7 +60,7 @@ const VisitsList = () => {
     const isHomeVisit = urlFormType === 'home_visit' || user?.department === 'B2C' || user?.role === 'home_visit';
     const isPrivileged = ['admin', 'superadmin'].includes(user?.role);
 
-    const activeFilterCount = [statusFilter, filters.startDate, filters.city, filters.companyName, filters.submittedBy].filter(Boolean).length;
+    const activeFilterCount = [statusFilter, ...Object.values(filters)].filter(Boolean).length;
 
     const fetchEmployees = async () => {
         try {
@@ -137,6 +137,26 @@ const VisitsList = () => {
         }
     };
 
+    const exportVisits = () => {
+        const headers = ['Title', 'Status', 'Location', 'Submitted By', 'Created At'];
+        const rows = filteredVisits.map(visit => [
+            visit?.studentInfo?.name || visit?.meta?.companyName || 'Untitled',
+            STATUS_CFG[visit.status]?.label || visit.status || '',
+            visit?.location?.city || visit?.gpsLocation || visit?.agencyProfile?.address || '',
+            visit?.submittedBy?.name || '',
+            visit?.createdAt ? new Date(visit.createdAt).toLocaleString('en-IN') : '',
+        ]);
+        const csv = [headers, ...rows]
+            .map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(','))
+            .join('\n');
+        const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `visits-${new Date().toISOString().slice(0, 10)}.csv`;
+        link.click();
+        URL.revokeObjectURL(url);
+    };
+
     const q = searchTerm.toLowerCase();
     const filteredVisits = visits.filter(visit => {
         if (!q) return true;
@@ -160,20 +180,29 @@ const VisitsList = () => {
                         {filteredVisits.length} of {visits.length} {isHomeVisit ? 'home visits' : 'visit records'}
                     </p>
                 </div>
-                {(user.role === 'user' || user.role === 'home_visit') && (
+                <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                    onClick={exportVisits}
+                    className="btn-secondary shrink-0 flex items-center gap-2 px-5"
+                >
+                    <Download className="w-4 h-4" />
+                    Export
+                </button>
+                {user.role !== 'accounts' && (
                     <button
-                        onClick={() => navigate('/new-visit')}
-                        className="btn-primary shrink-0 flex items-center gap-2 px-6 shadow-brand-blue/30 hover:shadow-brand-blue/40"
+                        onClick={() => navigate(`/new-visit${urlFormType ? `?formType=${urlFormType}` : ''}`)}
+                        className="btn-primary shrink-0 flex items-center gap-2 px-5"
                     >
                         <PlusCircle className="w-4 h-4" />
                         New Report
                     </button>
                 )}
+                </div>
             </div>
 
             {/* Search + Filter Bar */}
-            <div className="glass p-4 rounded-3xl border border-white/60 shadow-glass space-y-3">
-                <div className="flex flex-col sm:flex-row gap-3">
+            <div className="card space-y-3 p-4">
+                <div className="flex flex-col lg:flex-row gap-3">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                         <input
@@ -189,10 +218,10 @@ const VisitsList = () => {
                             </button>
                         )}
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Filter className="w-4 h-4 text-slate-400 shrink-0" />
+                    <div className="flex items-center gap-2 w-full lg:w-auto">
+                        <Filter className="hidden sm:block w-4 h-4 text-slate-400 shrink-0" />
                         <select
-                            className="input-field h-10 w-44 text-sm"
+                            className="input-field h-10 w-full lg:w-44 text-sm"
                             value={statusFilter}
                             onChange={(e) => setStatusFilter(e.target.value)}
                         >
@@ -206,10 +235,10 @@ const VisitsList = () => {
                     </div>
                     <button
                         onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                        className={`flex items-center gap-2 px-4 h-10 rounded-xl border-2 text-sm font-bold transition-all shrink-0 ${
+                        className={`flex items-center justify-center gap-2 px-4 h-10 rounded-lg border text-sm font-bold transition-all shrink-0 w-full lg:w-auto ${
                             showAdvancedFilters || activeFilterCount > 0
-                                ? 'border-brand-blue text-brand-blue bg-brand-blue/5'
-                                : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                                ? 'border-meridian-blue text-meridian-blue bg-blue-50'
+                                : 'border-meridian-border text-meridian-sub hover:border-slate-300'
                         }`}
                     >
                         <SlidersHorizontal className="w-4 h-4" />
@@ -223,16 +252,24 @@ const VisitsList = () => {
 
                 {/* Advanced Filters Panel */}
                 {showAdvancedFilters && (
-                    <div className="border-t border-white/60 pt-4 space-y-4 animate-fade-in">
+                    <div className="border-t border-meridian-border pt-4 space-y-4 animate-fade-in">
                         {/* Date Presets */}
-                        <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Quick Date</p>
-                            <div className="flex flex-wrap gap-2">
+                        <div className="rounded-2xl border border-slate-100 bg-white/70 p-3">
+                            <div className="flex items-center justify-between gap-3 mb-2">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Quick Date</p>
+                                {activeFilterCount > 0 && (
+                                    <button onClick={clearFilters} className="inline-flex items-center gap-1 text-xs font-bold text-red-500 hover:text-red-700 transition-all">
+                                        <X className="w-3 h-3" />
+                                        Clear
+                                    </button>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
                                 {DATE_PRESETS.map(p => (
                                     <button
                                         key={p.label}
                                         onClick={() => applyPreset(p)}
-                                        className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 hover:border-brand-blue hover:text-brand-blue hover:bg-brand-blue/5 transition-all"
+                                        className="px-3 py-2 sm:py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:border-brand-blue hover:text-brand-blue hover:bg-brand-blue/5 transition-all bg-white"
                                     >
                                         {p.label}
                                     </button>
@@ -240,8 +277,8 @@ const VisitsList = () => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            <div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                            <div className="min-w-0">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">From Date</label>
                                 <input
                                     type="date"
@@ -250,7 +287,7 @@ const VisitsList = () => {
                                     onChange={e => setFilters(p => ({ ...p, startDate: e.target.value }))}
                                 />
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">To Date</label>
                                 <input
                                     type="date"
@@ -259,7 +296,7 @@ const VisitsList = () => {
                                     onChange={e => setFilters(p => ({ ...p, endDate: e.target.value }))}
                                 />
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
                                     {isHomeVisit ? 'Student Name' : 'Company Name'}
                                 </label>
@@ -271,7 +308,7 @@ const VisitsList = () => {
                                     onChange={e => setFilters(p => ({ ...p, companyName: e.target.value }))}
                                 />
                             </div>
-                            <div>
+                            <div className="min-w-0">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">City / Place</label>
                                 <input
                                     type="text"
@@ -284,8 +321,8 @@ const VisitsList = () => {
                         </div>
 
                         {isPrivileged && (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                                <div className="min-w-0">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
                                         <UserIcon className="w-3 h-3" /> Team Member
                                     </label>
@@ -306,9 +343,14 @@ const VisitsList = () => {
                         )}
 
                         {activeFilterCount > 0 && (
-                            <button onClick={clearFilters} className="text-xs font-bold text-red-500 hover:text-red-700 transition-all">
-                                Clear All Filters
-                            </button>
+                            <div className="flex flex-wrap gap-2">
+                                {statusFilter && <span className="px-2.5 py-1 rounded-full bg-brand-blue/10 text-brand-blue text-[10px] font-black uppercase tracking-wide">Status</span>}
+                                {filters.startDate && <span className="px-2.5 py-1 rounded-full bg-brand-blue/10 text-brand-blue text-[10px] font-black uppercase tracking-wide">From date</span>}
+                                {filters.endDate && <span className="px-2.5 py-1 rounded-full bg-brand-blue/10 text-brand-blue text-[10px] font-black uppercase tracking-wide">To date</span>}
+                                {filters.companyName && <span className="px-2.5 py-1 rounded-full bg-brand-blue/10 text-brand-blue text-[10px] font-black uppercase tracking-wide">{isHomeVisit ? 'Student' : 'Company'}</span>}
+                                {filters.city && <span className="px-2.5 py-1 rounded-full bg-brand-blue/10 text-brand-blue text-[10px] font-black uppercase tracking-wide">City</span>}
+                                {filters.submittedBy && <span className="px-2.5 py-1 rounded-full bg-brand-blue/10 text-brand-blue text-[10px] font-black uppercase tracking-wide">Team member</span>}
+                            </div>
                         )}
                     </div>
                 )}
@@ -339,7 +381,7 @@ const VisitsList = () => {
             ) : (
                 <>
                     {/* Desktop Table */}
-                    <div className="hidden md:block glass rounded-[2rem] p-0 overflow-hidden shadow-glass border border-white/60">
+                    <div className="hidden md:block card p-0 overflow-hidden">
                         <table className="w-full text-left">
                             <thead>
                                 <tr className="border-b border-slate-100">
@@ -356,7 +398,7 @@ const VisitsList = () => {
                                     <tr
                                         key={visit._id}
                                         onClick={() => setSelectedVisit(visit)}
-                                        className="hover:bg-blue-50/30 cursor-pointer transition-colors group"
+                                        className="hover:bg-meridian-row-hov cursor-pointer transition-colors group"
                                     >
                                         <td className="td">
                                             <div className="flex items-center gap-3">
@@ -461,7 +503,7 @@ const VisitsList = () => {
                             <div
                                 key={visit._id}
                                 onClick={() => setSelectedVisit(visit)}
-                                className="glass rounded-[2rem] p-5 border border-white/60 shadow-glass hover:shadow-glow hover:-translate-y-1 cursor-pointer transition-all duration-300"
+                                className="card cursor-pointer p-5 hover:border-meridian-blue/30 hover:bg-meridian-row-hov"
                             >
                                 <div className="flex items-start justify-between gap-3">
                                     <div className="flex items-center gap-3 min-w-0 flex-1">
