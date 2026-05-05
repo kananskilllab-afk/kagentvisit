@@ -9,7 +9,7 @@ import {
     Hotel, UtensilsCrossed, Users, Wifi, ParkingCircle, Stamp,
     Package, PenLine, Navigation, Receipt,
     ShieldCheck, ShieldAlert, ShieldX, Brain, Sparkles, RefreshCw,
-    Info, Building2, ExternalLink
+    Info, Building2, ExternalLink, Trash2
 } from 'lucide-react';
 
 const STATUS_CFG = {
@@ -74,6 +74,7 @@ const ClaimDetail = () => {
     const canAudit = ['admin', 'accounts', 'superadmin'].includes(user?.role);
     const isPrivileged = ['admin', 'superadmin', 'accounts'].includes(user?.role);
     const isOwner = claim?.submittedBy?._id === user?._id;
+    const canDeleteDraft = claim?.status === 'draft' && (isOwner || user?.role === 'superadmin');
 
     useEffect(() => { fetchClaim(); }, [id]);
 
@@ -129,6 +130,20 @@ const ClaimDetail = () => {
             alert(err.response?.data?.message || 'Failed to run audit');
         } finally {
             setAuditLoading(false);
+        }
+    };
+
+    const handleDeleteClaim = async () => {
+        if (!canDeleteDraft) return;
+        if (!window.confirm('Delete this draft claim? Its expenses will become unclaimed again.')) return;
+        setActionLoading(true);
+        try {
+            await api.delete(`/expenses/claims/${id}`);
+            navigate('/expenses/claims');
+        } catch (err) {
+            alert(err.response?.data?.message || 'Failed to delete claim');
+        } finally {
+            setActionLoading(false);
         }
     };
 
@@ -286,13 +301,16 @@ const ClaimDetail = () => {
                             {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                             {claim.status === 'needs_justification' ? 'Resubmit with Justification' : 'Submit for Review'}
                         </button>
-                        <button
-                            onClick={() => navigate(`/expenses/claims/${id}`)}
-                            className="btn-outline flex items-center gap-2"
-                        >
-                            Edit Claim
-                        </button>
                     </>
+                )}
+                {canDeleteDraft && (
+                    <button
+                        onClick={handleDeleteClaim}
+                        disabled={actionLoading}
+                        className="px-4 py-2 rounded-xl border border-red-200 text-red-600 bg-white font-bold text-sm hover:bg-red-50 transition-all flex items-center gap-2"
+                    >
+                        <Trash2 className="w-4 h-4" /> Delete Draft
+                    </button>
                 )}
                 {canApprove && ['submitted', 'under_review'].includes(claim.status) && (
                     <>

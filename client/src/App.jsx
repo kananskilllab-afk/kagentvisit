@@ -80,7 +80,7 @@ function App() {
 
                     {/* Visit Plans */}
                     <Route path="visit-plans/:id" element={
-                        <ProtectedRoute roles={['user', 'admin', 'superadmin', 'hod', 'accounts']}>
+                        <ProtectedRoute roles={['user', 'admin', 'superadmin', 'home_visit', 'hod', 'accounts']}>
                             <VisitPlanDetail />
                         </ProtectedRoute>
                     } />

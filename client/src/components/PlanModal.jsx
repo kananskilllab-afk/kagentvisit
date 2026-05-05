@@ -35,6 +35,16 @@ function addHours(date, hours) {
     return d;
 }
 
+function addMinutes(date, minutes) {
+    const d = new Date(date);
+    d.setMinutes(d.getMinutes() + minutes);
+    return d;
+}
+
+function minutesBetween(a, b) {
+    return Math.round((new Date(b) - new Date(a)) / 60000);
+}
+
 function formatLocation(city, state) {
     return [city, state].filter(Boolean).join(', ');
 }
@@ -101,6 +111,24 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
 
     // Step 3 — Visits
     const [visits, setVisits] = useState([]);
+    const previousPlanStartRef = useRef(details.plannedStartAt);
+
+    useEffect(() => {
+        const previousStart = previousPlanStartRef.current;
+        if (!previousStart || previousStart === details.plannedStartAt) return;
+        if (Number.isNaN(new Date(previousStart).getTime()) || Number.isNaN(new Date(details.plannedStartAt).getTime())) return;
+        const deltaMinutes = minutesBetween(previousStart, details.plannedStartAt);
+        setVisits(prev => prev.map(v => ({
+            ...v,
+            scheduledDate: v.scheduledDate
+                ? toInputDatetime(addMinutes(v.scheduledDate, deltaMinutes))
+                : v.scheduledDate,
+            scheduledEndDate: v.scheduledEndDate
+                ? toInputDatetime(addMinutes(v.scheduledEndDate, deltaMinutes))
+                : v.scheduledEndDate
+        })));
+        previousPlanStartRef.current = details.plannedStartAt;
+    }, [details.plannedStartAt]);
 
     // Search agents with debounce
     useEffect(() => {
@@ -143,11 +171,12 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
 
     const visitForAssignment = (assignment, index) => {
         const name = assignment.agent?.name || assignment.customAgentName;
+        const planStart = details.plannedStartAt ? new Date(details.plannedStartAt) : defaultStart;
         return {
             title: `${name} visit`,
             agentId: assignment.agent?._id || '',
             customAgentName: assignment.customAgentName || '',
-            scheduledDate: toInputDatetime(addHours(defaultStart, index)),
+            scheduledDate: toInputDatetime(addHours(planStart, index)),
             reminderOffset: 60,
             location: locationForAssignment(assignment, index),
             notes: '',
@@ -238,11 +267,12 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
         const firstCustom = !firstAgent && customAgentNames[0] ? customAgentNames[0] : '';
         const agent = selectedAgents[0] || null;
         const label = agent?.name || firstCustom || '';
+        const planStart = details.plannedStartAt ? new Date(details.plannedStartAt) : defaultStart;
         setVisits(prev => [...prev, {
             title: label ? `${label} visit` : '',
             agentId: firstAgent,
             customAgentName: firstCustom,
-            scheduledDate: toInputDatetime(addHours(defaultStart, prev.length)),
+            scheduledDate: toInputDatetime(addHours(planStart, prev.length)),
             reminderOffset: 60,
             location: locationForAssignment(agent ? { agent } : { customAgentName: firstCustom }, prev.length),
             notes: ''

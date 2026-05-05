@@ -30,9 +30,9 @@ const AgentVisitsDrawer = ({ agentId, agentName, onClose }) => {
     }, [agentId, offset, status]);
 
     return (
-        <div className="fixed inset-0 z-[120] flex justify-end bg-slate-900/50 backdrop-blur-sm" onClick={onClose}>
-            <div className="h-full w-full max-w-xl bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
-                <div className="flex items-center justify-between border-b border-slate-100 p-5">
+        <div className="fixed inset-0 z-[120] flex justify-end bg-slate-900/50 p-0 backdrop-blur-sm sm:p-3" onClick={onClose}>
+            <div className="flex h-dvh w-full max-w-xl flex-col overflow-hidden bg-white shadow-2xl sm:h-full sm:rounded-2xl" onClick={e => e.stopPropagation()}>
+                <div className="shrink-0 flex items-center justify-between border-b border-slate-100 p-4 sm:p-5">
                     <div>
                         <h3 className="text-lg font-black text-slate-800">Visit History</h3>
                         <p className="text-xs font-bold text-slate-400">{agentName}</p>
@@ -41,7 +41,7 @@ const AgentVisitsDrawer = ({ agentId, agentName, onClose }) => {
                         <X className="h-5 w-5" />
                     </button>
                 </div>
-                <div className="border-b border-slate-100 p-4">
+                <div className="shrink-0 border-b border-slate-100 p-4">
                     <select
                         value={status}
                         onChange={e => { setStatus(e.target.value); setOffset(0); }}
@@ -54,7 +54,7 @@ const AgentVisitsDrawer = ({ agentId, agentName, onClose }) => {
                         <option value="closed">Closed</option>
                     </select>
                 </div>
-                <div className="h-[calc(100%-150px)] overflow-y-auto p-4">
+                <div className="min-h-0 flex-1 overflow-y-auto p-4">
                     {loading ? (
                         <div className="py-16 text-center text-sm font-bold text-slate-400">
                             <Loader2 className="mx-auto mb-3 h-6 w-6 animate-spin text-brand-blue" />
@@ -91,7 +91,7 @@ const AgentVisitsDrawer = ({ agentId, agentName, onClose }) => {
                         </div>
                     )}
                 </div>
-                <div className="flex items-center justify-between border-t border-slate-100 p-4 text-xs font-bold text-slate-400">
+                <div className="shrink-0 flex items-center justify-between border-t border-slate-100 p-4 text-xs font-bold text-slate-400">
                     <span>{pagination.total} total visits</span>
                     <div className="flex items-center gap-2">
                         <button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - limit))} className="btn-outline px-3 py-2 text-xs disabled:opacity-40">Prev</button>

@@ -675,15 +675,18 @@ export default function Calendar() {
             if (view === 'month') {
                 start = new Date(viewYear, viewMonth, 1);
                 end   = new Date(viewYear, viewMonth + 1, 0);
+                end.setHours(23, 59, 59, 999);
             } else if (view === 'week') {
                 start = weekStart;
                 end   = addDays(weekStart, 6);
+                end.setHours(23, 59, 59, 999);
             } else if (view === 'day') {
                 start = new Date(curDate); start.setHours(0,0,0,0);
                 end   = new Date(curDate); end.setHours(23,59,59,999);
             } else {
                 start = new Date(); start.setHours(0,0,0,0);
                 end   = addDays(start, 30);
+                end.setHours(23, 59, 59, 999);
             }
             const params = new URLSearchParams({ start: start.toISOString(), end: end.toISOString() });
             if (filters.agent)      params.set('agent',      filters.agent);

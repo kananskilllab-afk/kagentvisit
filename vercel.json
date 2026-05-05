@@ -27,18 +27,6 @@
       "dest": "/server/uploads/$1"
     },
     {
-      "src": "/assets/(.*)",
-      "dest": "/client/assets/$1"
-    },
-    {
-      "src": "/logo.png",
-      "dest": "/client/logo.png"
-    },
-    {
-      "src": "/fav.png",
-      "dest": "/client/fav.png"
-    },
-    {
       "handle": "filesystem"
     },
     {

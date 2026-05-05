@@ -4,17 +4,24 @@ const Notification = require('../models/Notification');
 const Expense = require('../models/Expense');
 const gcal = require('../services/googleCalendar.service');
 
+async function canAccessSchedule(user, schedule) {
+    if (!schedule) return false;
+    if (String(schedule.user) === String(user._id)) return true;
+    if (schedule.visitPlanRef) {
+        const plan = await VisitPlan.findById(schedule.visitPlanRef).select('owner');
+        return String(plan?.owner) === String(user._id);
+    }
+    return false;
+}
+
 // ─── Get Scheduled Visits (plan-aware) ────────────────────────────────────
 // GET /api/calendar?start=&end=&agent=&city=&hasOpenClaim=&view=week&planStatus=
 exports.getScheduledVisits = async (req, res) => {
     try {
         const { start, end, agent, city, hasOpenClaim, planStatus } = req.query;
 
-        // Build plan query for scope
-        const planQuery = {};
-        if (req.user.role === 'user' || req.user.role === 'home_visit') {
-            planQuery.owner = req.user._id;
-        }
+        // Calendar is creator-private for every role, including admin and superadmin.
+        const planQuery = { owner: req.user._id };
         if (city) planQuery.city = { $regex: city, $options: 'i' };
         if (planStatus) planQuery.status = planStatus;
 
@@ -28,22 +35,12 @@ exports.getScheduledVisits = async (req, res) => {
             if (end) scheduleQuery.scheduledDate.$lte = new Date(end);
         }
 
-        // If user is scoped, filter by their plans
-        if (req.user.role === 'user' || req.user.role === 'home_visit') {
-            const planIds = await VisitPlan.find(planQuery).distinct('_id');
-            scheduleQuery.visitPlanRef = { $in: planIds };
-        } else if (city || planStatus) {
-            const planIds = await VisitPlan.find(planQuery).distinct('_id');
-            if (planIds.length) scheduleQuery.visitPlanRef = { $in: planIds };
-        } else {
-            // Legacy schedules (no visitPlanRef) should still show up for their owner
-            if (req.user.role !== 'accounts' && req.user.role !== 'superadmin') {
-                scheduleQuery.$or = [
-                    { user: req.user._id },
-                    { visitPlanRef: { $exists: true } }
-                ];
-            }
-        }
+        const planIds = await VisitPlan.find(planQuery).distinct('_id');
+        scheduleQuery.$or = [
+            { visitPlanRef: { $in: planIds } },
+            { user: req.user._id, visitPlanRef: { $exists: false } },
+            { user: req.user._id, visitPlanRef: null }
+        ];
 
         const schedules = await VisitSchedule.find(scheduleQuery)
             .populate('agentId', 'name city state')
@@ -70,6 +67,14 @@ exports.createScheduledVisit = async (req, res) => {
             notes, visitType, location, linkedVisit, syncToGoogle,
             visitPlanRef, agentId
         } = req.body;
+
+        if (visitPlanRef) {
+            const plan = await VisitPlan.findById(visitPlanRef).select('owner');
+            if (!plan) return res.status(404).json({ success: false, message: 'Visit plan not found' });
+            if (String(plan.owner) !== String(req.user._id)) {
+                return res.status(403).json({ success: false, message: 'Not authorized to schedule this plan' });
+            }
+        }
 
         const schedule = await VisitSchedule.create({
             user: req.user._id,
@@ -102,8 +107,11 @@ exports.createScheduledVisit = async (req, res) => {
 // ─── Update Scheduled Visit ────────────────────────────────────────────────
 exports.updateScheduledVisit = async (req, res) => {
     try {
-        const schedule = await VisitSchedule.findOne({ _id: req.params.id, user: req.user._id });
+        const schedule = await VisitSchedule.findById(req.params.id);
         if (!schedule) return res.status(404).json({ success: false, message: 'Schedule not found' });
+        if (!(await canAccessSchedule(req.user, schedule))) {
+            return res.status(403).json({ success: false, message: 'Not authorized to update this schedule' });
+        }
 
         const allowedFields = [
             'title', 'scheduledDate', 'scheduledEndDate', 'reminderOffset',
@@ -148,8 +156,12 @@ exports.deleteScheduledVisit = async (req, res) => {
             });
         }
 
-        const schedule = await VisitSchedule.findOneAndDelete({ _id: req.params.id, user: req.user._id });
+        const schedule = await VisitSchedule.findById(req.params.id);
         if (!schedule) return res.status(404).json({ success: false, message: 'Schedule not found' });
+        if (!(await canAccessSchedule(req.user, schedule))) {
+            return res.status(403).json({ success: false, message: 'Not authorized to delete this schedule' });
+        }
+        await schedule.deleteOne();
 
         if (schedule.googleCalendarEventId && req.user.googleCalendar?.connected) {
             try { await gcal.deleteEvent(req.user, schedule.googleCalendarEventId); } catch (_) {}
@@ -170,8 +182,11 @@ exports.rescheduleVisit = async (req, res) => {
             return res.status(400).json({ success: false, message: 'scheduleId and newStart required' });
         }
 
-        const schedule = await VisitSchedule.findOne({ _id: scheduleId, user: req.user._id });
+        const schedule = await VisitSchedule.findById(scheduleId);
         if (!schedule) return res.status(404).json({ success: false, message: 'Schedule not found' });
+        if (!(await canAccessSchedule(req.user, schedule))) {
+            return res.status(403).json({ success: false, message: 'Not authorized to reschedule this visit' });
+        }
 
         // 7-day reimbursement-window rule: if linked plan exists, new date must stay within plan window
         if (schedule.visitPlanRef) {
@@ -215,7 +230,7 @@ exports.bulkCancel = async (req, res) => {
 
         const plan = await VisitPlan.findById(planId);
         if (!plan) return res.status(404).json({ success: false, message: 'Plan not found' });
-        if (String(plan.owner) !== String(req.user._id) && !['admin', 'superadmin'].includes(req.user.role)) {
+        if (String(plan.owner) !== String(req.user._id)) {
             return res.status(403).json({ success: false, message: 'Not authorized' });
         }
 
@@ -246,6 +261,13 @@ exports.checkConflicts = async (req, res) => {
             status: { $nin: ['cancelled', 'missed'] }
         };
         if (agentId) q.agentId = agentId;
+
+        const planIds = await VisitPlan.find({ owner: req.user._id }).distinct('_id');
+        q.$or = [
+            { visitPlanRef: { $in: planIds } },
+            { user: req.user._id, visitPlanRef: { $exists: false } },
+            { user: req.user._id, visitPlanRef: null }
+        ];
 
         const conflicts = await VisitSchedule.find(q)
             .populate('agentId', 'name')

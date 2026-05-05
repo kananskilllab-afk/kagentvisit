@@ -355,7 +355,22 @@ const NewVisit = () => {
     }, [id, user, urlFormType]);
 
     // saveDraft — defined before auto-save effects so refs are never stale
+    const groups = useMemo(() => {
+        if (!config || !config.fields) return [];
+        return [...new Set(config.fields.map(f => f.group))];
+    }, [config]);
+
     const saveDraftRef = useRef(null);
+
+    const buildVisitPayload = useCallback((data, status) => ({
+        ...data,
+        gpsLocation,
+        gpsCoordinates: gpsCoords,
+        status,
+        formVersion: config?.version,
+        formType: config?.formType,
+        ...(isAdmin && forUser ? { forUser } : {})
+    }), [gpsLocation, gpsCoords, config, isAdmin, forUser]);
 
     const saveDraft = useCallback(async () => {
         if (isLocked) return;
@@ -366,15 +381,7 @@ const NewVisit = () => {
         }
         setSaveStatus('Saving draft...');
         try {
-            const payload = {
-                ...formData,
-                gpsLocation,
-                gpsCoordinates: gpsCoords,
-                status: 'draft',
-                formVersion: config?.version,
-                formType: config?.formType,
-                ...(isAdmin && forUser ? { forUser } : {})
-            };
+            const payload = buildVisitPayload(formData, 'draft');
             if (visitId) {
                 await api.put(`/visits/${visitId}`, payload);
             } else {
@@ -385,7 +392,32 @@ const NewVisit = () => {
         } catch {
             setSaveStatus('Draft save failed');
         }
-    }, [formData, gpsLocation, gpsCoords, config, visitId, isLocked]);
+    }, [formData, visitId, isLocked, buildVisitPayload]);
+
+    const saveSubmittedChanges = useCallback(async () => {
+        if (isLocked || !visitId) return;
+        const valid = await trigger();
+        if (!valid) {
+            const notice = describeFormError(errors, config, groups);
+            setValidationNotice(notice);
+            setCurrentStep(notice.stepIndex);
+            window.scrollTo(0, 0);
+            return;
+        }
+        setIsSaving(true);
+        setValidationNotice(null);
+        setSaveStatus('Saving changes...');
+        try {
+            const payload = buildVisitPayload(formData, visitStatus || 'submitted');
+            await api.put(`/visits/${visitId}`, payload);
+            setSaveStatus(`Changes saved at ${new Date().toLocaleTimeString()}`);
+        } catch (err) {
+            setSaveStatus('Save changes failed');
+            alert('Error saving changes: ' + (err.response?.data?.message || err.message));
+        } finally {
+            setIsSaving(false);
+        }
+    }, [isLocked, visitId, trigger, errors, config, groups, buildVisitPayload, formData, visitStatus]);
 
     // Keep a stable ref so timeouts/event listeners always call the latest version
     useEffect(() => { saveDraftRef.current = saveDraft; }, [saveDraft]);
@@ -454,15 +486,7 @@ const NewVisit = () => {
         setIsSaving(true);
         setValidationNotice(null);
         try {
-            const payload = {
-                ...data,
-                gpsLocation,
-                gpsCoordinates: gpsCoords,
-                status: 'submitted',
-                formVersion: config?.version,
-                formType: config?.formType,
-                ...(isAdmin && forUser ? { forUser } : {})
-            };
+            const payload = buildVisitPayload(data, 'submitted');
             if (visitId) {
                 await api.put(`/visits/${visitId}`, payload);
             } else {
@@ -477,11 +501,6 @@ const NewVisit = () => {
             setIsSaving(false);
         }
     };
-
-    const groups = useMemo(() => {
-        if (!config || !config.fields) return [];
-        return [...new Set(config.fields.map(f => f.group))];
-    }, [config]);
 
     const nextStep = async () => {
         const currentGroup = groups[currentStep];
@@ -565,7 +584,7 @@ const NewVisit = () => {
                     {/* Draft save button — always visible for drafts, hidden when locked */}
                     {!isLocked && (
                         <button
-                            onClick={saveDraft}
+                            onClick={isDraft ? saveDraft : saveSubmittedChanges}
                             disabled={isSaving}
                             className="btn-outline shrink-0 flex items-center justify-center gap-2 py-2.5 sm:py-2 px-6 shadow-sm hover:shadow-md transition-all sm:w-auto w-full disabled:opacity-50"
                         >

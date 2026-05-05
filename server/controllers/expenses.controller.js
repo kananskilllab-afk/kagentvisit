@@ -43,7 +43,17 @@ exports.getExpenses = async (req, res) => {
         }
         if (req.query.claimRef) query.claimRef = req.query.claimRef;
         if (req.query.unclaimed === 'true') query.claimRef = { $exists: false };
-        if (req.query.visitPlanRef) query.visitPlanRef = req.query.visitPlanRef;
+        if (req.query.visitPlanRef) {
+            if (req.query.includeUnassigned === 'true') {
+                query.$or = [
+                    { visitPlanRef: req.query.visitPlanRef },
+                    { visitPlanRef: { $exists: false } },
+                    { visitPlanRef: null }
+                ];
+            } else {
+                query.visitPlanRef = req.query.visitPlanRef;
+            }
+        }
         if (req.query.visitScheduleRef) query.visitScheduleRef = req.query.visitScheduleRef;
         // Enhanced filters
         if (req.query.minAmount || req.query.maxAmount) {
@@ -366,6 +376,16 @@ exports.createClaim = async (req, res) => {
                 return res.status(400).json({ success: false, message: 'Some expenses are invalid or already claimed' });
             }
 
+            const mismatchedPlanExpense = expenses.find(e =>
+                e.visitPlanRef && String(e.visitPlanRef) !== String(plan._id)
+            );
+            if (mismatchedPlanExpense) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Selected expenses must be unassigned or linked to the selected visit plan.'
+                });
+            }
+
             totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
         }
 
@@ -438,12 +458,21 @@ exports.updateClaim = async (req, res) => {
                 _id: { $in: req.body.expenseIds },
                 createdBy: req.user._id
             });
+            const mismatchedPlanExpense = expenses.find(e =>
+                claim.visitPlanRef && e.visitPlanRef && String(e.visitPlanRef) !== String(claim.visitPlanRef)
+            );
+            if (mismatchedPlanExpense) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Selected expenses must be unassigned or linked to this claim visit plan.'
+                });
+            }
             claim.expenses = expenses.map(e => e._id);
             claim.totalAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
 
             await Expense.updateMany(
                 { _id: { $in: expenses.map(e => e._id) } },
-                { claimRef: claim._id }
+                { claimRef: claim._id, visitPlanRef: claim.visitPlanRef }
             );
         }
 
@@ -693,18 +722,74 @@ exports.getExpenseSummary = async (req, res) => {
 exports.auditClaim = async (req, res) => {
     try {
         const claim = await ExpenseClaim.findById(req.params.id)
-            .populate('submittedBy', 'name employeeId email')
+            .populate('submittedBy', 'name employeeId email role')
             .populate({
                 path: 'expenses',
                 populate: { path: 'createdBy', select: 'name employeeId' }
-            });
+            })
+            .populate('visitPlanRef', 'title planType city state cities plannedStartAt plannedEndAt status purpose cityTier');
 
         if (!claim) {
             return res.status(404).json({ success: false, message: 'Claim not found' });
         }
 
-        // Call AI audit service
-        const auditResult = await auditExpenseClaim(claim.toObject());
+        const policyEval = await evaluateClaim({
+            claim: claim.toObject(),
+            expenses: claim.expenses,
+            plan: claim.visitPlanRef,
+            user: claim.submittedBy
+        });
+
+        const policyFlags = [
+            ...policyEval.violations.map(v => ({
+                expenseId: v.expenseId || null,
+                type: v.code,
+                severity: v.severity || 'critical',
+                message: v.message,
+                policyRef: v.policyRef || policyEval.appliedPolicy?.name || ''
+            })),
+            ...policyEval.warnings.map(w => ({
+                expenseId: w.expenseId || null,
+                type: w.code,
+                severity: w.severity || 'warning',
+                message: w.message,
+                policyRef: w.policyRef || policyEval.appliedPolicy?.name || ''
+            }))
+        ];
+
+        let auditResult = {
+            complianceScore: policyEval.violations.length ? 50 : 95,
+            overallStatus: policyEval.violations.length ? 'violation' : (policyEval.warnings.length ? 'warning' : 'compliant'),
+            flags: policyFlags,
+            recommendations: policyEval.violations.length
+                ? 'Resolve each listed policy violation before approving this claim.'
+                : 'No blocking policy violations were found by the deterministic policy check.',
+            summary: policyEval.summary
+        };
+
+        try {
+            const aiResult = await auditExpenseClaim(claim.toObject());
+            const seen = new Set(policyFlags.map(f => `${f.type}|${f.expenseId || ''}|${f.message}`));
+            const aiFlags = (aiResult.flags || []).filter(f => {
+                const key = `${f.type}|${f.expenseId || ''}|${f.message}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            });
+            auditResult = {
+                ...aiResult,
+                overallStatus: policyEval.violations.length ? 'violation' : aiResult.overallStatus,
+                complianceScore: policyEval.violations.length
+                    ? Math.min(aiResult.complianceScore ?? 50, 50)
+                    : (aiResult.complianceScore ?? auditResult.complianceScore),
+                flags: [...policyFlags, ...aiFlags],
+                summary: policyFlags.length
+                    ? `${policyEval.summary}. ${aiResult.summary || ''}`.trim()
+                    : (aiResult.summary || policyEval.summary)
+            };
+        } catch (aiError) {
+            console.warn('AI audit unavailable; using deterministic policy audit:', aiError.message);
+        }
 
         // Save audit to claim
         claim.aiAudit = {

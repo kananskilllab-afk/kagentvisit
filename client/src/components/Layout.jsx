@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import api from '../utils/api';
 import ErrorBoundary from './ErrorBoundary';
 import {
     LayoutDashboard, PlusCircle, Users, BarChart3,
@@ -62,8 +63,7 @@ const RolePill = ({ role }) => {
 // CSS filter that flips the brand-colored PNG to pure white. `brightness(0)` collapses
 // all color to black, then `invert(1)` lifts it to white — preserves the alpha channel
 // so the logo silhouette stays clean against the dark sidebar.
-const WHITE_LOGO_FILTER = { filter: 'brightness(0) invert(1)' };
-const KANAN_LOGO_SRC = '/kanan-logo.png';
+const KANAN_LOGO_SRC = '/logo.png';
 
 // Compact mark — used in the collapsed icon rail.
 const BrandMark = ({ onClick }) => (
@@ -71,14 +71,13 @@ const BrandMark = ({ onClick }) => (
         to="/"
         onClick={onClick}
         aria-label="Kanan.co dashboard"
-        className="group relative flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-white"
+        className="group relative flex h-11 w-11 items-center justify-start overflow-hidden rounded-xl bg-white p-1.5 ring-1 ring-white/15 shadow-sm transition-all duration-200 hover:-translate-y-0.5 focus-visible:outline-white"
     >
         <img
             src={KANAN_LOGO_SRC}
             alt=""
             aria-hidden="true"
-            style={WHITE_LOGO_FILTER}
-            className="h-9 w-9 object-contain transition-transform duration-200 group-hover:scale-105"
+            className="h-8 w-auto max-w-none object-contain object-left transition-transform duration-200 group-hover:scale-105"
         />
     </Link>
 );
@@ -89,19 +88,69 @@ const BrandLogo = ({ small = false, onClick }) => (
         to="/"
         onClick={onClick}
         aria-label="Kanan.co dashboard"
-        className={`group relative flex items-center justify-start rounded-xl transition-all duration-200 focus-visible:outline-white ${
-            small ? 'py-1' : 'py-1.5'
+        className={`group relative flex items-center justify-start overflow-hidden rounded-xl bg-white ring-1 ring-white/15 shadow-sm transition-all duration-200 focus-visible:outline-white ${
+            small ? 'h-9 px-2' : 'h-14 px-3'
         }`}
     >
         <img
             src={KANAN_LOGO_SRC}
             alt="Kanan.co"
-            style={WHITE_LOGO_FILTER}
-            className={`object-contain object-left transition-transform duration-200 group-hover:scale-[1.02] ${
+            className={`w-full object-contain object-left transition-transform duration-200 group-hover:scale-[1.02] ${
                 small ? 'h-7' : 'h-10'
             }`}
         />
     </Link>
+);
+
+const workspaceLabelFor = (user) => {
+    if (!user) return 'Team';
+    if (user.role === 'accounts') return 'Finance: B2B + B2C';
+    if (user.role === 'superadmin') return 'All Workspaces';
+    const hasB2B = user.formAccess?.includes('b2b_visit');
+    const hasB2C = user.formAccess?.includes('b2c_visit');
+    if (hasB2B && hasB2C) return 'B2B + B2C';
+    if (user.role === 'home_visit') return 'B2C';
+    return user.department || user.role || 'Team';
+};
+
+const NotificationsMenu = ({ notifications, unreadCount, open, onToggle, onMarkRead }) => (
+    <div className="relative">
+        <NotifBell count={unreadCount} onClick={onToggle} />
+        {open && (
+            <div className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-xl border border-meridian-border bg-white shadow-2xl">
+                <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+                    <p className="text-xs font-black uppercase tracking-widest text-slate-500">Notifications</p>
+                    {unreadCount > 0 && (
+                        <button onClick={onMarkRead} className="text-xs font-bold text-brand-blue hover:underline">
+                            Mark all read
+                        </button>
+                    )}
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                        <div className="px-4 py-8 text-center text-sm font-semibold text-slate-400">
+                            No notifications yet.
+                        </div>
+                    ) : notifications.map(n => (
+                        <Link
+                            key={n._id}
+                            to={n.claimRef?._id ? `/expenses/claims/${n.claimRef._id}` : '/'}
+                            onClick={onToggle}
+                            className={`block border-b border-slate-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-slate-50 ${!n.isRead ? 'bg-blue-50/50' : 'bg-white'}`}
+                        >
+                            <div className="flex items-start gap-2">
+                                {!n.isRead && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-blue" />}
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-sm font-extrabold text-slate-800">{n.title}</p>
+                                    <p className="mt-0.5 line-clamp-2 text-xs font-medium text-slate-500">{n.message}</p>
+                                </div>
+                            </div>
+                        </Link>
+                    ))}
+                </div>
+            </div>
+        )}
+    </div>
 );
 
 const Sidebar = ({ menuItems, isActive, user, logout, onClose }) => (
@@ -233,6 +282,9 @@ const Layout = () => {
     const { user, logout, isAdmin } = useAuth();
     const location = useLocation();
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [notifications, setNotifications] = useState([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const [notificationsOpen, setNotificationsOpen] = useState(false);
 
     const isB2C      = user?.department === 'B2C' || user?.role === 'home_visit';
     const isAccounts = user?.role === 'accounts';
@@ -247,6 +299,40 @@ const Layout = () => {
         hasB2BVisitAccess && !hasB2CVisitAccess ? 'generic' :
         isB2C ? 'home_visit' : 'generic';
     const newVisitPath = `/new-visit?formType=${preferredVisitFormType}`;
+    const workspaceLabel = workspaceLabelFor(user);
+
+    useEffect(() => {
+        let cancelled = false;
+        const loadNotifications = async () => {
+            try {
+                const res = await api.get('/notifications', { params: { limit: 8 } });
+                if (cancelled) return;
+                setNotifications(res.data.data || []);
+                setUnreadCount(res.data.unreadCount || 0);
+            } catch {
+                if (!cancelled) {
+                    setNotifications([]);
+                    setUnreadCount(0);
+                }
+            }
+        };
+        loadNotifications();
+        const timer = setInterval(loadNotifications, 60000);
+        return () => {
+            cancelled = true;
+            clearInterval(timer);
+        };
+    }, []);
+
+    const markNotificationsRead = async () => {
+        try {
+            await api.put('/notifications/read', {});
+            setUnreadCount(0);
+            setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+        } catch {
+            // Non-critical UI affordance.
+        }
+    };
 
     const isActive = (path) => {
         const fullPath = location.pathname + location.search;
@@ -281,7 +367,7 @@ const Layout = () => {
                 { label: 'New Visit', icon: PlusCircle, path: newVisitPath, roles: ['user','home_visit','regional_bdm'] },
             ] : []),
         ]),
-        { label: 'Forms',     icon: ClipboardList, path: '/forms',       roles: ['user','admin','superadmin','home_visit','regional_bdm'] },
+        { label: 'Assigned Forms', icon: ClipboardList, path: '/forms',       roles: ['user','admin','superadmin','home_visit','regional_bdm'] },
         { label: 'Analytics', icon: BarChart3,     path: '/analytics',   roles: ['admin','superadmin'] },
         { label: 'Users',     icon: Users,         path: '/users',       roles: ['superadmin'] },
         { label: 'Form Builder', icon: Settings,   path: '/form-builder', roles: ['superadmin'] },
@@ -344,10 +430,16 @@ const Layout = () => {
                 <header className="hidden md:flex h-[58px] sticky top-0 z-20 bg-white/95 backdrop-blur border-b border-meridian-border items-center justify-between px-6 lg:px-8">
                     <div>
                         <p className="text-[10px] font-black uppercase tracking-widest text-meridian-sub">Workspace</p>
-                        <p className="text-sm font-bold text-meridian-text">{user?.department || user?.role || 'Team'}</p>
+                        <p className="text-sm font-bold text-meridian-text">{workspaceLabel}</p>
                     </div>
                     <div className="flex items-center gap-3">
-                        <NotifBell count={0} />
+                        <NotificationsMenu
+                            notifications={notifications}
+                            unreadCount={unreadCount}
+                            open={notificationsOpen}
+                            onToggle={() => setNotificationsOpen(prev => !prev)}
+                            onMarkRead={markNotificationsRead}
+                        />
                         <Link to="/profile" className="flex items-center gap-2 rounded-lg border border-meridian-border px-3 py-2 text-xs font-bold text-meridian-text hover:bg-meridian-bg">
                             <UserIcon className="w-4 h-4 text-meridian-blue" />
                             {user?.name}

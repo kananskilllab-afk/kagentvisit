@@ -55,8 +55,8 @@ const FormsHub = () => {
     return (
         <div className="space-y-6 page-enter">
             <div>
-                <h1 className="page-title">Forms</h1>
-                <p className="page-subtitle">Your assigned forms — select one to fill out</p>
+                <h1 className="page-title">Assigned Forms</h1>
+                <p className="page-subtitle">Forms assigned to your role or department</p>
             </div>
 
             {accessible.length === 0 ? (

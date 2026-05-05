@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../utils/api';
 import {
     Receipt, Plane, Train, Bus, Car, Hotel, UtensilsCrossed,
@@ -78,7 +78,11 @@ const POLICY_HINTS = {
 
 const AddExpense = () => {
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const planIdParam = searchParams.get('planId') || '';
     const [submitting, setSubmitting] = useState(false);
+    const [plans, setPlans] = useState([]);
+    const [loadingPlans, setLoadingPlans] = useState(true);
     const [form, setForm] = useState({
         category: '',
         otherCategory: '',
@@ -93,10 +97,30 @@ const AddExpense = () => {
         uploadRefs: [],      // all uploaded URLs
         cityTier: 'na',
         travelClass: '',
-        bookingMode: 'other'
+        bookingMode: 'other',
+        visitPlanRef: planIdParam
     });
     // uploadedUrls drives the ImageUpload component (source of truth for previews)
     const [uploadedUrls, setUploadedUrls] = useState([]);
+
+    useEffect(() => {
+        let cancelled = false;
+        api.get('/visit-plans')
+            .then(res => {
+                if (cancelled) return;
+                const available = (res.data.data || []).filter(plan =>
+                    !['closed', 'cancelled'].includes(plan.status)
+                );
+                setPlans(available);
+            })
+            .catch(() => {
+                if (!cancelled) setPlans([]);
+            })
+            .finally(() => {
+                if (!cancelled) setLoadingPlans(false);
+            });
+        return () => { cancelled = true; };
+    }, []);
 
     const handleChange = (field, value) => {
         setForm(prev => ({ ...prev, [field]: value }));
@@ -124,9 +148,13 @@ const AddExpense = () => {
 
         setSubmitting(true);
         try {
-            await api.post('/expenses', {
+            const payload = {
                 ...form,
                 amount: parseFloat(form.amount)
+            };
+            if (!payload.visitPlanRef) delete payload.visitPlanRef;
+            await api.post('/expenses', {
+                ...payload
             });
             navigate('/expenses');
         } catch (err) {
@@ -157,6 +185,32 @@ const AddExpense = () => {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="card p-5 space-y-3">
+                    <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-brand-blue" />
+                        Visit Plan Link
+                    </h3>
+                    <div>
+                        <label className="label">Visit Plan (recommended for claims)</label>
+                        <select
+                            className="input-field"
+                            value={form.visitPlanRef}
+                            onChange={(e) => handleChange('visitPlanRef', e.target.value)}
+                            disabled={loadingPlans}
+                        >
+                            <option value="">{loadingPlans ? 'Loading visit plans...' : 'No plan yet - assign during claim'}</option>
+                            {plans.map(plan => (
+                                <option key={plan._id} value={plan._id}>
+                                    {plan.title} ({new Date(plan.plannedStartAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })})
+                                </option>
+                            ))}
+                        </select>
+                        <p className="mt-2 text-xs font-medium text-slate-400">
+                            Expenses without a plan can still be recorded, then attached to a plan while creating the claim.
+                        </p>
+                    </div>
+                </div>
+
                 {/* Category Selection */}
                 <div className="card p-5 space-y-4">
                     <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">

@@ -179,7 +179,10 @@ const NewClaim = () => {
         setLoadingExpenses(true);
         try {
             const params = { unclaimed: 'true' };
-            if (form.visitPlanRef) params.visitPlanRef = form.visitPlanRef;
+            if (form.visitPlanRef) {
+                params.visitPlanRef = form.visitPlanRef;
+                params.includeUnassigned = 'true';
+            }
             const res = await api.get('/expenses', { params });
             setExpenses(res.data.data || []);
         } catch (err) {
@@ -241,7 +244,7 @@ const NewClaim = () => {
                     setPolicyWarnings(subRes.data.policyWarnings || []);
                 }
             }
-            navigate(submitNow ? '/' : `/expenses/claims/${claim._id}`);
+            navigate(`/expenses/claims/${claim._id}`);
         } catch (err) {
             const errData = err.response?.data;
             alert(errData?.message || 'Error creating claim');
@@ -359,12 +362,12 @@ const NewClaim = () => {
                     </h3>
                     <div>
                         <label className="label">Claim Title *</label>
-                        <input type="text" className="input-field" placeholder="e.g., Mumbai B2B Visit – April 2026 – Advance"
+                        <input type="text" className="input-field" placeholder="e.g., Mumbai Field Visit - April 2026 - Advance"
                             value={form.title} onChange={e => handleChange('title', e.target.value)} required />
                     </div>
                     <div>
                         <label className="label">Travel Purpose</label>
-                        <input type="text" className="input-field" placeholder="B2B agent visit and partnership meetings"
+                        <input type="text" className="input-field" placeholder="Field visit expenses and meetings"
                             value={form.travelPurpose} onChange={e => handleChange('travelPurpose', e.target.value)} />
                     </div>
                     <div>
@@ -412,8 +415,8 @@ const NewClaim = () => {
                         </div>
                     ) : expenses.length === 0 ? (
                         <div className="py-6 text-center">
-                            <p className="text-sm text-slate-500">No unclaimed expenses found for this plan.</p>
-                            <button type="button" onClick={() => navigate('/expenses/add')}
+                            <p className="text-sm text-slate-500">No unclaimed expenses found for this plan or unassigned expenses.</p>
+                            <button type="button" onClick={() => navigate(form.visitPlanRef ? `/expenses/add?planId=${form.visitPlanRef}` : '/expenses/add')}
                                 className="mt-2 text-sm font-bold text-brand-blue hover:underline">
                                 Add Expenses First
                             </button>

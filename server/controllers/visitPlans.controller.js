@@ -19,12 +19,30 @@ async function scopedPlanQuery(user) {
     if (user.role === 'user' || user.role === 'home_visit') {
         q.owner = user._id;
     } else if (user.role === 'hod' || user.role === 'admin') {
-        const me = await User.findById(user._id).select('assignedEmployees');
-        const ids = (me?.assignedEmployees || []).map(String);
-        q.owner = { $in: [user._id, ...ids] };
+        const ids = await managedOwnerIds(user);
+        q.owner = { $in: ids };
     }
     // accounts + superadmin see all
     return q;
+}
+
+async function managedOwnerIds(user) {
+    const ids = new Set([String(user._id)]);
+    if (!['admin', 'hod'].includes(user.role)) return Array.from(ids);
+
+    const me = await User.findById(user._id).select('assignedEmployees department formAccess');
+    (me?.assignedEmployees || []).forEach(id => ids.add(String(id)));
+
+    if (me?.department) {
+        const departmentUsers = await User.find({
+            isActive: true,
+            department: me.department,
+            role: { $in: ['user', 'home_visit', 'admin', 'hod'] }
+        }).select('_id');
+        departmentUsers.forEach(u => ids.add(String(u._id)));
+    }
+
+    return Array.from(ids);
 }
 
 // Resolve which user's Google Calendar to sync to. We always sync to the plan
@@ -40,8 +58,7 @@ async function canAccessPlan(user, plan) {
     if (user.role === 'accounts' || user.role === 'superadmin') return true;
     if (String(plan.owner) === String(user._id)) return true;
     if (user.role === 'admin' || user.role === 'hod') {
-        const me = await User.findById(user._id).select('assignedEmployees');
-        const ids = (me?.assignedEmployees || []).map(String);
+        const ids = await managedOwnerIds(user);
         return ids.includes(String(plan.owner));
     }
     return false;
