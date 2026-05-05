@@ -18,7 +18,7 @@ exports.getAssignableUsers = async (req, res) => {
     }
 };
 
-// @desc    Get all users (superadmin: all, admin: own department only)
+// @desc    Get users (superadmin/accounts: all, admin: own department only)
 exports.getUsers = async (req, res) => {
     try {
         let query = {};

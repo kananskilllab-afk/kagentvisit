@@ -203,8 +203,13 @@ const Dashboard = () => {
                             <PlusCircle className="w-4 h-4" /> New Visit
                         </button>
                     )}
+                    {isAccountsRole && (
+                        <button onClick={() => navigate('/expenses/analytics')} className="btn-secondary shrink-0">
+                            <TrendingUp className="w-4 h-4 text-emerald-600" /> Expense Analytics
+                        </button>
+                    )}
                     <button onClick={() => navigate('/expenses/claims')} className="btn-secondary shrink-0">
-                        <Receipt className="w-4 h-4 text-indigo-500" /> Manage Claims
+                        <Receipt className="w-4 h-4 text-indigo-500" /> {isAccountsRole ? 'Open Claims Queue' : 'Manage Claims'}
                     </button>
                 </div>
             </div>
@@ -491,7 +496,7 @@ const Dashboard = () => {
                         </div>
                     </div>
 
-                    {expenseSummary?.recentClaims?.length > 0 && (
+                    {expenseSummary?.recentClaims?.length > 0 ? (
                         <div className="card max-w-4xl">
                             <div className="flex items-center justify-between mb-6">
                                 <h3 className="font-extrabold text-lg text-slate-800 flex items-center gap-2">
@@ -524,6 +529,12 @@ const Dashboard = () => {
                                     </div>
                                 ))}
                             </div>
+                        </div>
+                    ) : (
+                        <div className="card max-w-4xl p-8 text-center">
+                            <Receipt className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+                            <p className="font-bold text-slate-600">No claims need attention right now</p>
+                            <p className="mt-1 text-sm text-slate-400">New employee claims will appear here as soon as they are submitted.</p>
                         </div>
                     )}
                 </div>

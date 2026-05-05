@@ -281,7 +281,7 @@ const Layout = () => {
                 { label: 'New Visit', icon: PlusCircle, path: newVisitPath, roles: ['user','home_visit','regional_bdm'] },
             ] : []),
         ]),
-        { label: 'Forms',     icon: ClipboardList, path: '/forms',       roles: ['user','admin','superadmin','home_visit','accounts','regional_bdm'] },
+        { label: 'Forms',     icon: ClipboardList, path: '/forms',       roles: ['user','admin','superadmin','home_visit','regional_bdm'] },
         { label: 'Analytics', icon: BarChart3,     path: '/analytics',   roles: ['admin','superadmin'] },
         { label: 'Users',     icon: Users,         path: '/users',       roles: ['superadmin'] },
         { label: 'Form Builder', icon: Settings,   path: '/form-builder', roles: ['superadmin'] },

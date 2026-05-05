@@ -131,7 +131,7 @@ function App() {
                         </ProtectedRoute>
                     } />
                     <Route path="expenses/add" element={
-                        <ProtectedRoute roles={['user', 'admin', 'superadmin', 'accounts', 'home_visit', 'hod']}>
+                        <ProtectedRoute roles={['user', 'admin', 'superadmin', 'home_visit', 'hod']}>
                             <AddExpense />
                         </ProtectedRoute>
                     } />

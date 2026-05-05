@@ -296,9 +296,11 @@ const ClaimDetail = () => {
                 )}
                 {canApprove && ['submitted', 'under_review'].includes(claim.status) && (
                     <>
-                        <button onClick={() => { setStatusForm({ status: 'under_review', comment: '', approvedAmount: '' }); setShowStatusModal(true); }} className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-all flex items-center gap-2">
-                            <Eye className="w-4 h-4" /> Mark Under Review
-                        </button>
+                        {claim.status === 'submitted' && (
+                            <button onClick={() => { setStatusForm({ status: 'under_review', comment: '', approvedAmount: '' }); setShowStatusModal(true); }} className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-sm hover:bg-blue-700 transition-all flex items-center gap-2">
+                                <Eye className="w-4 h-4" /> Mark Under Review
+                            </button>
+                        )}
                         <button onClick={() => { setStatusForm({ status: 'approved', comment: '', approvedAmount: String(claim.totalAmount) }); setShowStatusModal(true); }} className="px-4 py-2 rounded-xl bg-green-600 text-white font-bold text-sm hover:bg-green-700 transition-all flex items-center gap-2">
                             <CheckCircle2 className="w-4 h-4" /> Approve
                         </button>

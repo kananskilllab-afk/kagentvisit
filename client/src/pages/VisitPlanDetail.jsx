@@ -60,12 +60,16 @@ function fmtPlanType(plan) {
 }
 
 // ── Balance Progress Card ─────────────────────────────────────────────────────
-function BalanceCard({ balance, claimCount }) {
+function BalanceCard({ balance, claimCount, isAccounts = false }) {
     if (!balance) {
         return (
             <div className="rounded-lg border border-meridian-border bg-white p-4 text-sm text-meridian-text shadow-meridian-card">
                 <div className="font-medium mb-1">No advance approved yet</div>
-                <div className="text-xs text-blue-600">Create and submit an advance claim to get pre-approved funds.</div>
+                <div className="text-xs text-blue-600">
+                    {isAccounts
+                        ? 'No approved advance is linked to this plan yet.'
+                        : 'Create and submit an advance claim to get pre-approved funds.'}
+                </div>
             </div>
         );
     }
@@ -98,7 +102,7 @@ function BalanceCard({ balance, claimCount }) {
     );
 }
 
-function ScheduleRow({ schedule, planId, uploads, onRefresh, canManage }) {
+function ScheduleRow({ schedule, planId, uploads, onRefresh, canManage, showMissingPhotoHint = true }) {
     const [uploading, setUploading] = useState(false);
     const fileRef = React.useRef();
 
@@ -193,7 +197,7 @@ function ScheduleRow({ schedule, planId, uploads, onRefresh, canManage }) {
                             </button>
                         </>
                     )}
-                    {!canManage && scheduleUploads.length === 0 && (
+                    {showMissingPhotoHint && !canManage && scheduleUploads.length === 0 && (
                         <span className="text-xs text-orange-500">Photo required</span>
                     )}
                 </div>
@@ -221,7 +225,10 @@ export default function VisitPlanDetail() {
     const [cancelling, setCancelling] = useState(false);
 
     const isOwner = data && (user._id === String(data.plan.owner?._id) || user._id === String(data.plan.owner));
-    const canManage = isOwner || ['admin', 'hod', 'accounts', 'superadmin'].includes(user?.role);
+    const isAccountsRole = user?.role === 'accounts';
+    const canManageSchedules = isOwner || ['admin', 'hod', 'superadmin'].includes(user?.role);
+    const canCreatePlanClaim = !isAccountsRole && (isOwner || user?.role === 'superadmin');
+    const canCancelPlan = !isAccountsRole && (isOwner || ['admin', 'hod', 'superadmin'].includes(user?.role));
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -270,6 +277,7 @@ export default function VisitPlanDetail() {
     }
 
     const { plan, schedules, balance, claims, uploads } = data;
+    const planAllowsActions = !['completed','closed','cancelled'].includes(plan.status);
 
     const TABS = [
         { key: 'overview', label: 'Overview' },
@@ -300,22 +308,26 @@ export default function VisitPlanDetail() {
                 </div>
 
                 {/* Actions */}
-                {canManage && !['completed','closed','cancelled'].includes(plan.status) && (
+                {planAllowsActions && (canCreatePlanClaim || canCancelPlan) && (
                     <div className="flex items-center gap-2 flex-shrink-0">
-                        <button onClick={() => navigate(`/expenses/claims/new?planId=${plan._id}&type=advance`)}
-                            className="btn-primary px-3 py-1.5 text-xs">
-                            Create claim
-                        </button>
-                        <button onClick={handleCancel} disabled={cancelling}
-                            className="text-xs text-red-500 hover:text-red-700 px-2 py-1.5 rounded-lg hover:bg-red-50 border border-red-200">
-                            {cancelling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Cancel plan'}
-                        </button>
+                        {canCreatePlanClaim && (
+                            <button onClick={() => navigate(`/expenses/claims/new?planId=${plan._id}&type=advance`)}
+                                className="btn-primary px-3 py-1.5 text-xs">
+                                Create claim
+                            </button>
+                        )}
+                        {canCancelPlan && (
+                            <button onClick={handleCancel} disabled={cancelling}
+                                className="text-xs text-red-500 hover:text-red-700 px-2 py-1.5 rounded-lg hover:bg-red-50 border border-red-200">
+                                {cancelling ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Cancel plan'}
+                            </button>
+                        )}
                     </div>
                 )}
             </div>
 
             {/* ── Balance bar (always visible) ── */}
-            <BalanceCard balance={balance} claimCount={claims?.length || 0} />
+            <BalanceCard balance={balance} claimCount={claims?.length || 0} isAccounts={isAccountsRole} />
 
             {/* ── Tabs ── */}
             <div className="rounded-lg border border-meridian-border bg-white p-1 shadow-meridian-card">
@@ -381,7 +393,15 @@ export default function VisitPlanDetail() {
                         </div>
                     ) : (
                         schedules.map(s => (
-                            <ScheduleRow key={s._id} schedule={s} planId={plan._id} uploads={uploads} onRefresh={fetchData} canManage={canManage} />
+                            <ScheduleRow
+                                key={s._id}
+                                schedule={s}
+                                planId={plan._id}
+                                uploads={uploads}
+                                onRefresh={fetchData}
+                                canManage={canManageSchedules}
+                                showMissingPhotoHint={!isAccountsRole}
+                            />
                         ))
                     )}
                 </div>
@@ -417,7 +437,7 @@ export default function VisitPlanDetail() {
                         <div className="text-center py-10 text-gray-400 text-sm">No claims yet.</div>
                     )}
 
-                    {canManage && !['completed','closed','cancelled'].includes(plan.status) && (
+                    {canCreatePlanClaim && planAllowsActions && (
                         <div className="flex gap-2">
                             <button onClick={() => navigate(`/expenses/claims/new?planId=${plan._id}&type=advance`)}
                                 className="flex-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 rounded-lg py-2 hover:bg-blue-100 transition-colors">

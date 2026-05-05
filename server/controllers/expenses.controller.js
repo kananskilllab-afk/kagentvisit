@@ -69,6 +69,13 @@ exports.getExpenses = async (req, res) => {
 // @desc    Create expense
 exports.createExpense = async (req, res) => {
     try {
+        if (req.user.role === 'accounts') {
+            return res.status(403).json({
+                success: false,
+                message: 'Accounts users can review and process expenses, but cannot create employee expenses.'
+            });
+        }
+
         // Auto-detect over-budget against an existing advance balance
         let overBudget = !!req.body.overBudget;
         if (req.body.visitPlanRef && !overBudget) {
@@ -264,6 +271,13 @@ exports.getClaimById = async (req, res) => {
 // @desc    Create a new expense claim (draft)
 exports.createClaim = async (req, res) => {
     try {
+        if (req.user.role === 'accounts') {
+            return res.status(403).json({
+                success: false,
+                message: 'Accounts users can review and process claims, but cannot create employee claims.'
+            });
+        }
+
         const {
             title, description, travelPurpose, travelFrom, travelTo,
             travelStartDate, travelEndDate, claimLocation, expenseIds,

@@ -129,7 +129,9 @@ const ClaimsList = () => {
         employee: '',
     });
 
+    const isAccountsRole = user?.role === 'accounts';
     const isPrivileged = ['admin', 'superadmin', 'accounts'].includes(user?.role);
+    const canCreateClaim = !isAccountsRole;
 
     useEffect(() => { fetchClaims(); }, [filterStatus, filters]);
     useEffect(() => { if (isPrivileged) fetchEmployees(); }, []);
@@ -187,7 +189,7 @@ const ClaimsList = () => {
         filtered = filtered.filter(c => new Date(c.createdAt) <= end);
     }
 
-    const activeFilterCount = [filterStatus, filters.startDate, filters.employee].filter(Boolean).length;
+    const activeFilterCount = [filterStatus, filters.startDate, filters.endDate, filters.employee].filter(Boolean).length;
 
     // Group by user
     const groupedByUser = Object.values(
@@ -233,11 +235,15 @@ const ClaimsList = () => {
                         <ArrowLeft className="w-5 h-5 text-slate-600" />
                     </button>
                     <div>
-                        <h1 className="page-title">Expense Claims</h1>
-                        <p className="page-subtitle">{stats.total} claim{stats.total !== 1 ? 's' : ''}, {stats.pending} pending review</p>
+                        <h1 className="page-title">{isAccountsRole ? 'Claims Review Queue' : 'Expense Claims'}</h1>
+                        <p className="page-subtitle">
+                            {isAccountsRole
+                                ? `${stats.pending} pending review, ${stats.approved} approved, ${stats.total} total`
+                                : `${stats.total} claim${stats.total !== 1 ? 's' : ''}, ${stats.pending} pending review`}
+                        </p>
                     </div>
                 </div>
-                <div className="flex gap-2">
+                <div className="responsive-actions">
                     {isPrivileged && (
                         <Link to="/expenses/analytics" className="btn-outline shrink-0 flex items-center gap-2">
                             <BarChart3 className="w-4 h-4" />
@@ -246,12 +252,14 @@ const ClaimsList = () => {
                     )}
                     <Link to="/expenses" className="btn-outline shrink-0 flex items-center gap-2">
                         <Receipt className="w-4 h-4" />
-                        Expenses
+                        {isAccountsRole ? 'Expense Review' : 'Expenses'}
                     </Link>
-                    <button onClick={() => navigate('/expenses/claims/new')} className="btn-primary shrink-0 flex items-center gap-2">
-                        <Plus className="w-4 h-4" />
-                        New Claim
-                    </button>
+                    {canCreateClaim && (
+                        <button onClick={() => navigate('/expenses/claims/new')} className="btn-primary shrink-0 flex items-center gap-2">
+                            <Plus className="w-4 h-4" />
+                            New Claim
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -393,7 +401,9 @@ const ClaimsList = () => {
                 <div className="card p-12 text-center">
                     <FileText className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                     <p className="text-slate-500 font-bold">No claims found</p>
-                    <p className="text-sm text-slate-400 mt-1">Create your first expense claim</p>
+                    <p className="text-sm text-slate-400 mt-1">
+                        {isAccountsRole ? 'No employee claims match the current filters.' : 'Create your first expense claim'}
+                    </p>
                 </div>
             ) : isPrivileged ? (
                 <div className="space-y-5">

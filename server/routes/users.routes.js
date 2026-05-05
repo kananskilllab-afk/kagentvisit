@@ -14,7 +14,7 @@ const { authorize } = require('../middleware/role.middleware');
 router.use(protect);
 
 router.route('/')
-    .get(authorize('admin', 'superadmin'), getUsers)
+    .get(authorize('admin', 'accounts', 'superadmin'), getUsers)
     .post(authorize('superadmin'), createUser);
 
 router.get('/assignable', authorize('admin', 'superadmin'), getAssignableUsers);

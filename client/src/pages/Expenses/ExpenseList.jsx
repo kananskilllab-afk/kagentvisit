@@ -95,7 +95,9 @@ const ExpenseList = () => {
         cityTier: ''
     });
 
+    const isAccountsRole = user?.role === 'accounts';
     const isPrivileged = ['admin', 'superadmin', 'accounts'].includes(user?.role);
+    const canCreateExpense = !isAccountsRole;
 
     useEffect(() => { fetchExpenses(); }, [filterCategory, filters]);
     useEffect(() => { if (isPrivileged) fetchEmployees(); }, []);
@@ -154,7 +156,7 @@ const ExpenseList = () => {
         setSelectedUserId(null);
     };
 
-    const activeFilterCount = [filterCategory, filters.startDate, filters.minAmount, filters.maxAmount, filters.paymentMethod, filters.employee, filters.cityTier].filter(Boolean).length;
+    const activeFilterCount = [filterCategory, filters.startDate, filters.endDate, filters.minAmount, filters.maxAmount, filters.paymentMethod, filters.employee, filters.cityTier].filter(Boolean).length;
 
     const sq = search.toLowerCase();
     const filtered = !sq ? expenses : expenses.filter(e =>
@@ -198,12 +200,14 @@ const ExpenseList = () => {
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="page-title">Expenses</h1>
+                    <h1 className="page-title">{isAccountsRole ? 'Expense Review' : 'Expenses'}</h1>
                     <p className="page-subtitle">
-                        {expenses.length} expense{expenses.length !== 1 ? 's' : ''} recorded
+                        {isAccountsRole
+                            ? `${expenses.length} team expense${expenses.length !== 1 ? 's' : ''} available for finance review`
+                            : `${expenses.length} expense${expenses.length !== 1 ? 's' : ''} recorded`}
                     </p>
                 </div>
-                <div className="flex gap-2">
+                <div className="responsive-actions">
                     {isPrivileged && (
                         <Link to="/expenses/analytics" className="btn-outline shrink-0 flex items-center gap-2">
                             <BarChart3 className="w-4 h-4" />
@@ -212,12 +216,14 @@ const ExpenseList = () => {
                     )}
                     <Link to="/expenses/claims" className="btn-outline shrink-0 flex items-center gap-2">
                         <FileText className="w-4 h-4" />
-                        Claims
+                        {isAccountsRole ? 'Claims Queue' : 'Claims'}
                     </Link>
-                    <button onClick={() => navigate('/expenses/add')} className="btn-primary shrink-0 flex items-center gap-2">
-                        <Plus className="w-4 h-4" />
-                        Add Expense
-                    </button>
+                    {canCreateExpense && (
+                        <button onClick={() => navigate('/expenses/add')} className="btn-primary shrink-0 flex items-center gap-2">
+                            <Plus className="w-4 h-4" />
+                            Add Expense
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -358,7 +364,9 @@ const ExpenseList = () => {
                 <div className="card p-12 text-center">
                     <Receipt className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                     <p className="text-slate-500 font-bold">No expenses found</p>
-                    <p className="text-sm text-slate-400 mt-1">Add your first expense to get started</p>
+                    <p className="text-sm text-slate-400 mt-1">
+                        {isAccountsRole ? 'No team expenses match the current filters.' : 'Add your first expense to get started'}
+                    </p>
                 </div>
             ) : isPrivileged ? (
                 <div className="space-y-5">
@@ -406,14 +414,14 @@ const ExpenseList = () => {
                             </div>
                         )}
                         {displayedExpenses.map(expense => (
-                            <ExpenseCard key={expense._id} expense={expense} isPrivileged={isPrivileged} setDeleteTarget={setDeleteTarget} />
+                            <ExpenseCard key={expense._id} expense={expense} isPrivileged={isPrivileged} currentUser={user} setDeleteTarget={setDeleteTarget} />
                         ))}
                     </div>
                 </div>
             ) : (
                 <div className="space-y-2">
                     {filtered.map(expense => (
-                        <ExpenseCard key={expense._id} expense={expense} isPrivileged={isPrivileged} setDeleteTarget={setDeleteTarget} />
+                        <ExpenseCard key={expense._id} expense={expense} isPrivileged={isPrivileged} currentUser={user} setDeleteTarget={setDeleteTarget} />
                     ))}
                 </div>
             )}
@@ -448,10 +456,12 @@ const ExpenseList = () => {
     );
 };
 
-const ExpenseCard = ({ expense, isPrivileged, setDeleteTarget }) => {
+const ExpenseCard = ({ expense, isPrivileged, currentUser, setDeleteTarget }) => {
     const cat = CATEGORY_META[expense.category] || CATEGORY_META.other;
     const Icon = cat.icon;
     const isClaimed = !!expense.claimRef;
+    const isOwner = expense.createdBy?._id === currentUser?._id;
+    const canDelete = !isClaimed && currentUser?.role !== 'accounts' && (!isPrivileged || currentUser?.role === 'superadmin' || isOwner);
 
     return (
         <div className="card p-4 hover:shadow-md transition-all">
@@ -510,9 +520,10 @@ const ExpenseCard = ({ expense, isPrivileged, setDeleteTarget }) => {
                     </p>
                     <p className="text-[10px] text-slate-400 capitalize">{expense.paymentMethod?.replace('_', ' ')}</p>
                 </div>
-                {!isClaimed && (
+                {canDelete && (
                     <button
                         onClick={() => setDeleteTarget(expense)}
+                        aria-label="Delete expense"
                         className="p-1.5 rounded-lg border border-red-200 text-red-400 hover:text-red-600 hover:bg-red-50 transition-all shrink-0"
                     >
                         <Trash2 className="w-3.5 h-3.5" />
