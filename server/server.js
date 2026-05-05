@@ -223,8 +223,20 @@ const b2cFields = [
 
 // Middleware
 app.use(helmet()); // Security headers
+const allowedOrigins = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    ...(process.env.CLIENT_URL ? [process.env.CLIENT_URL] : []),
+];
 app.use(cors({
-    origin: process.env.CLIENT_URL ? [process.env.CLIENT_URL, 'http://127.0.0.1:5173', 'http://localhost:5173'] : ['http://localhost:5173', 'http://127.0.0.1:5173'],
+    origin: (origin, cb) => {
+        // Allow same-origin (no Origin header) and vercel.app deployments
+        if (!origin || allowedOrigins.includes(origin) || /\.vercel\.app$/.test(origin)) {
+            cb(null, true);
+        } else {
+            cb(new Error(`CORS: origin ${origin} not allowed`));
+        }
+    },
     credentials: true
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -313,31 +325,22 @@ app.use((err, req, res, next) => {
     });
 });
 
-if (process.env.NODE_ENV !== 'production' || require.main === module) {
-    const PORT = process.env.PORT || 5000;
-    
-    // Auto-connect to MongoDB when server starts
-    connectDB()
-        .then(() => {
-            console.log('MongoDB auto-connected successfully on startup.');
-            return seedData({ genericFields, b2cFields }); // Ensure B2B/B2C configurations are synced
-        })
-        .then(() => {
-            scheduleOverdueDigest();
-            // AIT-06: actionItems.status + actionItems.dueDate compound index covers
-            // the $elemMatch overdue query. Per-agent query covered by { submittedBy, 'actionItems.status' }.
-            // Validate with: Visit.find({actionItems:{$elemMatch:{status:'open',dueDate:{$lt:new Date()}}}}).explain()
-            app.listen(PORT, () => {
-                console.log(`Server running on port ${PORT}`);
-            });
-        })
-        .catch(err => {
-            console.error('Initial startup Database Connection Error:', err);
-            // Start server even if initial DB connection fails (fallback to lazy connect)
-            app.listen(PORT, () => {
-                console.log(`Server running on port ${PORT} (Notice: DB connection pending)`);
-            });
-        });
-}
+// Always connect at module load — mongoose caches the connection, so this works
+// for both Vercel serverless (skips listen) and local dev (then starts listen).
+const PORT = process.env.PORT || 5000;
+connectDB()
+    .then(() => seedData({ genericFields, b2cFields }))
+    .then(() => {
+        scheduleOverdueDigest();
+        if (process.env.NODE_ENV !== 'production' || require.main === module) {
+            app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+        }
+    })
+    .catch(err => {
+        console.error('DB connect error:', err);
+        if (process.env.NODE_ENV !== 'production' || require.main === module) {
+            app.listen(PORT, () => console.log(`Server running on port ${PORT} (DB pending)`));
+        }
+    });
 
 module.exports = app;

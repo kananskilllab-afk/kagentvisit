@@ -1,37 +1,21 @@
 {
   "version": 2,
-  "name": "kagentvisit",
-  "builds": [
-    {
-      "src": "client/package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    },
-    {
-      "src": "server/server.js",
-      "use": "@vercel/node"
+  "buildCommand": "npm install --prefix client && npm run build --prefix client",
+  "outputDirectory": "client/dist",
+  "functions": {
+    "server/server.js": {
+      "memory": 1024,
+      "maxDuration": 30
     }
-  ],
-  "routes": [
+  },
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "headers": {
-        "cache-control": "no-cache"
-      },
-      "dest": "/server/server.js"
+      "source": "/api/:path*",
+      "destination": "/server/server.js"
     },
     {
-      "src": "/uploads/(.*)",
-      "dest": "/server/uploads/$1"
-    },
-    {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/client/index.html"
+      "source": "/:path*",
+      "destination": "/index.html"
     }
   ]
 }
