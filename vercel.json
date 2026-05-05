@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "name": "agent-visit-survey",
+  "name": "kagentvisit",
   "builds": [
     {
       "src": "client/package.json",
