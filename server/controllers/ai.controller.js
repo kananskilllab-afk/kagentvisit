@@ -1,6 +1,17 @@
 const Visit = require('../models/Visit');
 const aiService = require('../services/ai.service');
 
+const canAccessVisitInsights = (user, visit) => {
+    if (!user || !visit) return false;
+    if (user.role === 'admin' || user.role === 'superadmin') return true;
+
+    const submittedById = visit.submittedBy?.toString?.() || String(visit.submittedBy || '');
+    const forUserId = visit.forUser?.toString?.() || String(visit.forUser || '');
+    const currentUserId = user._id?.toString?.() || String(user._id || '');
+
+    return submittedById === currentUserId || forUserId === currentUserId;
+};
+
 // Generate Insights for User/Submitter
 exports.generateInsights = async (req, res) => {
     try {
@@ -11,8 +22,8 @@ exports.generateInsights = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Visit not found' });
         }
 
-        // Only allow if user is admin or the submitter
-        if (req.user.role !== 'admin' && req.user.role !== 'superadmin' && visit.submittedBy.toString() !== req.user._id.toString()) {
+        // Match the same ownership rules used by visit detail access.
+        if (!canAccessVisitInsights(req.user, visit)) {
             return res.status(403).json({ success: false, message: 'Not authorized to view insights for this visit' });
         }
 

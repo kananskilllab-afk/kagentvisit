@@ -240,11 +240,11 @@ const VisitDetailModal = ({ visit: initialVisit, onClose, onEdit, onVisitUpdated
 
     return (
         <div
-            className="fixed inset-0 z-[100] bg-slate-900/60"
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-0 sm:p-4"
             onClick={onClose}
         >
             <div
-                className="flex h-screen w-full flex-col overflow-hidden bg-white animate-fade-in"
+                className="flex h-dvh w-full flex-col overflow-hidden bg-white animate-fade-in sm:h-[90vh] sm:max-h-[900px] sm:w-full sm:max-w-5xl sm:rounded-3xl sm:shadow-2xl"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* ── Header ──────────────────────────────────────── */}

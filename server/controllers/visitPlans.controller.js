@@ -211,7 +211,12 @@ exports.createPlan = async (req, res) => {
                     plan.googleCalendarEventId = eventId;
                     await plan.save();
                 }
-            } catch (e) { /* non-fatal */ }
+                console.log('[GCal] Plan synced:', plan._id, 'eventId:', eventId);
+            } catch (e) {
+                console.error('[GCal] Failed to sync plan to Google Calendar:', e.message);
+            }
+        } else {
+            console.log('[GCal] Plan sync skipped — syncToGoogle:', plan.syncToGoogle, 'gcal connected:', !!req.user.googleCalendar?.connected);
         }
 
         audit(req, 'CREATE_VISIT_PLAN', plan);
@@ -656,7 +661,12 @@ exports.addSchedule = async (req, res) => {
                     schedule.googleCalendarEventId = eventId;
                     await schedule.save();
                 }
-            } catch (e) { /* non-fatal */ }
+                console.log('[GCal] Schedule synced:', schedule._id, 'eventId:', eventId);
+            } catch (e) {
+                console.error('[GCal] Failed to sync schedule to Google Calendar:', e.message);
+            }
+        } else {
+            console.log('[GCal] Schedule sync skipped — syncToGoogle:', syncToGoogle, 'gcal connected:', !!targetUser?.googleCalendar?.connected);
         }
 
         // Bump visit count only for DB agents

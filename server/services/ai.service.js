@@ -8,6 +8,113 @@ const MODEL_CHAIN = ['gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.0-flash'];
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 2000;
 
+const stripHtml = (value) => {
+    if (!value) return '';
+    return String(value).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+};
+
+const cleanText = (value) => {
+    if (value === null || value === undefined) return '';
+    if (Array.isArray(value)) return value.map(cleanText).filter(Boolean).join(', ');
+    if (typeof value === 'object') return '';
+    return stripHtml(value);
+};
+
+const listText = (value) => {
+    if (!Array.isArray(value) || value.length === 0) return '';
+    return value.map(cleanText).filter(Boolean).join(', ');
+};
+
+const dateText = (value) => {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+const compactBullet = (label, value, bullets) => {
+    const cleaned = cleanText(value);
+    if (cleaned) bullets.push(`${label}: ${cleaned}`);
+};
+
+const buildFallbackVisitInsights = (visitData) => {
+    const companyName = cleanText(visitData?.meta?.companyName) || cleanText(visitData?.studentInfo?.name) || 'this visit';
+    const bdmName = cleanText(visitData?.meta?.bdmName);
+    const rmName = cleanText(visitData?.meta?.rmName);
+    const visitDate = dateText(visitData?.meta?.meetingStart || visitData?.visitInfo?.visitDate || visitData?.submittedAt || visitData?.createdAt);
+    const kananStatus = cleanText(visitData?.kananSpecific?.prepcomAcademy);
+    const activeWithKanan = ['prepcom', 'appcom', 'both'].includes(kananStatus.toLowerCase());
+    const actorNames = [bdmName, rmName].filter(Boolean).join(' and ') || 'the assigned team';
+    const outcome = cleanText(visitData?.outcome?.status) || cleanText(visitData?.postVisit?.remarks) || cleanText(visitData?.partnership?.feedback) || 'follow-up is pending';
+    const summary = [
+        `${companyName} is ${activeWithKanan ? 'an active Kanan partner' : 'currently a prospect or non-active Kanan partner'}.`,
+        `${actorNames} visited ${companyName}${visitDate ? ` on ${visitDate}` : ''}.`,
+        `Current outcome: ${outcome}.`
+    ].join(' ');
+
+    const bullets = [];
+    compactBullet('Team & Agency', [
+        visitData?.promoterTeam?.totalStaff ? `${visitData.promoterTeam.totalStaff} total staff` : '',
+        visitData?.promoterTeam?.coachingTeamSize ? `${visitData.promoterTeam.coachingTeamSize} coaching team` : '',
+        visitData?.promoterTeam?.countryTeamSize ? `${visitData.promoterTeam.countryTeamSize} country team` : '',
+        visitData?.agencyProfile?.establishmentYear ? `established ${visitData.agencyProfile.establishmentYear}` : '',
+        visitData?.marketingOps?.totalBranches ? `${visitData.marketingOps.totalBranches} branches` : ''
+    ].filter(Boolean).join(', '), bullets);
+    compactBullet('Business', [
+        listText(visitData?.agencyProfile?.businessModel),
+        visitData?.marketingOps?.avgDailyWalkins ? `${visitData.marketingOps.avgDailyWalkins} walk-ins/day` : '',
+        visitData?.marketingOps?.totalVisaYear ? `${visitData.marketingOps.totalVisaYear} visa cases/year` : '',
+        visitData?.marketingOps?.totalCoachingYear ? `${visitData.marketingOps.totalCoachingYear} coaching enrollments/year` : '',
+        listText(visitData?.promoterTeam?.countriesPromoted)
+    ].filter(Boolean).join(', '), bullets);
+    compactBullet('Kanan Tools', [
+        visitData?.kananTools?.useAcademyPortal ? `Portal: ${listText(visitData.kananTools.portalCourses) || 'in use'}` : '',
+        visitData?.kananTools?.useBooks ? `Books: ${listText(visitData.kananTools.bookCourses) || 'in use'}` : '',
+        visitData?.kananTools?.useClassroomContent ? 'Classroom content in use' : '',
+        visitData?.kananTools?.trainerRating ? `trainer rating ${visitData.kananTools.trainerRating}/5` : '',
+        visitData?.kananTools?.counsellorRating ? `counsellor rating ${visitData.kananTools.counsellorRating}/5` : ''
+    ].filter(Boolean).join(', '), bullets);
+    compactBullet('Budget & Tech', [
+        visitData?.budget?.marketing2026 ? `marketing budget INR ${Number(visitData.budget.marketing2026).toLocaleString('en-IN')}` : '',
+        visitData?.budget?.coaching2026 ? `coaching budget INR ${Number(visitData.budget.coaching2026).toLocaleString('en-IN')}` : '',
+        cleanText(visitData?.opsTech?.techPlatforms),
+        visitData?.opsTech?.techWillingness ? `tech willingness ${visitData.opsTech.techWillingness}/5` : ''
+    ].filter(Boolean).join(', '), bullets);
+    compactBullet('Enquiry Stats', [
+        visitData?.enquiryStats?.avgAdmissions ? `${visitData.enquiryStats.avgAdmissions} admissions/month` : '',
+        visitData?.enquiryStats?.avgCoaching ? `${visitData.enquiryStats.avgCoaching} coaching/month` : '',
+        visitData?.enquiryStats?.avgCanada ? `${visitData.enquiryStats.avgCanada} Canada/month` : '',
+        visitData?.enquiryStats?.avgIELTS ? `${visitData.enquiryStats.avgIELTS} IELTS/month` : ''
+    ].filter(Boolean).join(', '), bullets);
+    compactBullet('Partnership', [
+        listText(visitData?.partnership?.workingCountries),
+        visitData?.studentCounts?.canada ? `${visitData.studentCounts.canada} students in Canada` : '',
+        visitData?.studentCounts?.usa ? `${visitData.studentCounts.usa} students in USA` : '',
+        visitData?.studentCounts?.uk ? `${visitData.studentCounts.uk} students in UK` : '',
+        visitData?.partnership?.onshoreReferral ? 'onshore referral available' : ''
+    ].filter(Boolean).join(', '), bullets);
+    compactBullet('Pain Points', visitData?.support?.painPoints, bullets);
+    compactBullet('Solutions Given', visitData?.support?.solutions, bullets);
+    compactBullet('Action Points', visitData?.postVisit?.actionPoints, bullets);
+    compactBullet('Feedback/Remarks', [visitData?.partnership?.feedback, visitData?.postVisit?.remarks].filter(Boolean).join(' '), bullets);
+
+    const followUps = Array.isArray(visitData?.followUpMeetings) ? visitData.followUpMeetings : [];
+    if (followUps.length > 0) {
+        const latest = followUps[followUps.length - 1];
+        compactBullet('Latest Follow-up', [dateText(latest?.date), cleanText(latest?.notes), cleanText(latest?.keyOutcomes)].filter(Boolean).join(' - '), bullets);
+    }
+
+    const suggestionsSource = cleanText(visitData?.postVisit?.actionPoints) || cleanText(visitData?.support?.solutions) || 'the next discussed actions';
+    const blockerSource = cleanText(visitData?.support?.painPoints) || cleanText(visitData?.support?.biggestChallenge) || 'the open concerns raised in the visit';
+    const suggestions = `${companyName} has a usable visit summary even though the AI service was unavailable. Focus the next follow-up on ${suggestionsSource}. Close the loop on ${blockerSource} and capture any concrete outcome update in the next visit entry.`;
+
+    return {
+        summary,
+        bulletPoints: bullets.slice(0, 14),
+        suggestions
+    };
+};
+
 /**
  * Clean and parse JSON from Gemini's response
  * Sometimes the model wraps JSON in markdown blocks like ```json ... ```
@@ -75,7 +182,9 @@ const callGeminiWithRetry = async (prompt) => {
  * Generate User-facing Insights (Senior Agent AI)
  */
 const generateVisitInsights = async (visitData) => {
-    if (!process.env.GEMINI_API_KEY) throw new Error('GEMINI_API_KEY is missing');
+    if (!process.env.GEMINI_API_KEY) {
+        return buildFallbackVisitInsights(visitData);
+    }
 
     const prompt = `You are a senior field mentor generating a precise, data-rich Minutes of Meeting (MOM) for a B2B agency visit in the education consultancy sector. Analyze the FULL visit thread — original visit + all followUpMeetings combined.
 
@@ -141,7 +250,7 @@ Return ONLY this JSON, no markdown wrapping:
         return parseGeminiJSON(responseText);
     } catch (error) {
         console.error('generateVisitInsights error:', error);
-        throw error;
+        return buildFallbackVisitInsights(visitData);
     }
 };
 

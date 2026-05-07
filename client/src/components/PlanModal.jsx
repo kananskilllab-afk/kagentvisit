@@ -311,6 +311,7 @@ export default function PlanModal({ defaultDate, editPlan = null, onClose, onSav
                 customAgentNames,
                 plannedStartAt: new Date(details.plannedStartAt).toISOString(),
                 plannedEndAt: new Date(details.plannedEndAt).toISOString(),
+                syncToGoogle: true,
             };
 
             let plan;
