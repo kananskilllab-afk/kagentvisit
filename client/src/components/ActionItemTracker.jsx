@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Plus, CheckCircle2, Circle, Trash2, History, Loader2, StickyNote, CalendarClock } from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronDown, Plus, CheckCircle2, Circle, Trash2, History, Loader2, StickyNote, CalendarClock } from 'lucide-react';
 import api from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -21,6 +21,89 @@ const formatDate = (value) => {
     return new Date(value).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 };
 
+const UserSearchInput = ({ value, onChange, options }) => {
+    const [query, setQuery] = useState('');
+    const [open, setOpen] = useState(false);
+    const ref = useRef(null);
+
+    const selected = options.find(u => u._id === value);
+
+    const filtered = useMemo(() => {
+        if (!query.trim()) return options;
+        const q = query.toLowerCase();
+        return options.filter(u => u.name.toLowerCase().includes(q));
+    }, [query, options]);
+
+    useEffect(() => {
+        const handleOutside = (e) => {
+            if (ref.current && !ref.current.contains(e.target)) {
+                setOpen(false);
+                setQuery('');
+            }
+        };
+        document.addEventListener('mousedown', handleOutside);
+        return () => document.removeEventListener('mousedown', handleOutside);
+    }, []);
+
+    const select = (id) => {
+        onChange(id);
+        setQuery('');
+        setOpen(false);
+    };
+
+    return (
+        <div ref={ref} className="relative">
+            <div
+                className="input-field h-10 flex items-center gap-2 cursor-pointer select-none"
+                onClick={() => setOpen(v => !v)}
+            >
+                {open ? (
+                    <input
+                        autoFocus
+                        value={query}
+                        onChange={e => setQuery(e.target.value)}
+                        onClick={e => e.stopPropagation()}
+                        className="flex-1 outline-none bg-transparent text-sm font-medium text-slate-800 min-w-0"
+                        placeholder="Search user..."
+                    />
+                ) : (
+                    <span className={`flex-1 text-sm truncate ${selected ? 'font-semibold text-slate-800' : 'text-slate-400'}`}>
+                        {selected ? selected.name : 'Unassigned'}
+                    </span>
+                )}
+                <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
+            </div>
+            {open && (
+                <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-52 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                    <button
+                        type="button"
+                        className={`w-full px-3 py-2.5 text-left text-sm hover:bg-slate-50 ${!value ? 'font-bold text-brand-blue bg-brand-blue/5' : 'text-slate-400 font-medium'}`}
+                        onClick={() => select('')}
+                    >
+                        Unassigned
+                    </button>
+                    {filtered.map(u => (
+                        <button
+                            key={u._id}
+                            type="button"
+                            className={`w-full px-3 py-2.5 text-left text-sm hover:bg-slate-50 flex items-center justify-between gap-2 ${u._id === value ? 'font-bold text-brand-blue bg-brand-blue/5' : 'font-medium text-slate-700'}`}
+                            onClick={() => select(u._id)}
+                        >
+                            <span className="truncate">{u.name}</span>
+                            {u.employeeId && (
+                                <span className="shrink-0 text-[10px] text-slate-400 font-normal">#{u.employeeId}</span>
+                            )}
+                        </button>
+                    ))}
+                    {filtered.length === 0 && (
+                        <div className="px-3 py-3 text-sm text-slate-400 text-center">No users found</div>
+                    )}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const ActionItemTracker = ({
     value,
     onChange,
@@ -29,7 +112,7 @@ const ActionItemTracker = ({
     compact = false,
     title = 'Action Items'
 }) => {
-    const { user, isAdmin } = useAuth();
+    const { user } = useAuth();
     const [items, setItems] = useState(Array.isArray(value) ? value : []);
     const [draft, setDraft] = useState(makeDraftItem());
     const [noteByItem, setNoteByItem] = useState({});
@@ -61,16 +144,16 @@ const ActionItemTracker = ({
     }, [visitId, isPersisted]);
 
     useEffect(() => {
-        if (!isAdmin) return;
+        if (!canEdit) return;
         api.get('/users/assignable')
             .then(res => setAssignableUsers(res.data.data || []))
             .catch(() => setAssignableUsers([]));
-    }, [isAdmin]);
+    }, [canEdit]);
 
     const assigneeOptions = useMemo(() => {
         const map = new Map();
         if (user?._id) map.set(user._id, { _id: user._id, name: `${user.name || 'Me'} (me)` });
-        assignableUsers.forEach(u => map.set(u._id, u));
+        assignableUsers.forEach(u => { if (!map.has(u._id)) map.set(u._id, u); });
         return Array.from(map.values());
     }, [assignableUsers, user]);
 
@@ -189,29 +272,21 @@ const ActionItemTracker = ({
 
             {canEdit && (
                 <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr_160px_150px_auto] gap-2">
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_180px_150px_auto] gap-2">
                         <input
                             value={draft.text}
                             onChange={e => updateDraft({ text: e.target.value })}
                             onKeyDown={e => {
-                                if (e.key === 'Enter') {
-                                    e.preventDefault();
-                                    addItem();
-                                }
+                                if (e.key === 'Enter') { e.preventDefault(); addItem(); }
                             }}
                             className="input-field h-10"
                             placeholder="Add a follow-up action..."
                         />
-                        <select
+                        <UserSearchInput
                             value={draft.assignee}
-                            onChange={e => updateDraft({ assignee: e.target.value })}
-                            className="input-field h-10"
-                        >
-                            <option value="">Unassigned</option>
-                            {assigneeOptions.map(option => (
-                                <option key={option._id} value={option._id}>{option.name}</option>
-                            ))}
-                        </select>
+                            onChange={v => updateDraft({ assignee: v })}
+                            options={assigneeOptions}
+                        />
                         <input
                             type="date"
                             min={todayIso()}

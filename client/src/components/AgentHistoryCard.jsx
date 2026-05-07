@@ -39,7 +39,7 @@ const AgentHistoryCard = ({ agentId, agentName, compact = false, onOpenItems }) 
             }
         };
         loadHistory();
-    }, [agentId, user?.role]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [agentId, user?.role]);
 
     if (!agentId || user?.role === 'home_visit') return null;
 

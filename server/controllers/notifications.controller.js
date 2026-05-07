@@ -8,6 +8,7 @@ exports.getNotifications = async (req, res) => {
 
         const notifications = await Notification.find(query)
             .populate('claimRef', 'claimNumber status totalAmount')
+            .populate('visitRef', '_id meta studentInfo')
             .sort({ createdAt: -1 })
             .limit(parseInt(req.query.limit) || 50);
 

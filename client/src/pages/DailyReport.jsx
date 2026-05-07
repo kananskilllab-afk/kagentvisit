@@ -1,11 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Loader2, CheckCircle, ChevronDown } from 'lucide-react';
+import { FileText, Loader2, CheckCircle } from 'lucide-react';
 import api from '../utils/api';
+import MultiSelect from '../components/shared/MultiSelect';
+
+const BDM_NAMES = [
+    'Bikal Singh',
+    'Dilip Siyag',
+    'Sachin Shah',
+    'Parth Harumalani',
+    'Archana Vishwakarma',
+    'Davidayal',
+    'Tisha',
+    'Palash Thakore',
+    'Shubham Mahavar',
+    'Archi Patel'
+];
 
 const defaultForm = {
     date: new Date().toISOString().slice(0, 10),
-    bdmName: '',
+    bdmName: [],
     leaveToday: '',
     location: '',
     numberOfMeetings: ''
@@ -14,29 +28,42 @@ const defaultForm = {
 const DailyReport = () => {
     const navigate = useNavigate();
     const [form, setForm] = useState(defaultForm);
-    const [bdmUsers, setBdmUsers] = useState([]);
-    const [loadingUsers, setLoadingUsers] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    const [errors, setErrors] = useState({});
 
-    useEffect(() => {
-        api.get('/daily-report/bdm-names')
-            .then(res => setBdmUsers(res.data.data || []))
-            .catch(() => setBdmUsers([]))
-            .finally(() => setLoadingUsers(false));
-    }, []);
+    const set = (field, value) => {
+        setForm(prev => ({ ...prev, [field]: value }));
+        setErrors(prev => { const next = { ...prev }; delete next[field]; return next; });
+    };
 
-    const set = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
+    const handleLeaveChange = (val) => {
+        setErrors(prev => { const next = { ...prev }; delete next.leaveToday; return next; });
+        setForm(prev => ({
+            ...prev,
+            leaveToday: val,
+            ...(val === 'Yes' ? { location: '', numberOfMeetings: '' } : {})
+        }));
+    };
+
+    const validate = () => {
+        const errs = {};
+        if (!form.bdmName.length) errs.bdmName = 'Please select at least one BDM Name.';
+        if (!form.leaveToday) errs.leaveToday = 'Please select Leave Today status.';
+        setErrors(errs);
+        return Object.keys(errs).length === 0;
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!form.bdmName) return alert('Please select a BDM Name.');
-        if (!form.leaveToday) return alert('Please select Leave Today status.');
+        if (!validate()) return;
         setSubmitting(true);
         try {
             await api.post('/daily-report', {
                 ...form,
-                numberOfMeetings: Number(form.numberOfMeetings) || 0
+                bdmName: form.bdmName.join(', '),
+                bdmNames: form.bdmName,
+                numberOfMeetings: form.leaveToday === 'Yes' ? 0 : (Number(form.numberOfMeetings) || 0)
             });
             setSubmitted(true);
         } catch (err) {
@@ -45,6 +72,8 @@ const DailyReport = () => {
             setSubmitting(false);
         }
     };
+
+    const isOnLeave = form.leaveToday === 'Yes';
 
     if (submitted) {
         return (
@@ -58,7 +87,7 @@ const DailyReport = () => {
                 </div>
                 <div className="flex gap-3">
                     <button
-                        onClick={() => { setForm(defaultForm); setSubmitted(false); }}
+                        onClick={() => { setForm(defaultForm); setSubmitted(false); setErrors({}); }}
                         className="btn-outline px-6 py-2.5"
                     >
                         Submit Another
@@ -73,13 +102,12 @@ const DailyReport = () => {
 
     return (
         <div className="space-y-5 page-enter max-w-xl mx-auto">
-            {/* Header */}
             <div>
                 <h1 className="page-title flex items-center gap-2">
                     <FileText className="w-6 h-6 text-brand-blue" />
-                    Daily Report
+                    Daily Business Development Report
                 </h1>
-                <p className="page-subtitle">Submit your end-of-day activity report</p>
+                <p className="page-subtitle">Daily tracking of demos, new accounts, and revenue.</p>
             </div>
 
             <form onSubmit={handleSubmit} className="card space-y-5">
@@ -96,28 +124,16 @@ const DailyReport = () => {
                     />
                 </div>
 
-                {/* 2. BDM Name */}
+                {/* 2. BDM Name (multi-select) */}
                 <div>
                     <label className="label">BDM Name <span className="text-red-500">*</span></label>
-                    <div className="relative">
-                        <select
-                            className="input-field appearance-none pr-9"
-                            value={form.bdmName}
-                            onChange={e => set('bdmName', e.target.value)}
-                            required
-                            disabled={loadingUsers}
-                        >
-                            <option value="">
-                                {loadingUsers ? 'Loading...' : 'Select BDM'}
-                            </option>
-                            {bdmUsers.map(u => (
-                                <option key={u._id} value={u.name}>
-                                    {u.name}{u.employeeId ? ` (${u.employeeId})` : ''}
-                                </option>
-                            ))}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
-                    </div>
+                    <MultiSelect
+                        options={BDM_NAMES}
+                        value={form.bdmName}
+                        onChange={v => set('bdmName', v)}
+                        placeholder="Select BDM(s)..."
+                    />
+                    {errors.bdmName && <p className="text-red-500 text-xs mt-1">{errors.bdmName}</p>}
                 </div>
 
                 {/* 3. Leave Today */}
@@ -134,7 +150,9 @@ const DailyReport = () => {
                                             : opt === 'No'
                                                 ? 'border-brand-blue bg-brand-blue/5 text-brand-blue'
                                                 : 'border-brand-orange bg-brand-orange/5 text-brand-orange'
-                                        : 'border-slate-200 text-slate-500 hover:border-slate-300'
+                                        : errors.leaveToday
+                                            ? 'border-red-300 text-slate-500'
+                                            : 'border-slate-200 text-slate-500 hover:border-slate-300'
                                 }`}
                             >
                                 <input
@@ -142,39 +160,50 @@ const DailyReport = () => {
                                     name="leaveToday"
                                     value={opt}
                                     checked={form.leaveToday === opt}
-                                    onChange={() => set('leaveToday', opt)}
+                                    onChange={() => handleLeaveChange(opt)}
                                     className="sr-only"
                                 />
                                 {opt}
                             </label>
                         ))}
                     </div>
+                    {errors.leaveToday && <p className="text-red-500 text-xs mt-1">{errors.leaveToday}</p>}
                 </div>
 
-                {/* 4. Location */}
-                <div>
-                    <label className="label">Location</label>
-                    <input
-                        type="text"
-                        className="input-field"
-                        placeholder="e.g. Ahmedabad, Gujarat"
-                        value={form.location}
-                        onChange={e => set('location', e.target.value)}
-                    />
-                </div>
+                {/* On leave notice — form ends */}
+                {isOnLeave && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-700">
+                        You're marked as on leave — no further details needed. Submit when ready.
+                    </div>
+                )}
 
-                {/* 5. Number of Meetings */}
-                <div>
-                    <label className="label">Number of Meetings</label>
-                    <input
-                        type="number"
-                        min="0"
-                        className="input-field"
-                        placeholder="0"
-                        value={form.numberOfMeetings}
-                        onChange={e => set('numberOfMeetings', e.target.value)}
-                    />
-                </div>
+                {/* Location & Meetings — hidden when on leave */}
+                {!isOnLeave && (
+                    <>
+                        <div>
+                            <label className="label">Location</label>
+                            <input
+                                type="text"
+                                className="input-field"
+                                placeholder="e.g. Ahmedabad, Gujarat"
+                                value={form.location}
+                                onChange={e => set('location', e.target.value)}
+                            />
+                        </div>
+
+                        <div>
+                            <label className="label">Number of Meetings</label>
+                            <input
+                                type="number"
+                                min="0"
+                                className="input-field"
+                                placeholder="0"
+                                value={form.numberOfMeetings}
+                                onChange={e => set('numberOfMeetings', e.target.value)}
+                            />
+                        </div>
+                    </>
+                )}
 
                 {/* Actions */}
                 <div className="flex gap-3 pt-2">

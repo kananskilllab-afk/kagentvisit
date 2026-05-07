@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "buildCommand": "npm install --prefix client && npm run build --prefix client",
+  "installCommand": "npm install --audit=false --fund=false --prefix server && npm install --audit=false --fund=false --prefix client",
+  "buildCommand": "npm run build --prefix client",
   "outputDirectory": "client/dist",
   "functions": {
     "api/index.js": {
-      "memory": 1024,
       "maxDuration": 30
     }
   },

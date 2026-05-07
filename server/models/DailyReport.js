@@ -8,6 +8,7 @@ const dailyReportSchema = new mongoose.Schema({
     },
     date:             { type: Date, required: true },
     bdmName:          { type: String, required: true, trim: true },
+    bdmNames:         [{ type: String, trim: true }],
     leaveToday:       { type: String, enum: ['Yes', 'No', 'On Travel'], required: true },
     location:         { type: String, trim: true },
     numberOfMeetings: { type: Number, min: 0, default: 0 },

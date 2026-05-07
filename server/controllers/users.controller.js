@@ -2,15 +2,18 @@ const User = require('../models/User');
 
 const USER_DELETE_OWNER_EMAIL = 'superadmin@kanan.co';
 
-// @desc    Get users assignable for visit creation (admin: their assignedEmployees, superadmin: all)
+// @desc    Get all users searchable for assignment (all authenticated users can call this)
 exports.getAssignableUsers = async (req, res) => {
     try {
         let users;
         if (req.user.role === 'superadmin') {
-            users = await User.find({ isActive: true }).select('-passwordHash').sort({ name: 1 });
+            users = await User.find({ isActive: true }).select('name employeeId role department').sort({ name: 1 });
+        } else if (['admin', 'hod'].includes(req.user.role)) {
+            const me = await User.findById(req.user._id).populate('assignedEmployees', 'name employeeId role department');
+            users = (me?.assignedEmployees || []).filter(u => u.isActive);
         } else {
-            const admin = await User.findById(req.user._id).populate('assignedEmployees', '-passwordHash');
-            users = (admin.assignedEmployees || []).filter(u => u.isActive);
+            // Regular users, home_visit, accounts, regional_bdm — all active users are searchable
+            users = await User.find({ isActive: true }).select('name employeeId role department').sort({ name: 1 });
         }
         res.json({ success: true, data: users });
     } catch (error) {

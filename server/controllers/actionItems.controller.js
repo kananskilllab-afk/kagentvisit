@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const Visit = require('../models/Visit');
 const User = require('../models/User');
 const AuditLog = require('../models/AuditLog');
+const { notifyActionItemAssigned } = require('../services/notification.service');
 
 async function canMutateActionItem(user, visit) {
     if (!visit) return false;
@@ -122,7 +123,12 @@ exports.createActionItem = async (req, res) => {
         );
 
         auditActionItem(req, 'ACTION_ITEM_CREATE', newItem, req.params.id);
-        
+
+        if (assignee && String(assignee) !== String(req.user._id)) {
+            notifyActionItemAssigned(newItem, req.params.id, req.user, assignee)
+                .catch(err => console.error('[ActionItems] Assign notification failed:', err.message));
+        }
+
         return res.status(201).json({ success: true, data: newItem });
     } catch (err) {
         console.error('[ActionItems]', err);
@@ -163,6 +169,13 @@ exports.updateActionItem = async (req, res) => {
             .populate('actionItems.history.by', 'name employeeId');
 
         auditActionItem(req, 'ACTION_ITEM_EDIT', item, req.params.id);
+
+        const prevAssignee = item.assignee?.toString() || '';
+        const newAssignee = assignee?.toString() || '';
+        if (newAssignee && newAssignee !== prevAssignee && newAssignee !== String(req.user._id)) {
+            notifyActionItemAssigned({ text, dueDate }, req.params.id, req.user, newAssignee)
+                .catch(err => console.error('[ActionItems] Reassign notification failed:', err.message));
+        }
 
         return res.status(200).json({ success: true, data: updated.actionItems.id(req.params.itemId) });
     } catch (err) {

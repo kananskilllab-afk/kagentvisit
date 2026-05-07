@@ -17,7 +17,7 @@ router.route('/')
     .get(authorize('admin', 'accounts', 'superadmin'), getUsers)
     .post(authorize('superadmin'), createUser);
 
-router.get('/assignable', authorize('admin', 'superadmin'), getAssignableUsers);
+router.get('/assignable', getAssignableUsers);
 router.post('/bulk-import', authorize('superadmin'), bulkImportUsers);
 
 router.route('/:id')

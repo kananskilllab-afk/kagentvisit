@@ -4,8 +4,10 @@ const postDemoFeedbackSchema = new mongoose.Schema({
     submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
     // Demo Info
-    demoBookedBy:      { type: String, trim: true },
-    demoConductedBy:   { type: String, trim: true },
+    demoBookedBy:        { type: String, trim: true },
+    demoBookedByList:    [{ type: String, trim: true }],
+    demoConductedBy:     { type: String, trim: true },
+    demoConductedByList: [{ type: String, trim: true }],
     demoDate:          { type: Date },
     customerEmail:     { type: String, trim: true, lowercase: true },
     mediumOfMeeting:   { type: String, enum: ['In person', 'Online', ''] },

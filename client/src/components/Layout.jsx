@@ -6,7 +6,8 @@ import ErrorBoundary from './ErrorBoundary';
 import {
     LayoutDashboard, PlusCircle, Users, BarChart3,
     Settings, LogOut, Menu, X, User as UserIcon,
-    ChevronRight, List, Building2, Receipt, FileText, CalendarDays, ClipboardList
+    ChevronRight, List, Building2, Receipt, FileText, CalendarDays, ClipboardList,
+    CheckCircle2, XCircle, AlertCircle, DollarSign, Eye, Bell, Clock
 } from 'lucide-react';
 import { NotifBell } from '../design';
 
@@ -113,40 +114,94 @@ const workspaceLabelFor = (user) => {
     return user.department || user.role || 'Team';
 };
 
+const NOTIF_TYPE_CONFIG = {
+    claim_submitted:           { label: 'Claim',    icon: FileText,     color: 'text-amber-600',  bg: 'bg-amber-50' },
+    claim_approved:            { label: 'Approved', icon: CheckCircle2, color: 'text-green-600',  bg: 'bg-green-50' },
+    claim_rejected:            { label: 'Rejected', icon: XCircle,      color: 'text-red-600',    bg: 'bg-red-50' },
+    claim_needs_justification: { label: 'Action',   icon: AlertCircle,  color: 'text-yellow-600', bg: 'bg-yellow-50' },
+    claim_paid:                { label: 'Paid',     icon: DollarSign,   color: 'text-green-600',  bg: 'bg-green-50' },
+    claim_under_review:        { label: 'Review',   icon: Eye,          color: 'text-blue-600',   bg: 'bg-blue-50' },
+    expense_reminder:          { label: 'Reminder', icon: Bell,         color: 'text-orange-600', bg: 'bg-orange-50' },
+    visit_reminder:            { label: 'Visit',    icon: CalendarDays, color: 'text-blue-600',   bg: 'bg-blue-50' },
+    action_item_overdue:       { label: 'Overdue',  icon: Clock,        color: 'text-red-600',    bg: 'bg-red-50' },
+    action_item_assigned:      { label: 'Assigned', icon: ClipboardList,color: 'text-purple-600', bg: 'bg-purple-50' },
+};
+
+const timeAgo = (date) => {
+    const s = Math.floor((Date.now() - new Date(date)) / 1000);
+    if (s < 60) return 'just now';
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ago`;
+    const d = Math.floor(h / 24);
+    if (d < 7) return `${d}d ago`;
+    return new Date(date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+};
+
+const notifLink = (n) => {
+    if (n.claimRef?._id) return `/expenses/claims/${n.claimRef._id}`;
+    if (n.visitRef?._id) return `/visits/${n.visitRef._id}`;
+    return '/';
+};
+
 const NotificationsMenu = ({ notifications, unreadCount, open, onToggle, onMarkRead }) => (
     <div className="relative">
         <NotifBell count={unreadCount} onClick={onToggle} />
         {open && (
-            <div className="absolute right-0 top-11 z-50 w-80 overflow-hidden rounded-xl border border-meridian-border bg-white shadow-2xl">
+            <div className="absolute right-0 top-11 z-50 w-96 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
                 <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-                    <p className="text-xs font-black uppercase tracking-widest text-slate-500">Notifications</p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-xs font-black uppercase tracking-widest text-slate-500">Notifications</p>
+                        {unreadCount > 0 && (
+                            <span className="rounded-full bg-brand-blue px-2 py-0.5 text-[10px] font-black text-white leading-none">
+                                {unreadCount}
+                            </span>
+                        )}
+                    </div>
                     {unreadCount > 0 && (
                         <button onClick={onMarkRead} className="text-xs font-bold text-brand-blue hover:underline">
                             Mark all read
                         </button>
                     )}
                 </div>
-                <div className="max-h-80 overflow-y-auto">
+                <div className="max-h-[28rem] overflow-y-auto divide-y divide-slate-100">
                     {notifications.length === 0 ? (
-                        <div className="px-4 py-8 text-center text-sm font-semibold text-slate-400">
-                            No notifications yet.
+                        <div className="px-4 py-10 text-center">
+                            <Bell className="mx-auto mb-2 w-8 h-8 text-slate-200" />
+                            <p className="text-sm font-semibold text-slate-400">No notifications yet.</p>
                         </div>
-                    ) : notifications.map(n => (
-                        <Link
-                            key={n._id}
-                            to={n.claimRef?._id ? `/expenses/claims/${n.claimRef._id}` : '/'}
-                            onClick={onToggle}
-                            className={`block border-b border-slate-100 px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-slate-50 ${!n.isRead ? 'bg-blue-50/50' : 'bg-white'}`}
-                        >
-                            <div className="flex items-start gap-2">
-                                {!n.isRead && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand-blue" />}
-                                <div className="min-w-0 flex-1">
-                                    <p className="truncate text-sm font-extrabold text-slate-800">{n.title}</p>
-                                    <p className="mt-0.5 line-clamp-2 text-xs font-medium text-slate-500">{n.message}</p>
+                    ) : notifications.map(n => {
+                        const cfg = NOTIF_TYPE_CONFIG[n.type] || { label: 'Info', icon: Bell, color: 'text-slate-500', bg: 'bg-slate-50' };
+                        const Icon = cfg.icon;
+                        return (
+                            <Link
+                                key={n._id}
+                                to={notifLink(n)}
+                                onClick={onToggle}
+                                className={`flex gap-3 px-4 py-3 transition-colors hover:bg-slate-50 ${!n.isRead ? 'bg-blue-50/40' : 'bg-white'}`}
+                            >
+                                <div className={`shrink-0 mt-0.5 w-8 h-8 rounded-lg ${cfg.bg} flex items-center justify-center`}>
+                                    <Icon className={`w-4 h-4 ${cfg.color}`} />
                                 </div>
-                            </div>
-                        </Link>
-                    ))}
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-start justify-between gap-2 mb-0.5">
+                                        <p className="text-sm font-bold text-slate-800 leading-snug">{n.title}</p>
+                                        <span className="shrink-0 text-[10px] font-semibold text-slate-400 whitespace-nowrap mt-0.5">
+                                            {timeAgo(n.createdAt)}
+                                        </span>
+                                    </div>
+                                    <p className="line-clamp-2 text-xs text-slate-500 leading-relaxed">{n.message}</p>
+                                    <span className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${cfg.bg} ${cfg.color}`}>
+                                        {cfg.label}
+                                    </span>
+                                </div>
+                                {!n.isRead && (
+                                    <div className="shrink-0 mt-2 w-2 h-2 rounded-full bg-brand-blue" />
+                                )}
+                            </Link>
+                        );
+                    })}
                 </div>
             </div>
         )}

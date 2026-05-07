@@ -1,11 +1,13 @@
 const mongoose = require('mongoose');
 
 const partnerSchema = new mongoose.Schema({
-    name:        { type: String, trim: true },
-    status:      { type: String, enum: ['New', 'Existing', ''] },
-    city:        { type: String, trim: true },
-    gmbLink:     { type: String, trim: true },
-    interestedIn:{ type: String, enum: ['Admission', 'Academy', 'Both', ''] }
+    name:             { type: String, trim: true },
+    status:           { type: String, enum: ['New', 'Existing', ''] },
+    statuses:         [{ type: String, trim: true }],
+    city:             { type: String, trim: true },
+    gmbLink:          { type: String, trim: true },
+    interestedIn:     { type: String, enum: ['Admission', 'Academy', 'Both', ''] },
+    interestedInList: [{ type: String, trim: true }]
 }, { _id: false });
 
 const postFieldDaySchema = new mongoose.Schema({
@@ -16,13 +18,14 @@ const postFieldDaySchema = new mongoose.Schema({
     },
     date: { type: Date, required: true },
     representativeName: { type: String, required: true },
+    representativeNames: [{ type: String, trim: true }],
     leaveToday: { type: Boolean, required: true },
     todaysLocation: { type: String, trim: true },
     workMode: {
         type: String,
-        enum: ['On field', 'Work from home', 'Other'],
-        required: true
+        enum: ['On field', 'Work from home', 'Other', '']
     },
+    workModes: [{ type: String, trim: true }],
     workModeOther: { type: String, trim: true },
 
     visitsPlanned:  { type: Number, default: 0 },

@@ -30,13 +30,14 @@ const findAccountsUsers = async () => {
 /**
  * Create a notification record and optionally send email
  */
-const createNotification = async ({ recipient, type, title, message, claimRef, sendEmailFlag = true }) => {
+const createNotification = async ({ recipient, type, title, message, claimRef, visitRef, sendEmailFlag = true }) => {
     const notification = await Notification.create({
         recipient: recipient._id || recipient,
         type,
         title,
         message,
-        claimRef
+        ...(claimRef ? { claimRef } : {}),
+        ...(visitRef ? { visitRef } : {})
     });
 
     if (sendEmailFlag && recipient.email) {
@@ -133,10 +134,37 @@ const notifyClaimStatusChange = async (claim, newStatus, changedBy, comment) => 
     await sendEmail({ to: submitter.email, ...emailTemplate });
 };
 
+/**
+ * Notify a user when an action item is assigned to them
+ */
+const notifyActionItemAssigned = async (actionItem, visitId, assigner, assigneeId) => {
+    try {
+        const assigneeUser = await User.findById(assigneeId).select('_id name email');
+        if (!assigneeUser) return;
+        if (String(assigneeUser._id) === String(assigner._id)) return;
+
+        const duePart = actionItem.dueDate
+            ? ` · Due ${new Date(actionItem.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}`
+            : '';
+
+        await createNotification({
+            recipient: assigneeUser,
+            type: 'action_item_assigned',
+            title: `Action item assigned by ${assigner.name}`,
+            message: `"${actionItem.text}"${duePart}`,
+            visitRef: visitId,
+            sendEmailFlag: false
+        });
+    } catch (err) {
+        console.error('[NotificationService] notifyActionItemAssigned failed:', err.message);
+    }
+};
+
 module.exports = {
     findAdminsForUser,
     findAccountsUsers,
     createNotification,
     notifyClaimSubmitted,
-    notifyClaimStatusChange
+    notifyClaimStatusChange,
+    notifyActionItemAssigned
 };

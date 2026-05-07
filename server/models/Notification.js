@@ -10,15 +10,16 @@ const notificationSchema = new mongoose.Schema({
         type: String,
         required: true,
         enum: [
-            'claim_submitted',       // Sent to accounts/admin when user submits
-            'claim_approved',        // Sent to user when approved
-            'claim_rejected',        // Sent to user when rejected
-            'claim_needs_justification', // Sent to user when justification requested
-            'claim_paid',            // Sent to user when paid
-            'claim_under_review',    // Sent to user when review starts
-            'expense_reminder',      // Generic expense reminder
-            'visit_reminder',        // Scheduled visit reminder
-            'action_item_overdue'
+            'claim_submitted',            // Sent to accounts/admin when user submits
+            'claim_approved',             // Sent to user when approved
+            'claim_rejected',             // Sent to user when rejected
+            'claim_needs_justification',  // Sent to user when justification requested
+            'claim_paid',                 // Sent to user when paid
+            'claim_under_review',         // Sent to user when review starts
+            'expense_reminder',           // Generic expense reminder
+            'visit_reminder',             // Scheduled visit reminder
+            'action_item_overdue',        // Action item past due date
+            'action_item_assigned'        // Sent to user when an action item is assigned to them
         ]
     },
     title: {

@@ -5,6 +5,21 @@ import {
     Phone, BarChart3, TrendingUp, CalendarDays, AlertCircle
 } from 'lucide-react';
 import api from '../utils/api';
+import MultiSelect from '../components/shared/MultiSelect';
+
+const STAFF_NAMES = [
+    'Bikal Singh',
+    'Sachin Shah',
+    'Dilip Siyag',
+    'Parth Harumalani',
+    'Archana Vishwakarma',
+    'Bhumika Manohar',
+    'Davidayal',
+    'Tisha',
+    'Avinash',
+    'Palash Thakore',
+    'Shubham Mahavar'
+];
 
 // ── Reusable field components ─────────────────────────────────────────────────
 
@@ -119,7 +134,7 @@ const SectionCard = ({ icon: Icon, title, children }) => (
 // ── Default state & validation ────────────────────────────────────────────────
 
 const defaultForm = {
-    demoBookedBy: '', demoConductedBy: '', demoDate: '', customerEmail: '', mediumOfMeeting: '',
+    demoBookedBy: [], demoConductedBy: [], demoDate: '', customerEmail: '', mediumOfMeeting: '',
     accountBusinessName: '', meetingType: '', meetingTypeOther: '', accountType: '', demoType: '',
     alreadyOnboarded: [], alreadyOnboardedOther: '', leadSource: '', leadSourceOther: '',
     primaryContactName: '', primaryContactDesignation: '', contactNumber: '', city: '', state: '',
@@ -139,7 +154,7 @@ const defaultForm = {
 
 const validate = (form) => {
     const e = {};
-    if (!form.demoConductedBy.trim())   e.demoConductedBy  = 'Required';
+    if (!form.demoConductedBy.length)   e.demoConductedBy  = 'Select at least one';
     if (!form.demoDate)                 e.demoDate         = 'Required';
     if (!form.customerEmail.trim()) {
         e.customerEmail = 'Required';
@@ -208,6 +223,10 @@ const PostDemoFeedback = () => {
         try {
             await api.post('/post-demo-feedback', {
                 ...form,
+                demoBookedBy:        form.demoBookedBy.join(', '),
+                demoBookedByList:    form.demoBookedBy,
+                demoConductedBy:     form.demoConductedBy.join(', '),
+                demoConductedByList: form.demoConductedBy,
                 expectedDealSize:    form.expectedDealSize !== '' ? Number(form.expectedDealSize) : undefined,
                 demoDate:            form.demoDate || undefined,
                 nextFollowUpDate:    form.nextFollowUpDate || undefined,
@@ -265,10 +284,10 @@ const PostDemoFeedback = () => {
                 <SectionCard icon={CalendarDays} title="Demo Information">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Field label="Demo Booked By">
-                            <input type="text" className="input-field" placeholder="Name" value={form.demoBookedBy} onChange={e => set('demoBookedBy', e.target.value)} />
+                            <MultiSelect options={STAFF_NAMES} value={form.demoBookedBy} onChange={v => set('demoBookedBy', v)} placeholder="Select..." />
                         </Field>
                         <Field id="demoConductedBy" label="Demo Conducted By" required error={errors.demoConductedBy}>
-                            <input type="text" className={`input-field ${errors.demoConductedBy ? 'border-red-300' : ''}`} placeholder="Name" value={form.demoConductedBy} onChange={e => set('demoConductedBy', e.target.value)} />
+                            <MultiSelect options={STAFF_NAMES} value={form.demoConductedBy} onChange={v => set('demoConductedBy', v)} placeholder="Select..." />
                         </Field>
                         <Field id="demoDate" label="Demo Date" required error={errors.demoDate}>
                             <input type="date" className={`input-field ${errors.demoDate ? 'border-red-300' : ''}`} value={form.demoDate} onChange={e => set('demoDate', e.target.value)} />

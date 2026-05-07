@@ -33,7 +33,8 @@
       "Skill(gsd:progress)",
       "Skill(gsd:execute-phase)",
       "Bash(git -C \"C:\\\\Users\\\\Kanan\\\\OneDrive\\\\Desktop\\\\Projects\\\\kagent_visit\\\\kagentvisit\" log --oneline -5)",
-      "Bash(npm view *)"
+      "Bash(npm view *)",
+      "WebFetch(domain:docs.google.com)"
     ]
   }
 }

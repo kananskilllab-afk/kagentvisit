@@ -141,7 +141,7 @@ const VisitDetailModal = ({ visit: initialVisit, onClose, onEdit, onVisitUpdated
                 .catch(err => setAuditError(err.response?.data?.message || 'Audit generation failed.'))
                 .finally(() => setGeneratingAudit(false));
         }
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleStatusUpdate = async () => {
         if (!reviewAction) return;

@@ -1,31 +1,33 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import NewVisit from './pages/NewVisit';
-import VisitsList from './pages/VisitsList';
-import Analytics from './pages/Analytics';
-import UserManagement from './pages/SuperAdmin/UserManagement';
-import PolicyConsole from './pages/SuperAdmin/PolicyConsole';
-import VisitPlanDetail from './pages/VisitPlanDetail';
-import FormBuilder from './pages/FormBuilder';
-import Profile from './pages/Profile';
-import ManageAgent from './pages/ManageAgent';
-import ExpenseList from './pages/Expenses/ExpenseList';
-import AddExpense from './pages/Expenses/AddExpense';
-import ClaimsList from './pages/Expenses/ClaimsList';
-import NewClaim from './pages/Expenses/NewClaim';
-import ClaimDetail from './pages/Expenses/ClaimDetail';
-import ExpenseAnalytics from './pages/Expenses/ExpenseAnalytics';
-import Calendar from './pages/Calendar';
-import PostFieldDay from './pages/PostFieldDay';
-import DailyReport from './pages/DailyReport';
-import PostDemoFeedback from './pages/PostDemoFeedback';
-import PostInPersonVisit from './pages/PostInPersonVisit';
-import FormsAdmin from './pages/FormsAdmin';
-import FormsHub from './pages/FormsHub';
-import DesignSystem from './pages/DesignSystem';
+
+const Login = lazy(() => import('./pages/Login'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const NewVisit = lazy(() => import('./pages/NewVisit'));
+const VisitsList = lazy(() => import('./pages/VisitsList'));
+const Analytics = lazy(() => import('./pages/Analytics'));
+const UserManagement = lazy(() => import('./pages/SuperAdmin/UserManagement'));
+const PolicyConsole = lazy(() => import('./pages/SuperAdmin/PolicyConsole'));
+const VisitPlanDetail = lazy(() => import('./pages/VisitPlanDetail'));
+const FormBuilder = lazy(() => import('./pages/FormBuilder'));
+const Profile = lazy(() => import('./pages/Profile'));
+const ManageAgent = lazy(() => import('./pages/ManageAgent'));
+const ExpenseList = lazy(() => import('./pages/Expenses/ExpenseList'));
+const AddExpense = lazy(() => import('./pages/Expenses/AddExpense'));
+const ClaimsList = lazy(() => import('./pages/Expenses/ClaimsList'));
+const NewClaim = lazy(() => import('./pages/Expenses/NewClaim'));
+const ClaimDetail = lazy(() => import('./pages/Expenses/ClaimDetail'));
+const ExpenseAnalytics = lazy(() => import('./pages/Expenses/ExpenseAnalytics'));
+const Calendar = lazy(() => import('./pages/Calendar'));
+const PostFieldDay = lazy(() => import('./pages/PostFieldDay'));
+const DailyReport = lazy(() => import('./pages/DailyReport'));
+const PostDemoFeedback = lazy(() => import('./pages/PostDemoFeedback'));
+const PostInPersonVisit = lazy(() => import('./pages/PostInPersonVisit'));
+const FormsAdmin = lazy(() => import('./pages/FormsAdmin'));
+const FormsHub = lazy(() => import('./pages/FormsHub'));
+const DesignSystem = lazy(() => import('./pages/DesignSystem'));
 
 const ProtectedRoute = ({ children, roles, formAccess }) => {
     const { user } = useAuth();
@@ -37,11 +39,18 @@ const ProtectedRoute = ({ children, roles, formAccess }) => {
     return children;
 };
 
+const PageFallback = () => (
+    <div className="min-h-dvh bg-slate-50 flex items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-slate-200 border-t-brand-blue" />
+    </div>
+);
+
 function App() {
     return (
         <Router>
-            <Routes>
-                <Route path="/login" element={<Login />} />
+            <Suspense fallback={<PageFallback />}>
+                <Routes>
+                    <Route path="/login" element={<Login />} />
 
                 <Route path="/" element={
                     <ProtectedRoute>
@@ -161,8 +170,9 @@ function App() {
                     <Route path="/design-system" element={<DesignSystem />} />
                 )}
 
-                <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+            </Suspense>
         </Router>
     );
 }
