@@ -2,12 +2,13 @@ import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
+import { Analytics } from '@vercel/analytics/react';
 
 const Login = lazy(() => import('./pages/Login'));
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const NewVisit = lazy(() => import('./pages/NewVisit'));
 const VisitsList = lazy(() => import('./pages/VisitsList'));
-const Analytics = lazy(() => import('./pages/Analytics'));
+const AnalyticsPage = lazy(() => import('./pages/Analytics'));
 const UserManagement = lazy(() => import('./pages/SuperAdmin/UserManagement'));
 const PolicyConsole = lazy(() => import('./pages/SuperAdmin/PolicyConsole'));
 const VisitPlanDetail = lazy(() => import('./pages/VisitPlanDetail'));
@@ -47,9 +48,10 @@ const PageFallback = () => (
 
 function App() {
     return (
-        <Router>
-            <Suspense fallback={<PageFallback />}>
-                <Routes>
+        <>
+            <Router>
+                <Suspense fallback={<PageFallback />}>
+                    <Routes>
                     <Route path="/login" element={<Login />} />
 
                 <Route path="/" element={
@@ -68,7 +70,7 @@ function App() {
                     } />
                     <Route path="analytics" element={
                         <ProtectedRoute roles={['admin', 'superadmin']}>
-                            <Analytics />
+                            <AnalyticsPage />
                         </ProtectedRoute>
                     } />
                     <Route path="users" element={
@@ -174,6 +176,8 @@ function App() {
                 </Routes>
             </Suspense>
         </Router>
+        <Analytics />
+        </>
     );
 }
 
